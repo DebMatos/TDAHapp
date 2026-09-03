@@ -73,3 +73,23 @@ export const INITIAL_TIMELINE_BLOCKS = [
     tasks: [],
   },
 ];
+
+export const INITIAL_TASKS = INITIAL_TIMELINE_BLOCKS.flatMap((block) => {
+  let currentMinute = block.startHour * 60;
+
+  return (block.tasks || []).map((task) => {
+    const startMinsPlanned =
+      task.startMinsPlanned ?? currentMinute;
+
+    currentMinute =
+      startMinsPlanned + (task.timeMinutes || 30);
+
+    return {
+      ...task,
+      startMinsPlanned,
+    };
+  });
+});
+export const TIMELINE_PERIODS = INITIAL_TIMELINE_BLOCKS.map(
+  ({ tasks, ...period }) => period
+);

@@ -23,12 +23,16 @@ import TimeBar from '../components/TimeBar';
 import AccordionItem from '../components/Accordion';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import EditTaskModal from '../components/modals/EditTaskModal';
-import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';
-
+import {
+  INITIAL_TIMELINE_BLOCKS,
+  INITIAL_TASKS,
+  TIMELINE_PERIODS,
+} from '../utils/acordionData';
 // Ignorar o aviso de compatibilidade nativo que aparece em baixo no ecrã
 LogBox.ignoreLogs(['InteractionManager has been deprecated']);
 
 const STORAGE_KEY = '@my_time_blocks_data_v12';
+const TASKS_STORAGE_KEY = '@my_time_tasks_data_v1';
 const SLOT_HEIGHT = 50;
 
 const formatTimeFromMinutes = (totalMinutes) => {
@@ -66,6 +70,7 @@ const isCurrentTimeInBlock = (startHour, endHour) => {
 
 export default function HomeScreen() {
   const [blocks, setBlocks] = useState(INITIAL_TIMELINE_BLOCKS || []);
+  const [tasks, setTasks] = useState(INITIAL_TASKS || []);
   const [modalVisible, setModalVisible] = useState(false);
   const [targetBlockId, setTargetBlockId] = useState(null);
   const [targetSlotMinutes, setTargetSlotMinutes] = useState(null);
@@ -88,22 +93,72 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const loadStoredBlocks = async () => {
+    const loadStoredData = async () => {
       try {
-        const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-        if (storedData) {
-          const parsed = JSON.parse(storedData);
+        const storedBlocks = await AsyncStorage.getItem(STORAGE_KEY);
+        const storedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+
+        let parsedBlocks = null;
+
+        // 1. Carregar os blocks antigos, enquanto ainda precisamos deles
+        if (storedBlocks) {
+          const parsed = JSON.parse(storedBlocks);
+
           if (Array.isArray(parsed) && parsed.length > 0) {
+            parsedBlocks = parsed;
             setBlocks(parsed);
           }
         }
+
+        // 2. Se já existem tasks no formato novo, são a fonte de verdade
+        if (storedTasks) {
+          const parsed = JSON.parse(storedTasks);
+
+          if (Array.isArray(parsed)) {
+            setTasks(parsed);
+            return;
+          }
+        }
+
+        // 3. Se ainda não existem, migrar as tasks dos blocks antigos
+        if (parsedBlocks) {
+          const migratedTasks = parsedBlocks.flatMap((block) => {
+            let currentMinute = block.startHour * 60;
+
+            return (block.tasks || []).map((task) => {
+              const startMinsPlanned =
+                task.startMinsPlanned ??
+                (task.timeOfDay
+                  ? parseTimeToMinutes(task.timeOfDay, block.startHour)
+                  : currentMinute);
+
+              currentMinute =
+                startMinsPlanned + (task.timeMinutes || 30);
+
+              return {
+                ...task,
+                startMinsPlanned,
+                timeOfDay:
+                  task.timeOfDay ||
+                  formatTimeFromMinutes(startMinsPlanned),
+              };
+            });
+          });
+
+          setTasks(migratedTasks);
+
+          await AsyncStorage.setItem(
+            TASKS_STORAGE_KEY,
+            JSON.stringify(migratedTasks)
+          );
+        }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('Erro ao carregar/migrar dados:', error);
       }
     };
-    loadStoredBlocks();
-  }, []);
 
+    loadStoredData();
+  }, []);
   const saveBlocks = async (newBlocks) => {
     setBlocks(newBlocks);
     try {
@@ -112,13 +167,40 @@ export default function HomeScreen() {
       console.error('Erro ao guardar:', error);
     }
   };
+  const saveTasks = async (newTasks) => {
+    setTasks(newTasks);
 
+    try {
+      await AsyncStorage.setItem(
+        TASKS_STORAGE_KEY,
+        JSON.stringify(newTasks)
+      );
+    } catch (error) {
+      console.error('Erro ao guardar tarefas:', error);
+    }
+  };
   const buildDraggableGrid = (block) => {
     const blockStartMins = block.startHour * 60;
     const blockEndMins =
       (block.endHour >= block.startHour ? block.endHour : block.endHour + 24) * 60;
 
-    const sortedTasks = [...(block.tasks || [])]
+    const sortedTasks = tasks
+      .filter((task) => {
+        const start = task.startMinsPlanned ?? parseTimeToMinutes(task.timeOfDay);
+
+        const blockStart = block.startHour * 60;
+        const blockEnd =
+          (block.endHour >= block.startHour
+            ? block.endHour
+            : block.endHour + 24) * 60;
+
+        const normalizedStart =
+          block.endHour < block.startHour && start < block.startHour * 60
+            ? start + 24 * 60
+            : start;
+
+        return normalizedStart >= blockStart && normalizedStart < blockEnd;
+      })
       .map((t) => ({
         ...t,
         startMinsPlanned:
@@ -140,7 +222,7 @@ export default function HomeScreen() {
       }
 
       if (taskAtTime) {
-        placedTaskIds.add(taskAtTime.id); 
+        placedTaskIds.add(taskAtTime.id);
         const duration = taskAtTime.timeMinutes || 30;
         items.push({
           id: `task-${taskAtTime.id}`,
@@ -167,48 +249,57 @@ export default function HomeScreen() {
   };
 
   const handleReorder = (blockId, reorderedItems) => {
-    const updatedBlocks = blocks.map((block) => {
-      if (block.id !== blockId) return block;
+    const block = blocks.find((b) => b.id === blockId);
 
-      let clock = block.startHour * 60;
-      const updatedTasks = [];
+    if (!block) return;
 
-      reorderedItems.forEach((item) => {
-        if (item.type === 'task') {
-          updatedTasks.push({
-            ...item.data,
-            startMinsPlanned: clock,
-            timeOfDay: formatTimeFromMinutes(clock),
-          });
-          clock += item.duration;
-        } else {
-          clock += 30;
-        }
-      });
+    let clock = block.startHour * 60;
+    const reorderedTaskUpdates = new Map();
 
-      return { ...block, tasks: updatedTasks };
+    reorderedItems.forEach((item) => {
+      if (item.type === 'task') {
+        reorderedTaskUpdates.set(item.data.id, {
+          startMinsPlanned: clock,
+          timeOfDay: formatTimeFromMinutes(clock),
+        });
+
+        clock += item.duration;
+      } else {
+        clock += 30;
+      }
     });
 
-    saveBlocks(updatedBlocks);
+    const updatedTasks = tasks.map((task) => {
+      const update = reorderedTaskUpdates.get(task.id);
+
+      return update
+        ? {
+          ...task,
+          ...update,
+        }
+        : task;
+    });
+
+    saveTasks(updatedTasks);
   };
 
-  const toggleTask = (blockId, taskId) => {
-    const updated = blocks.map((block) => {
-      if (block.id !== blockId) return block;
-      return {
-        ...block,
-        tasks: (block.tasks || []).map((task) =>
-          task.id === taskId ? { ...task, completed: !task.completed } : task
-        ),
-      };
-    });
-    saveBlocks(updated);
+  const toggleTask = (taskId) => {
+    const updatedTasks = tasks.map((task) =>
+      task.id === taskId
+        ? { ...task, completed: !task.completed }
+        : task
+    );
+
+    saveTasks(updatedTasks);
   };
 
   const handleSaveTask = (blockId, title, durationMinutes) => {
     const targetBlock = blocks.find((b) => b.id === blockId);
     const duration = Math.max(1, Number(durationMinutes) || 30);
-    const startMins = targetSlotMinutes ?? (targetBlock?.startHour || 7) * 60;
+
+    const startMins =
+      targetSlotMinutes ??
+      (targetBlock?.startHour || 7) * 60;
 
     const newTask = {
       id: `task-${Date.now()}`,
@@ -221,51 +312,50 @@ export default function HomeScreen() {
       timeOfDay: formatTimeFromMinutes(startMins),
     };
 
-    const updated = blocks.map((block) => {
-      if (block.id !== blockId) return block;
-      return { ...block, tasks: [...(block.tasks || []), newTask] };
-    });
+    saveTasks([...tasks, newTask]);
 
-    saveBlocks(updated);
     setTargetSlotMinutes(null);
   };
 
   const handleEditTask = (taskId, targetBlockId, changes) => {
-    const updatedBlocks = blocks.map((block) => {
-      const filteredTasks = (block.tasks || []).filter((t) => t.id !== taskId);
+    const targetBlock = blocks.find(
+      (block) => block.id === (targetBlockId || editingTask?.blockId)
+    );
 
-      if (block.id === (targetBlockId || editingTask?.blockId)) {
-        const startMins = parseTimeToMinutes(changes.timeOfDay, block.startHour);
-        const duration = Math.max(1, Number(changes.timeMinutes) || 30);
+    const startMins = parseTimeToMinutes(
+      changes.timeOfDay,
+      targetBlock?.startHour || 7
+    );
 
-        const updatedTask = {
-          ...(editingTask || {}),
+    const duration = Math.max(
+      1,
+      Number(changes.timeMinutes) || 30
+    );
+
+    const updatedTasks = tasks.map((task) =>
+      task.id === taskId
+        ? {
+          ...task,
           ...changes,
           id: taskId,
           timeMinutes: duration,
           startMinsPlanned: startMins,
-          timeOfDay: changes.timeOfDay || formatTimeFromMinutes(startMins),
-        };
+          timeOfDay:
+            changes.timeOfDay ||
+            formatTimeFromMinutes(startMins),
+        }
+        : task
+    );
 
-        return {
-          ...block,
-          tasks: [...filteredTasks, updatedTask],
-        };
-      }
-
-      return { ...block, tasks: filteredTasks };
-    });
-
-    saveBlocks(updatedBlocks);
+    saveTasks(updatedTasks);
     setEditingTask(null);
   };
-
   const handleDeleteTask = (taskId) => {
-    const updated = blocks.map((block) => ({
-      ...block,
-      tasks: (block.tasks || []).filter((task) => task.id !== taskId),
-    }));
-    saveBlocks(updated);
+    const updatedTasks = tasks.filter(
+      (task) => task.id !== taskId
+    );
+
+    saveTasks(updatedTasks);
     setEditingTask(null);
   };
 
@@ -288,10 +378,11 @@ export default function HomeScreen() {
     setExpandedBlocks(nextMap);
   };
 
-  const allTasks = blocks.flatMap((b) => b.tasks || []);
-  const totalCompletedTasks = allTasks.filter((t) => t.completed).length;
-  const totalTasksCount = allTasks.length;
+const totalCompletedTasks = tasks.filter(
+  (task) => task.completed
+).length;
 
+const totalTasksCount = tasks.length;
   const renderSlotItem = ({ item, drag, isActive, blockId }) => {
     const startMins = item.startMins;
     const duration = item.duration;
@@ -332,9 +423,11 @@ export default function HomeScreen() {
     const isShort = duration < 15;
     const slotsCount = Math.max(0.6, duration / 30);
     const cardHeight = Math.max(34, slotsCount * SLOT_HEIGHT - 4);
+    const TaskWrapper =
+      Platform.OS === 'web' ? React.Fragment : ScaleDecorator;
 
     return (
-      <ScaleDecorator>
+      <TaskWrapper>
         <View style={styles.timelineRow}>
           <View style={styles.timeColumn}>
             <Text style={[styles.timeText, isCurrent && styles.timeTextCurrent]}>
@@ -383,14 +476,14 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => toggleTask(blockId, task.id)}
+              onPress={() => toggleTask(task.id)}
               style={[styles.checkboxRound, task.completed && styles.checkboxCompleted]}
             >
               {task.completed && <Ionicons name="checkmark" size={11} color="#FFF" />}
             </TouchableOpacity>
           </TouchableOpacity>
         </View>
-      </ScaleDecorator>
+      </TaskWrapper>
     );
   };
 
@@ -420,8 +513,38 @@ export default function HomeScreen() {
 
       <ScrollContainer contentContainerStyle={styles.content}>
         {blocks.map((block) => {
-          const completedCount = (block.tasks || []).filter((t) => t.completed).length;
-          const totalCount = (block.tasks || []).length;
+
+
+          const blockStartMins = block.startHour * 60;
+
+          const blockEndMins =
+            (block.endHour >= block.startHour
+              ? block.endHour
+              : block.endHour + 24) * 60;
+
+          const blockTasks = tasks.filter((task) => {
+            const start =
+              task.startMinsPlanned ??
+              parseTimeToMinutes(task.timeOfDay);
+
+            const normalizedStart =
+              block.endHour < block.startHour &&
+                start < blockStartMins
+                ? start + 24 * 60
+                : start;
+
+            return (
+              normalizedStart >= blockStartMins &&
+              normalizedStart < blockEndMins
+            );
+          });
+
+          const completedCount = blockTasks.filter(
+            (task) => task.completed
+          ).length;
+
+          const totalCount = blockTasks.length;
+
           const taskProgress = `${completedCount}/${totalCount}`;
 
           const blockDurationHours =
@@ -430,13 +553,18 @@ export default function HomeScreen() {
               : 24 - block.startHour + block.endHour;
 
           const totalBlockSlots = blockDurationHours * 2;
+
           const usedSlots = Math.round(
-            (block.tasks || []).reduce((acc, t) => acc + (t.timeMinutes || 30), 0) / 30
+            blockTasks.reduce(
+              (acc, task) => acc + (task.timeMinutes || 30),
+              0
+            ) / 30
           );
+
           const slotsProgress = `${usedSlots}/${totalBlockSlots} slots`;
 
           const gridItems = buildDraggableGrid(block);
-          
+
           const standardEndMins = (block.endHour >= block.startHour ? block.endHour : block.endHour + 24) * 60;
           const lastItem = gridItems[gridItems.length - 1];
           const actualEndMins = lastItem ? lastItem.startMins + lastItem.duration : standardEndMins;
