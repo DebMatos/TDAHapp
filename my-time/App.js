@@ -9,7 +9,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import HomeScreen from './src/screens/HomeScreen';
-import TodoScreen from './src/screens/TodoScreen';
+import TimelineSpike from './src/screens/TimelineSpike';
 
 const Tab = createBottomTabNavigator();
 
@@ -61,7 +61,7 @@ export default function App() {
             })}
           >
             <Tab.Screen name="Timeline" component={HomeScreen} />
-            <Tab.Screen name="Backlog" component={TodoScreen} />
+            <Tab.Screen name="Backlog" component={TimelineSpike} />
           </Tab.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
