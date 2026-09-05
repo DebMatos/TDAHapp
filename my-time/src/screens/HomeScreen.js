@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LayoutAnimation,
+  Image,
   PanResponder,
   Platform,
   ScrollView,
@@ -19,6 +19,7 @@ import TimeBar from '../components/TimeBar';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import EditTaskModal from '../components/modals/EditTaskModal';
 import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -27,20 +28,20 @@ const STORAGE_KEY = '@my_time_blocks_data_v12';
 const TASKS_STORAGE_KEY = '@my_time_tasks_data_v1';
 
 const DAY_MINUTES = 24 * 60;
-const SNAP_MINUTES = 15;
-
 const MAX_PPM = 1.75;
 const DEFAULT_PPM = 1.25;
 const VERTICAL_PADDING = 20;
-
 const AXIS_WIDTH = 48;
 
-const COLLAPSED_GAP_HEIGHT = 28; // Espaço do botão quando comprimido
-
-const formatHour = (minute) => {
-  const h = Math.floor(minute / 60) % 24;
-  return String(h).padStart(2, '0');
-};
+const TIMELINE_START_MINUTES = 7 * 60;
+const VERTICAL_SEGMENTS = [
+  { start: 7,  duration: 2, color: '#68D391' }, // Verde
+  { start: 9,  duration: 3, color: '#F6E05E' }, // Amarelo
+  { start: 12, duration: 2, color: '#F6AD55' }, // Laranja
+  { start: 14, duration: 4, color: '#FC8181' }, // Vermelho
+  { start: 18, duration: 5, color: '#B794F4' }, // Roxo
+  { start: 23, duration: 8, color: '#7F9CF5' }, // Azul escuro
+];
 
 const formatTimeFromMinutes = (totalMinutes) => {
   const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
@@ -64,9 +65,6 @@ const getPinchDistance = (touches) => {
   return Math.sqrt(dx * dx + dy * dy);
 };
 
-
-
-
 /* -------------------------------------------------------
    SCREEN
 ------------------------------------------------------- */
@@ -84,75 +82,36 @@ export default function TimelineScreen() {
   const [editingTask, setEditingTask] = useState(null);
   const [targetSlotMinutes, setTargetSlotMinutes] = useState(null);
 
-  // Intervalo comprimível (00:00 até às 06:00 da manhã como na tua screenshot)
-  const [isNightCollapsed, setIsNightCollapsed] = useState(true);
-
-  const NIGHT_START = 0 * 60; // 00:00
-  const NIGHT_END = 6 * 60;   // 06:00
-  const NIGHT_DURATION = NIGHT_END - NIGHT_START;
-
-  const toggleNight = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsNightCollapsed((prev) => !prev);
-  };
-
-  /* CÁLCULO DE Y ADAPTATIVO */
   const getVisualY = useCallback(
     (minute) => {
-      if (!isNightCollapsed) {
-        return minute * ppm + VERTICAL_PADDING;
+      let offset = minute - TIMELINE_START_MINUTES;
+      if (offset < 0) {
+        offset += DAY_MINUTES; 
       }
-
-      if (minute <= NIGHT_START) {
-        return minute * ppm + VERTICAL_PADDING;
-      }
-
-      if (minute > NIGHT_START && minute < NIGHT_END) {
-        // Horas dentro do colapso ficam compactadas dentro do botão toggle
-        const progress = (minute - NIGHT_START) / NIGHT_DURATION;
-        return NIGHT_START * ppm + progress * COLLAPSED_GAP_HEIGHT + VERTICAL_PADDING;
-      }
-
-      // Horas depois do bloco sobem o tempo colapsado
-      const savedHeight = NIGHT_DURATION * ppm - COLLAPSED_GAP_HEIGHT;
-      return minute * ppm - savedHeight + VERTICAL_PADDING;
+      return offset * ppm + VERTICAL_PADDING;
     },
-    [isNightCollapsed, ppm]
+    [ppm]
   );
 
   const getMinuteFromY = useCallback(
     (y) => {
       const rawY = y - VERTICAL_PADDING;
-      if (!isNightCollapsed) return rawY / ppm;
-
-      const splitY = NIGHT_START * ppm;
-      if (rawY <= splitY) return rawY / ppm;
-
-      if (rawY <= splitY + COLLAPSED_GAP_HEIGHT) {
-        const progress = (rawY - splitY) / COLLAPSED_GAP_HEIGHT;
-        return NIGHT_START + progress * NIGHT_DURATION;
-      }
-
-      const savedHeight = NIGHT_DURATION * ppm - COLLAPSED_GAP_HEIGHT;
-      return (rawY + savedHeight) / ppm;
+      const offset = rawY / ppm;
+      let realMinute = (offset + TIMELINE_START_MINUTES) % DAY_MINUTES;
+      if (realMinute < 0) realMinute += DAY_MINUTES;
+      return realMinute;
     },
-    [isNightCollapsed, ppm]
+    [ppm]
   );
 
   const canvasHeight = useMemo(() => {
-    if (!isNightCollapsed) {
-      return DAY_MINUTES * ppm + VERTICAL_PADDING * 2;
-    }
-    const savedHeight = NIGHT_DURATION * ppm - COLLAPSED_GAP_HEIGHT;
-    return DAY_MINUTES * ppm - savedHeight + VERTICAL_PADDING * 2;
-  }, [isNightCollapsed, ppm]);
+    return DAY_MINUTES * ppm + VERTICAL_PADDING * 2;
+  }, [ppm]);
 
-  /* AGORA */
   const now = new Date();
   const currentAbsMins = now.getHours() * 60 + now.getMinutes();
   const nowTop = getVisualY(currentAbsMins);
 
-  /* SCROLL PARA O AGORA */
   const initialScrollDone = useRef(false);
   useEffect(() => {
     if (viewportHeight > 0 && !initialScrollDone.current && scrollRef.current) {
@@ -167,7 +126,6 @@ export default function TimelineScreen() {
     }
   }, [viewportHeight, nowTop, canvasHeight]);
 
-  /* CARREGAR DADOS */
   useEffect(() => {
     const loadStoredData = async () => {
       try {
@@ -267,12 +225,12 @@ export default function TimelineScreen() {
     const updatedTasks = tasks.map((t) =>
       t.id === taskId
         ? {
-          ...t,
-          ...changes,
-          timeMinutes: duration,
-          startMinsPlanned: startMins,
-          timeOfDay: changes.timeOfDay || formatTimeFromMinutes(startMins),
-        }
+            ...t,
+            ...changes,
+            timeMinutes: duration,
+            startMinsPlanned: startMins,
+            timeOfDay: changes.timeOfDay || formatTimeFromMinutes(startMins),
+          }
         : t
     );
     saveTasks(updatedTasks);
@@ -292,9 +250,6 @@ export default function TimelineScreen() {
   useEffect(() => { ppmRef.current = ppm; }, [ppm]);
   const minPpmRef = useRef(minPpm);
   useEffect(() => { minPpmRef.current = minPpm; }, [minPpm]);
-
-  // Lista das 24 horas (00 a 23)
-  const hourMarkers = useMemo(() => Array.from({ length: 25 }, (_, i) => i * 60), []);
 
   const pinchStartDistance = useRef(0);
   const initialPpm = useRef(1);
@@ -343,72 +298,80 @@ export default function TimelineScreen() {
           contentContainerStyle={{ height: canvasHeight }}
         >
           <View style={[styles.timelineCanvas, { height: canvasHeight }]}>
-            {/* RÉGUA */}
-            <View style={[styles.rail, { height: canvasHeight }]} />
+            {/* RÉGUA VERTICAL COLORIDA */}
+            <View style={styles.railContainer}>
+              {VERTICAL_SEGMENTS.map((seg, index) => {
+                let offsetHour = seg.start - 7;
+                if (offsetHour < 0) offsetHour += 24;
+                
+                const topPos = offsetHour * 60 * ppm + VERTICAL_PADDING;
+                const segHeight = seg.duration * 60 * ppm;
 
-            {/* MARCADORES DE HORA */}
-            {hourMarkers.map((minute) => {
-              // Se colapsado, esconde as horas entre as 00 e as 06
-              if (isNightCollapsed && minute > NIGHT_START && minute < NIGHT_END) {
-                return null;
-              }
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.coloredRailSegment,
+                      {
+                        top: topPos,
+                        height: segHeight,
+                        backgroundColor: seg.color,
+                      },
+                      index === 0 && styles.railFirst,
+                      index === VERTICAL_SEGMENTS.length - 1 && styles.railLast,
+                    ]}
+                  />
+                );
+              })}
+            </View>
 
-              const top = getVisualY(minute);
-              const isOdd = (minute / 60) % 2 !== 0;
-              const hideText = isDense && isOdd;
+            {/* MARCADORES DE HORA E MEIA-HORA */}
+            {Array.from({ length: 49 }).map((_, i) => {
+              const offsetMinutes = i * 30;
+              const top = offsetMinutes * ppm + VERTICAL_PADDING;
+              
+              const isHalfHour = i % 2 !== 0;
+              const displayHour = (Math.floor(i / 2) + 7) % 24;
+              
+              const isOddHour = Math.floor(i / 2) % 2 !== 0;
+              const hideText = isHalfHour || (isDense && isOddHour);
 
               return (
-                <View key={minute} style={[styles.hourRow, { top: top - 8 }]}>
+                <View key={i} style={[styles.hourRow, { top: top - 8 }]}>
                   <Text style={[styles.hourText, isDense && styles.hourTextOverview]}>
-                    {!hideText ? formatHour(minute) : ''}
+                    {!hideText ? String(displayHour).padStart(2, '0') : ''}
                   </Text>
-                  <View style={[styles.hourLine, (isDense || hideText) && styles.hourLineOverview]} />
+                  
+                  <View 
+                    style={[
+                      styles.hourLine, 
+                      isHalfHour ? styles.halfHourLine : (isDense || hideText) && styles.hourLineOverview
+                    ]} 
+                  />
                 </View>
               );
             })}
 
-            {/* TOGGLE PERMANENTE NO EIXO (Estilo das tuas imagens) */}
-            <View
-              style={[
-                styles.axisToggleRow,
-                { top: getVisualY(NIGHT_START) + 12 },
-              ]}
-            >
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={toggleNight}
-                style={styles.axisToggleButton}
-              >
-                {/* Mostra o ícone de toggle estilo TimeTune */}
-                <Text style={styles.axisToggleIcon}>
-                  {isNightCollapsed ? '⬍' : '≎'}
-                </Text>
-              </TouchableOpacity>
-              {isNightCollapsed && <View style={styles.axisToggleDash} />}
-            </View>
-
             {/* TAREFAS */}
             {tasks.map((task, index) => (
-    <TaskCardClean
-    key={task.id}
-    task={task}
-    ppm={ppm}
-    themeIndex={index}
-    onChangeStart={handleDragEnd}
-    onDragStateChange={setIsDragging}
-    onToggle={toggleTaskComplete}
-    onPress={(t) => setEditingTask(t)}
-    getVisualY={getVisualY}
-    getMinuteFromY={getMinuteFromY}
-  />
+              <TaskCardClean
+                key={task.id}
+                task={task}
+                ppm={ppm}
+                themeIndex={index}
+                onChangeStart={handleDragEnd}
+                onDragStateChange={setIsDragging}
+                onToggle={toggleTaskComplete}
+                onPress={(t) => setEditingTask(t)}
+                getVisualY={getVisualY}
+                getMinuteFromY={getMinuteFromY}
+              />
             ))}
 
             {/* LINHA "AGORA" */}
             <View pointerEvents="none" style={[styles.nowLine, { top: nowTop }]}>
               <View style={styles.nowDot} />
-              <View style={styles.nowBadge}>
-                <Text style={styles.nowBadgeText}>AGORA</Text>
-              </View>
+              <Image source={require('../../assets/abelha.png')} style={styles.nowBeeImage} />
             </View>
           </View>
         </ScrollView>
@@ -455,7 +418,7 @@ const styles = StyleSheet.create({
   timelineViewport: {
     flex: 1,
     position: 'relative',
-    marginTop: 8,
+    marginTop: 2,
   },
   timelineCanvas: {
     position: 'relative',
@@ -496,45 +459,13 @@ const styles = StyleSheet.create({
     width: 1.5,
     backgroundColor: '#ECE7E1',
   },
-
-  /* BOTÃO TOGGLE NO EIXO */
-  axisToggleRow: {
-    position: 'absolute',
-    left: 0,
-    right: 12,
-    height: COLLAPSED_GAP_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 50,
-  },
-  axisToggleButton: {
-    width: AXIS_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  axisToggleIcon: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8A827C',
-    letterSpacing: -1,
-  },
-  axisToggleDash: {
-    flex: 1,
-    height: 1,
-    borderWidth: 1,
-    borderColor: '#E8E1DA',
-    borderStyle: 'dashed',
-  },
-
-  /* AGORA */
   nowLine: {
     position: 'absolute',
     left: AXIS_WIDTH,
     right: 10,
     height: 1.5,
     zIndex: 90,
-    backgroundColor: '#FF4D85',
+    backgroundColor: '#ECC94B',
   },
   nowDot: {
     position: 'absolute',
@@ -543,22 +474,49 @@ const styles = StyleSheet.create({
     width: 6.5,
     height: 6.5,
     borderRadius: 4,
-    backgroundColor: '#FF4D85',
+    backgroundColor: '#ECC94B',
   },
-  nowBadge: {
+  nowBeeImage: {
     position: 'absolute',
-    right: 0,
-    top: -9,
-    backgroundColor: '#FF4D85',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
+    right: -6,
+    top: -10,
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+    transform: [{ rotate: '90deg' }],
+  },
+  halfHourLine: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9F7F5',
+    borderStyle: 'dashed',
   },
   nowBadgeText: {
     color: '#FFFFFF',
     fontSize: 8,
     fontWeight: '800',
     letterSpacing: 0.4,
+  },
+  railContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: AXIS_WIDTH - 1,
+    width: 2,
+    zIndex: 1,
+  },
+  coloredRailSegment: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  railFirst: {
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  railLast: {
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
   },
   fab: {
     position: 'absolute',
@@ -576,5 +534,4 @@ const styles = StyleSheet.create({
     shadowRadius: 4.5,
     elevation: 6,
   },
-  
 });

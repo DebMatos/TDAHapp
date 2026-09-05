@@ -18,49 +18,22 @@ const CARD_RIGHT = 12;
 const LONG_PRESS_DELAY_MS = 350;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
 const snap = (minutes) => Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
 
 const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized =
-    ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-
+  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
   const hours = Math.floor(normalized / 60);
   const mins = normalized % 60;
-
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
 const CARD_THEMES = [
-  {
-    bg: '#F1F5FD',
-    border: '#DCE6FA',
-    accent: '#4F75E2',
-    text: '#2A437E',
-  },
-  {
-    bg: '#F5F2FC',
-    border: '#E5DCFA',
-    accent: '#7A55D6',
-    text: '#4C328E',
-  },
-  {
-    bg: '#FDF4EC',
-    border: '#FAE0CC',
-    accent: '#E0783E',
-    text: '#8F471B',
-  },
-  {
-    bg: '#EDF8F2',
-    border: '#D0EFE0',
-    accent: '#38A169',
-    text: '#216340',
-  },
+  { bg: '#F1F5FD', border: '#DCE6FA', accent: '#4F75E2', text: '#2A437E' },
+  { bg: '#F5F2FC', border: '#E5DCFA', accent: '#7A55D6', text: '#4C328E' },
+  { bg: '#FDF4EC', border: '#FAE0CC', accent: '#E0783E', text: '#8F471B' },
+  { bg: '#EDF8F2', border: '#D0EFE0', accent: '#38A169', text: '#216340' },
 ];
 
-/* -------------------------------------------------------
-   TASK CARD CLEAN
-------------------------------------------------------- */
 export default function TaskCardClean({
   task,
   ppm,
@@ -74,11 +47,16 @@ export default function TaskCardClean({
 }) {
   const dragY = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-const duration = task.timeMinutes || 30;
 
- const realHeight = duration * ppm;
- const visualHeight =  duration * ppm;
- const isShortTask = visualHeight < 44;
+  // 1. DURAÇÃO E ALTURA EXATAS (A ESCALA VOLTOU!)
+  const duration = task.timeMinutes || 30;
+  const rawHeight = duration * ppm;
+  const visualHeight = Math.max(rawHeight, 4); 
+
+  // 2. LÓGICA DE UI
+  const isMicroTask = duration < 30 && visualHeight < 20; 
+  const isNormalTask = !isMicroTask && visualHeight >= 30; 
+  const isCompactTask = !isMicroTask && !isNormalTask;
 
   const top = getVisualY(task.startMinsPlanned || 0);
   const theme = CARD_THEMES[themeIndex % CARD_THEMES.length];
@@ -98,11 +76,7 @@ const duration = task.timeMinutes || 30;
     clearTimer();
     isDragActive.current = false;
     onDragStateChange?.(false);
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 6,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 6 }).start();
   }, [clearTimer, onDragStateChange, scaleAnim]);
 
   const responder = useMemo(
@@ -113,32 +87,19 @@ const duration = task.timeMinutes || 30;
         onMoveShouldSetPanResponder: () => isDragActive.current,
         onMoveShouldSetPanResponderCapture: () => isDragActive.current,
         onPanResponderTerminationRequest: () => !isDragActive.current,
-
-        onPanResponderGrant: () => {
-          dragY.setValue(0);
-        },
-
+        onPanResponderGrant: () => { dragY.setValue(0); },
         onPanResponderMove: (_, gesture) => {
-          if (isDragActive.current) {
-            dragY.setValue(gesture.dy);
-          }
+          if (isDragActive.current) dragY.setValue(gesture.dy);
         },
-
         onPanResponderRelease: (_, gesture) => {
           if (isDragActive.current) {
             const finalY = top + gesture.dy;
-            const finalMins = clamp(
-              snap(getMinuteFromY(finalY)),
-              0,
-              DAY_MINUTES - duration
-            );
-
+            const finalMins = clamp(snap(getMinuteFromY(finalY)), 0, DAY_MINUTES - duration);
             dragY.setValue(0);
             onChangeStart(task.id, finalMins);
           }
           resetAll();
         },
-
         onPanResponderTerminate: () => {
           dragY.setValue(0);
           resetAll();
@@ -150,17 +111,11 @@ const duration = task.timeMinutes || 30;
   const handleTouchStart = (e) => {
     const { pageX, pageY } = e.nativeEvent;
     initialTouch.current = { x: pageX, y: pageY };
-
     clearTimer();
     longPressTimer.current = setTimeout(() => {
       isDragActive.current = true;
       onDragStateChange?.(true);
-
-      Animated.spring(scaleAnim, {
-        toValue: 1.03,
-        useNativeDriver: true,
-        friction: 4,
-      }).start();
+      Animated.spring(scaleAnim, { toValue: 1.03, useNativeDriver: true, friction: 4 }).start();
     }, LONG_PRESS_DELAY_MS);
   };
 
@@ -173,22 +128,13 @@ const duration = task.timeMinutes || 30;
     }
   };
 
-  const handleTouchEnd = () => {
-    if (!isDragActive.current) clearTimer();
-  };
+  const handleTouchEnd = () => { if (!isDragActive.current) clearTimer(); };
 
   const formatDuration = (minutes) => {
-    if (minutes < 60) {
-      return `${minutes} min`;
-    }
-
+    if (minutes < 60) return `${minutes} min`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-
-    if (mins === 0) {
-      return `${hours}h`;
-    }
-
+    if (mins === 0) return `${hours}h`;
     return `${hours}h${String(mins).padStart(2, '0')}`;
   };
 
@@ -196,7 +142,8 @@ const duration = task.timeMinutes || 30;
   const endTimeStr = formatTimeFromMinutes(task.startMinsPlanned + duration);
   const durationStr = formatDuration(duration);
 
-  if (isShortTask) {
+  // --- 1. ESTADO MICRO (Só Linha) ---
+  if (isMicroTask) {
     return (
       <Animated.View
         {...responder.panHandlers}
@@ -211,45 +158,71 @@ const duration = task.timeMinutes || 30;
             height: visualHeight,
             left: CARD_LEFT,
             right: CARD_RIGHT,
-            backgroundColor: theme.bg,
+            backgroundColor: '#FFFFFF',
             borderColor: theme.border,
             transform: [{ translateY: dragY }, { scale: scaleAnim }],
           },
+          task.completed && styles.taskCompletedOpacity,
+        ]}
+      >
+        <View style={[styles.taskCompactBar, { backgroundColor: theme.accent }]} />
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={() => { if (!isDragActive.current) onPress(task); }}
+        />
+      </Animated.View>
+    );
+  }
+
+  // --- 2. ESTADO COMPACTO (1 Linha) ---
+  if (isCompactTask) {
+    return (
+      <Animated.View
+        {...responder.panHandlers}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={[
+          styles.taskCompact,
+          {
+            top,
+            height: visualHeight,
+            left: CARD_LEFT,
+            right: CARD_RIGHT,
+            backgroundColor: '#FFFFFF',
+            borderColor: theme.border,
+            transform: [{ translateY: dragY }, { scale: scaleAnim }],
+          },
+          task.completed && styles.taskCompletedOpacity,
         ]}
       >
         <View style={[styles.taskCompactBar, { backgroundColor: theme.accent }]} />
         <TouchableOpacity
           style={styles.compactClickArea}
-          onPress={() => {
-            if (!isDragActive.current) onPress(task);
-          }}
+          onPress={() => { if (!isDragActive.current) onPress(task); }}
         >
           <Text
-            style={[
-              styles.compactTitle,
-              { color: theme.text },
-              task.completed && styles.taskTitleCompleted,
-            ]}
+            style={[styles.compactTitle, { color: theme.text }, task.completed && styles.taskTitleCompleted]}
             numberOfLines={1}
           >
-            {task.title} · {durationStr}
+            {task.title} <Text style={styles.compactMeta}>· {startTimeStr}–{endTimeStr} ({durationStr})</Text>
           </Text>
         </TouchableOpacity>
+        
+        {/* CHECKBOX PEQUENA AQUI */}
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => onToggle(task.id)}
-          style={[
-            styles.compactCheckbox,
-            { borderColor: theme.accent },
-            task.completed && { backgroundColor: theme.accent },
-          ]}
+          style={[styles.universalCheckbox, { alignSelf: 'center' }]}
         >
-          {task.completed && <Ionicons name="checkmark" size={8} color="#FFF" />}
+          {task.completed && <Ionicons name="checkmark" size={10} color={theme.accent} />}
         </TouchableOpacity>
       </Animated.View>
     );
   }
 
+  // --- 3. ESTADO NORMAL (2 Linhas) ---
   return (
     <Animated.View
       {...responder.panHandlers}
@@ -261,10 +234,10 @@ const duration = task.timeMinutes || 30;
         styles.taskNormal,
         {
           top,
-          height: visualHeight,
+          height: visualHeight, 
           left: CARD_LEFT,
           right: CARD_RIGHT,
-          backgroundColor: theme.bg,
+          backgroundColor: '#FFFFFF',
           borderColor: theme.border,
           transform: [{ translateY: dragY }, { scale: scaleAnim }],
         },
@@ -274,16 +247,10 @@ const duration = task.timeMinutes || 30;
       <View style={[styles.taskAccentBar, { backgroundColor: theme.accent }]} />
       <TouchableOpacity
         style={styles.taskBody}
-        onPress={() => {
-          if (!isDragActive.current) onPress(task);
-        }}
+        onPress={() => { if (!isDragActive.current) onPress(task); }}
       >
         <Text
-          style={[
-            styles.taskTitle,
-            { color: theme.text },
-            task.completed && styles.taskTitleCompleted,
-          ]}
+          style={[styles.taskTitle, { color: theme.text }, task.completed && styles.taskTitleCompleted]}
           numberOfLines={1}
         >
           {task.title}
@@ -293,16 +260,13 @@ const duration = task.timeMinutes || 30;
         </Text>
       </TouchableOpacity>
 
+      {/* CHECKBOX IGUALZINHA E ALINHADA AO TOPO (AO TÍTULO) */}
       <TouchableOpacity
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         onPress={() => onToggle(task.id)}
-        style={[
-          styles.checkbox,
-          { borderColor: theme.accent },
-          task.completed && { backgroundColor: theme.accent },
-        ]}
+        style={[styles.universalCheckbox, { marginTop: 8 }]} // Alinha com o paddingTop do taskBody
       >
-        {task.completed && <Ionicons name="checkmark" size={12} color="#FFF" />}
+        {task.completed && <Ionicons name="checkmark" size={10} color={theme.accent} />}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -311,84 +275,89 @@ const duration = task.timeMinutes || 30;
 const styles = StyleSheet.create({
   taskNormal: {
     position: 'absolute',
-    borderRadius: 14,
+    borderRadius: 4, 
     borderWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    shadowColor: '#1A1817',
-    shadowOffset: { width: 0, height: 2 },
+    alignItems: 'flex-start',
+    overflow: 'visible',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 2,
+    elevation: 1,
   },
   taskAccentBar: {
     width: 4,
     alignSelf: 'stretch',
+    borderTopLeftRadius: 3,    
+    borderBottomLeftRadius: 3,
   },
   taskBody: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingTop: 8, 
+    paddingBottom: 8,
+    justifyContent: 'flex-start', 
   },
   taskTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600', 
+    includeFontPadding: false, 
+    lineHeight: 15, 
   },
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
     opacity: 0.6,
   },
   taskMeta: {
-    marginTop: 2,
+    marginTop: 2, 
     fontSize: 10,
     fontWeight: '500',
     color: '#8A827C',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    includeFontPadding: false,
+    lineHeight: 12, 
   },
   taskCompletedOpacity: {
     opacity: 0.55,
   },
   taskCompact: {
     position: 'absolute',
-    borderRadius: 6,
+    borderRadius: 4, 
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden',
-    elevation: 2,
+    overflow: 'visible', 
+    elevation: 1,
   },
   taskCompactBar: {
-    width: 3,
+    width: 4,
     alignSelf: 'stretch',
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
   },
   compactClickArea: {
     flex: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
   },
   compactTitle: {
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 11, 
+    fontWeight: '600',
+    includeFontPadding: false, 
   },
-  compactCheckbox: {
-    width: 11,
-    height: 11,
-    marginRight: 6,
-    borderRadius: 3,
-    borderWidth: 1.2,
+  compactMeta: {
+    fontWeight: '400',
+    color: '#8A827C',
+  },
+  // ESTILO UNIVERSAL PARA A CHECKBOX EM QUALQUER VISTA
+  universalCheckbox: {
+    width: 14, // Fica fininha e premium como querias
+    height: 14,
+    marginRight: 8,
+    borderRadius: 3, 
+    borderWidth: 1.2, 
+    borderColor: '#C7BFB9', 
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
 });
