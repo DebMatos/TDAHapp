@@ -15,7 +15,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
-import TimeBar from '../components/TimeBar';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import EditTaskModal from '../components/modals/EditTaskModal';
 import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';

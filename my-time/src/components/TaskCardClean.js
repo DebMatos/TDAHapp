@@ -10,10 +10,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 const DAY_MINUTES = 24 * 60;
-const SNAP_MINUTES = 5;
+const SNAP_MINUTES = 15;
 
-const CARD_LEFT = 52;
-const CARD_RIGHT = 12;
+const CARD_LEFT = 56;
+const CARD_RIGHT = 16;
 
 const LONG_PRESS_DELAY_MS = 350;
 
@@ -92,11 +92,10 @@ export default function TaskCardClean({
   ------------------------------------------------------- */
 
 const isMicroTask = visualHeight < 8;
-
+const isTinyTask = visualHeight >= 8 && visualHeight < 12;
+const isCompactTask = visualHeight >= 12 && visualHeight < 30;
 const isNormalTask = visualHeight >= 30;
 
-const isCompactTask =
-  !isMicroTask && !isNormalTask;
   const top = getVisualY(
     task.startMinsPlanned || 0
   );
@@ -354,7 +353,15 @@ const isCompactTask =
 
   const durationStr =
     formatDuration(duration);
-
+console.log(
+  task.title,
+  duration,
+  'min ->',
+  visualHeight.toFixed(1),
+  'px',
+  'ppm:',
+  ppm.toFixed(3)
+);
   /* -------------------------------------------------------
      MICRO
   ------------------------------------------------------- */
@@ -426,7 +433,70 @@ const isCompactTask =
       </Animated.View>
     );
   }
+/* -------------------------------------------------------
+   TINY -pensar
+------------------------------------------------------- */
+/* -------------------------------------------------------
+   TINY
+------------------------------------------------------- */
 
+if (isTinyTask) {
+  return (
+    <Animated.View
+      {...responder.panHandlers}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      style={[
+        styles.taskTiny,
+        {
+          top,
+          height: visualHeight,
+          left: CARD_LEFT,
+          right: CARD_RIGHT,
+          backgroundColor: task.completed
+            ? '#F5F4F2'
+            : theme.bg,
+          transform: [
+            { translateY: dragY },
+            { scale: scaleAnim },
+          ],
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.taskTinyBar,
+          {
+            backgroundColor: task.completed
+              ? '#C9C3BD'
+              : theme.accent,
+          },
+        ]}
+      />
+
+      <TouchableOpacity
+        style={styles.tinyClickArea}
+        onPress={() => {
+          if (!isDragActive.current) {
+            onPress(task);
+          }
+        }}
+      >
+        <Text
+          style={[
+            styles.tinyTitle,
+            task.completed && styles.taskTitleCompleted,
+          ]}
+          numberOfLines={1}
+        >
+          {task.title}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
   /* -------------------------------------------------------
      COMPACTO
   ------------------------------------------------------- */
@@ -674,7 +744,8 @@ const styles =
       borderWidth: 0,
 
       flexDirection: 'row',
-
+borderBottomWidth: StyleSheet.hairlineWidth,
+borderBottomColor: '#e7e3df',
       alignItems:
         'flex-start',
 
@@ -717,8 +788,7 @@ const styles =
     taskTitleCompleted: {
       textDecorationLine:
         'line-through',
-
-  color: '#8F8983',
+       color: '#8F8983',
     },
 
     taskMeta: {
@@ -742,7 +812,8 @@ const styles =
       borderRadius: 3,
 
       borderWidth: 0,
-
+borderBottomWidth: StyleSheet.hairlineWidth,
+borderBottomColor: '#E4E0DC',
       flexDirection: 'row',
 
       alignItems: 'center',
@@ -813,4 +884,37 @@ compactCheckbox: {
       justifyContent:
         'center',
     },
+
+taskTiny: {
+  position: 'absolute',
+  borderRadius: 2,
+  borderWidth: 0,
+
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: '#E4E0DC',
+
+  flexDirection: 'row',
+  alignItems: 'center',
+  overflow: 'hidden',
+},
+
+taskTinyBar: {
+  width: 3,
+  height: '100%',
+},
+
+tinyClickArea: {
+  flex: 1,
+  height: '100%',
+  paddingHorizontal: 6,
+  justifyContent: 'center',
+},
+
+tinyTitle: {
+  fontSize: 8,
+  lineHeight: 9,
+  fontWeight: '600',
+  color: '#403B37',
+  includeFontPadding: false,
+},
   });
