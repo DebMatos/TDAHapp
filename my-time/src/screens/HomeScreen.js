@@ -103,6 +103,25 @@ const VERTICAL_SEGMENTS = [
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
+const normalizeTaskDate = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  // Já está no formato da BD/timeline
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  // Formato usado pelo TaskDetailsModal: DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split('/');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  return value;
+};
 
 const formatTimeFromMinutes = (
   totalMinutes
@@ -170,6 +189,31 @@ const snapMinutes = (
       SNAP_MINUTES
   ) *
   SNAP_MINUTES;
+
+  const getDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const isSameDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const addDays = (date, amount) => {
+  const next = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+
+  next.setDate(next.getDate() + amount);
+
+  return next;
+};
 
 const getPinchDistance = (
   touches
@@ -401,6 +445,15 @@ const calculateOverlapColumns = (
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+const today = new Date();
+
+const selectedDateKey = getDateKey(selectedDate);
+
+const isViewingToday = isSameDay(
+  selectedDate,
+  today
+);
   const scrollRef =
     useRef(null);
 
@@ -461,6 +514,22 @@ export default function TimelineScreen() {
     setTasks,
   ] = useState([]);
 
+  const visibleTasks = useMemo(() => {
+  const todayKey = getDateKey(new Date());
+
+  return tasks.filter((task) => {
+    /*
+     * Compatibilidade com tarefas antigas:
+     * antes de existir suporte de datas,
+     * todas pertenciam implicitamente a Hoje.
+     */
+    const taskDate =
+      task.date || todayKey;
+
+    return taskDate === selectedDateKey;
+  });
+}, [tasks, selectedDateKey]);
+
   const [
     blocks,
     setBlocks,
@@ -483,6 +552,22 @@ export default function TimelineScreen() {
     targetSlotMinutes,
     setTargetSlotMinutes,
   ] = useState(null);
+
+  const goToPreviousDay = () => {
+  setSelectedDate((current) =>
+    addDays(current, -1)
+  );
+};
+
+const goToNextDay = () => {
+  setSelectedDate((current) =>
+    addDays(current, 1)
+  );
+};
+
+const goToToday = () => {
+  setSelectedDate(new Date());
+};
 
   /* -------------------------------------------------------
      CONVERSÃO TEMPO <-> POSIÇÃO
@@ -554,14 +639,14 @@ export default function TimelineScreen() {
      OVERLAPS
   ------------------------------------------------------- */
 
-  const overlapColumns =
-    useMemo(
-      () =>
-        calculateOverlapColumns(
-          tasks
-        ),
-      [tasks]
-    );
+const overlapColumns =
+  useMemo(
+    () =>
+      calculateOverlapColumns(
+        visibleTasks
+      ),
+    [visibleTasks]
+  );
 
   const taskHorizontalLayouts =
     useMemo(() => {
@@ -576,7 +661,7 @@ export default function TimelineScreen() {
             TASK_CARD_RIGHT
         );
 
-      tasks.forEach(
+      visibleTasks.forEach(
         (task) => {
           const overlap =
             overlapColumns.get(
@@ -647,7 +732,7 @@ export default function TimelineScreen() {
 
       return layouts;
     }, [
-      tasks,
+      visibleTasks,
       overlapColumns,
       viewportWidth,
     ]);
@@ -1030,6 +1115,7 @@ export default function TimelineScreen() {
 
     const newTask = {
       id: `task-${Date.now()}`,
+  date: selectedDateKey,
 
       title:
         title.trim(),
@@ -1486,15 +1572,11 @@ export default function TimelineScreen() {
      CONTADOR
   ------------------------------------------------------- */
 
-  const totalCompletedTasks =
-    tasks.filter(
-      (task) =>
-        getTaskStatus(
-          task
-        ) ===
-        'completed'
-    ).length;
-
+const totalCompletedTasks =
+  visibleTasks.filter(
+    (task) =>
+      getTaskStatus(task) === 'completed'
+  ).length;
   /* -------------------------------------------------------
      RENDER
   ------------------------------------------------------- */
@@ -1510,14 +1592,16 @@ export default function TimelineScreen() {
         'right',
       ]}
     >
-      <Header
-        completedTasks={
-          totalCompletedTasks
-        }
-        totalTasks={
-          tasks.length
-        }
-      />
+  <Header
+  selectedDate={selectedDate}
+  onPreviousDay={goToPreviousDay}
+  onNextDay={goToNextDay}
+  onDatePress={() => {
+    // Depois abrimos o calendário/date picker
+  }}
+  completedTasks={totalCompletedTasks}
+  totalTasks={visibleTasks.length}
+/>
 
       <View
         ref={
@@ -1765,7 +1849,7 @@ export default function TimelineScreen() {
 
             {/* TAREFAS */}
 
-            {tasks.map(
+            {visibleTasks.map(
               (
                 task,
                 index
@@ -1823,29 +1907,28 @@ export default function TimelineScreen() {
 
             {/* LINHA AGORA */}
 
-            <View
-              pointerEvents="none"
-              style={[
-                styles.nowLine,
-                {
-                  top:
-                    nowTop,
-                },
-              ]}
-            >
-              <View
-                style={
-                  styles.nowDot
-                }
-              />
+          {/* LINHA AGORA — apenas no dia atual */}
 
-              <Image
-                source={require('../../assets/abelha.png')}
-                style={
-                  styles.nowBeeImage
-                }
-              />
-            </View>
+{isViewingToday && (
+  <View
+    pointerEvents="none"
+    style={[
+      styles.nowLine,
+      {
+        top: nowTop,
+      },
+    ]}
+  >
+    <View
+      style={styles.nowDot}
+    />
+
+    <Image
+      source={require('../../assets/abelha.png')}
+      style={styles.nowBeeImage}
+    />
+  </View>
+)}
           </View>
         </ScrollView>
       </View>
@@ -1923,7 +2006,9 @@ export default function TimelineScreen() {
           ) {
             const newTask = {
               id: `task-${Date.now()}`,
-
+  date:
+    changes.date ||
+    selectedDateKey,
               ...changes,
 
               status:
