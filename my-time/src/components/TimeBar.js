@@ -78,8 +78,8 @@ export default function TimeBar() {
 
 const styles = StyleSheet.create({
   container: { 
-    marginTop: 30, 
-    marginBottom: 16,
+    marginTop: 12, 
+    marginBottom: 4,
     paddingHorizontal: 20, // <--- Aumentado de 4 para 20 para dar mais margem nas laterais
   },
   barContainer: {
