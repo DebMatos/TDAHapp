@@ -28,41 +28,106 @@ import EditTaskModal from '../components/modals/EditTaskModal';
 
 import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';
 
+import {
+  taskToLegacyView,
+} from '../domain/taskAdapter';
+
+import {
+  loadTasks as loadStoredTasks,
+  saveTasks as saveStoredTasks,
+} from '../data/taskRepository';
+
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
 ) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+  UIManager.setLayoutAnimationEnabledExperimental(
+    true
+  );
 }
 
-const STORAGE_KEY = '@my_time_blocks_data_v12';
-const TASKS_STORAGE_KEY = '@my_time_tasks_data_v1';
+/* -------------------------------------------------------
+   STORAGE LEGACY DOS BLOCOS
+------------------------------------------------------- */
 
-const DAY_MINUTES = 24 * 60;
+const STORAGE_KEY =
+  '@my_time_blocks_data_v12';
 
-const MAX_PPM = 1.75;
-const DEFAULT_PPM = 1.25;
+/* -------------------------------------------------------
+   TIMELINE
+------------------------------------------------------- */
 
-const VERTICAL_PADDING = 20;
-const AXIS_WIDTH = 48;
+const DAY_MINUTES =
+  24 * 60;
 
-const TASK_CARD_LEFT = 56;
-const TASK_CARD_RIGHT = 16;
-const OVERLAP_GAP = 4;
+const MAX_PPM =
+  1.75;
 
-const TIMELINE_START_MINUTES = 7 * 60;
-const SNAP_MINUTES = 5;
+const DEFAULT_PPM =
+  1.25;
+
+const VERTICAL_PADDING =
+  20;
+
+const AXIS_WIDTH =
+  48;
+
+const TASK_CARD_LEFT =
+  56;
+
+const TASK_CARD_RIGHT =
+  16;
+
+const OVERLAP_GAP =
+  4;
+
+const TIMELINE_START_MINUTES =
+  7 * 60;
+
+const SNAP_MINUTES =
+  5;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
 ------------------------------------------------------- */
 
-const getRailColor = (hour) => {
-  if (hour >= 7 && hour < 9) return '#68D391';
-  if (hour >= 9 && hour < 12) return '#F6E05E';
-  if (hour >= 12 && hour < 14) return '#F6AD55';
-  if (hour >= 14 && hour < 18) return '#FC8181';
-  if (hour >= 18 && hour < 23) return '#B794F4';
+const getRailColor = (
+  hour
+) => {
+  if (
+    hour >= 7 &&
+    hour < 9
+  ) {
+    return '#68D391';
+  }
+
+  if (
+    hour >= 9 &&
+    hour < 12
+  ) {
+    return '#F6E05E';
+  }
+
+  if (
+    hour >= 12 &&
+    hour < 14
+  ) {
+    return '#F6AD55';
+  }
+
+  if (
+    hour >= 14 &&
+    hour < 18
+  ) {
+    return '#FC8181';
+  }
+
+  if (
+    hour >= 18 &&
+    hour < 23
+  ) {
+    return '#B794F4';
+  }
 
   return '#7F9CF5';
 };
@@ -103,44 +168,38 @@ const VERTICAL_SEGMENTS = [
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
-const normalizeTaskDate = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  // Já está no formato da BD/timeline
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  // Formato usado pelo TaskDetailsModal: DD/MM/YYYY
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-    const [day, month, year] = value.split('/');
-
-    return `${year}-${month}-${day}`;
-  }
-
-  return value;
-};
 
 const formatTimeFromMinutes = (
   totalMinutes
 ) => {
   const normalized =
-    ((totalMinutes % DAY_MINUTES) +
-      DAY_MINUTES) %
+    (
+      (
+        totalMinutes %
+        DAY_MINUTES
+      ) +
+      DAY_MINUTES
+    ) %
     DAY_MINUTES;
 
   const hours =
-    Math.floor(normalized / 60);
+    Math.floor(
+      normalized /
+      60
+    );
 
   const mins =
-    normalized % 60;
+    normalized %
+    60;
 
-  return `${String(hours).padStart(
+  return `${String(
+    hours
+  ).padStart(
     2,
     '0'
-  )}:${String(mins).padStart(
+  )}:${String(
+    mins
+  ).padStart(
     2,
     '0'
   )}`;
@@ -156,15 +215,26 @@ const parseTimeToMinutes = (
     return 7 * 60;
   }
 
-  const [h, m] =
+  const [
+    h,
+    m,
+  ] =
     timeStr
       .split(':')
       .map(Number);
 
   return (
-    (isNaN(h) ? 7 : h) *
+    (
+      Number.isNaN(h)
+        ? 7
+        : h
+    ) *
       60 +
-    (isNaN(m) ? 0 : m)
+    (
+      Number.isNaN(m)
+        ? 0
+        : m
+    )
   );
 };
 
@@ -190,27 +260,58 @@ const snapMinutes = (
   ) *
   SNAP_MINUTES;
 
-  const getDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+const getDateKey = (
+  date
+) => {
+  const year =
+    date.getFullYear();
+
+  const month =
+    String(
+      date.getMonth() +
+        1
+    ).padStart(
+      2,
+      '0'
+    );
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(
+      2,
+      '0'
+    );
 
   return `${year}-${month}-${day}`;
 };
 
-const isSameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
+const isSameDay = (
+  a,
+  b
+) =>
+  a.getFullYear() ===
+    b.getFullYear() &&
+  a.getMonth() ===
+    b.getMonth() &&
+  a.getDate() ===
+    b.getDate();
 
-const addDays = (date, amount) => {
-  const next = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
+const addDays = (
+  date,
+  amount
+) => {
+  const next =
+    new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+  next.setDate(
+    next.getDate() +
+      amount
   );
-
-  next.setDate(next.getDate() + amount);
 
   return next;
 };
@@ -218,7 +319,10 @@ const addDays = (date, amount) => {
 const getPinchDistance = (
   touches
 ) => {
-  const [t1, t2] =
+  const [
+    t1,
+    t2,
+  ] =
     touches;
 
   const dx =
@@ -236,7 +340,7 @@ const getPinchDistance = (
 };
 
 /* -------------------------------------------------------
-   ESTADO
+   COMPATIBILIDADE
 ------------------------------------------------------- */
 
 const getTaskStatus = (
@@ -247,6 +351,13 @@ const getTaskStatus = (
     task.completed
       ? 'completed'
       : 'pending'
+  );
+
+const canonicalTasksToLegacyView = (
+  canonicalTasks
+) =>
+  canonicalTasks.map(
+    taskToLegacyView
   );
 
 /* -------------------------------------------------------
@@ -266,7 +377,9 @@ const getTaskTimelineInterval = (
     startMinute -
     TIMELINE_START_MINUTES;
 
-  if (start < 0) {
+  if (
+    start < 0
+  ) {
     start +=
       DAY_MINUTES;
   }
@@ -276,12 +389,16 @@ const getTaskTimelineInterval = (
       1,
       Number(
         task.timeMinutes
-      ) || 30
+      ) ||
+        30
     );
 
   return {
-    id: task.id,
+    id:
+      task.id,
+
     start,
+
     end:
       start +
       duration,
@@ -297,7 +414,10 @@ const calculateOverlapColumns = (
         getTaskTimelineInterval
       )
       .sort(
-        (a, b) => {
+        (
+          a,
+          b
+        ) => {
           if (
             a.start !==
             b.start
@@ -318,8 +438,11 @@ const calculateOverlapColumns = (
   const result =
     new Map();
 
-  let group = [];
-  let groupEnd = -1;
+  let group =
+    [];
+
+  let groupEnd =
+    -1;
 
   const processGroup =
     () => {
@@ -330,13 +453,19 @@ const calculateOverlapColumns = (
         return;
       }
 
-      const active = [];
-      const assignments = [];
+      const active =
+        [];
 
-      let maxColumns = 1;
+      const assignments =
+        [];
+
+      let maxColumns =
+        1;
 
       group.forEach(
-        (event) => {
+        (
+          event
+        ) => {
           for (
             let i =
               active.length -
@@ -345,7 +474,8 @@ const calculateOverlapColumns = (
             i--
           ) {
             if (
-              active[i].end <=
+              active[i]
+                .end <=
               event.start
             ) {
               active.splice(
@@ -358,28 +488,36 @@ const calculateOverlapColumns = (
           const usedColumns =
             new Set(
               active.map(
-                (item) =>
+                (
+                  item
+                ) =>
                   item.column
               )
             );
 
-          let column = 0;
+          let column =
+            0;
 
           while (
             usedColumns.has(
               column
             )
           ) {
-            column += 1;
+            column +=
+              1;
           }
 
           active.push({
-            end: event.end,
+            end:
+              event.end,
+
             column,
           });
 
           assignments.push({
-            id: event.id,
+            id:
+              event.id,
+
             column,
           });
 
@@ -387,7 +525,8 @@ const calculateOverlapColumns = (
             Math.max(
               maxColumns,
               active.length,
-              column + 1
+              column +
+                1
             );
         }
       );
@@ -401,6 +540,7 @@ const calculateOverlapColumns = (
             id,
             {
               column,
+
               columnCount:
                 maxColumns,
             }
@@ -410,7 +550,9 @@ const calculateOverlapColumns = (
     };
 
   intervals.forEach(
-    (event) => {
+    (
+      event
+    ) => {
       if (
         group.length >
           0 &&
@@ -419,8 +561,11 @@ const calculateOverlapColumns = (
       ) {
         processGroup();
 
-        group = [];
-        groupEnd = -1;
+        group =
+          [];
+
+        groupEnd =
+          -1;
       }
 
       group.push(
@@ -445,15 +590,29 @@ const calculateOverlapColumns = (
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
-const today = new Date();
+  const [
+    selectedDate,
+    setSelectedDate,
+  ] =
+    useState(
+      () =>
+        new Date()
+    );
 
-const selectedDateKey = getDateKey(selectedDate);
+  const today =
+    new Date();
 
-const isViewingToday = isSameDay(
-  selectedDate,
-  today
-);
+  const selectedDateKey =
+    getDateKey(
+      selectedDate
+    );
+
+  const isViewingToday =
+    isSameDay(
+      selectedDate,
+      today
+    );
+
   const scrollRef =
     useRef(null);
 
@@ -478,96 +637,130 @@ const isViewingToday = isSameDay(
   const [
     detailsTask,
     setDetailsTask,
-  ] = useState(null);
+  ] =
+    useState(null);
 
   const [
     detailsMode,
     setDetailsMode,
-  ] = useState(
-    'create'
-  );
+  ] =
+    useState(
+      'create'
+    );
 
   const [
     viewportHeight,
     setViewportHeight,
-  ] = useState(0);
+  ] =
+    useState(0);
 
   const [
     viewportWidth,
     setViewportWidth,
-  ] = useState(0);
+  ] =
+    useState(0);
 
   const [
     isDragging,
     setIsDragging,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     ppm,
     setPpm,
-  ] = useState(
-    DEFAULT_PPM
-  );
+  ] =
+    useState(
+      DEFAULT_PPM
+    );
 
   const [
     tasks,
     setTasks,
-  ] = useState([]);
+  ] =
+    useState([]);
 
-  const visibleTasks = useMemo(() => {
-  const todayKey = getDateKey(new Date());
+  const visibleTasks =
+    useMemo(
+      () => {
+        const todayKey =
+          getDateKey(
+            new Date()
+          );
 
-  return tasks.filter((task) => {
-    /*
-     * Compatibilidade com tarefas antigas:
-     * antes de existir suporte de datas,
-     * todas pertenciam implicitamente a Hoje.
-     */
-    const taskDate =
-      task.date || todayKey;
+        return tasks.filter(
+          (
+            task
+          ) => {
+            const taskDate =
+              task.date ||
+              todayKey;
 
-    return taskDate === selectedDateKey;
-  });
-}, [tasks, selectedDateKey]);
+            return (
+              taskDate ===
+              selectedDateKey
+            );
+          }
+        );
+      },
+      [
+        tasks,
+        selectedDateKey,
+      ]
+    );
 
   const [
     blocks,
     setBlocks,
-  ] = useState(
-    INITIAL_TIMELINE_BLOCKS ||
-      []
-  );
+  ] =
+    useState(
+      INITIAL_TIMELINE_BLOCKS ||
+        []
+    );
 
   const [
     modalVisible,
     setModalVisible,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     editingTask,
     setEditingTask,
-  ] = useState(null);
+  ] =
+    useState(null);
 
   const [
     targetSlotMinutes,
     setTargetSlotMinutes,
-  ] = useState(null);
+  ] =
+    useState(null);
 
-  const goToPreviousDay = () => {
-  setSelectedDate((current) =>
-    addDays(current, -1)
-  );
-};
+  const goToPreviousDay =
+    () => {
+      setSelectedDate(
+        (
+          current
+        ) =>
+          addDays(
+            current,
+            -1
+          )
+      );
+    };
 
-const goToNextDay = () => {
-  setSelectedDate((current) =>
-    addDays(current, 1)
-  );
-};
-
-const goToToday = () => {
-  setSelectedDate(new Date());
-};
+  const goToNextDay =
+    () => {
+      setSelectedDate(
+        (
+          current
+        ) =>
+          addDays(
+            current,
+            1
+          )
+      );
+    };
 
   /* -------------------------------------------------------
      CONVERSÃO TEMPO <-> POSIÇÃO
@@ -575,7 +768,9 @@ const goToToday = () => {
 
   const getVisualY =
     useCallback(
-      (minute) => {
+      (
+        minute
+      ) => {
         let offset =
           minute -
           TIMELINE_START_MINUTES;
@@ -588,16 +783,21 @@ const goToToday = () => {
         }
 
         return (
-          offset * ppm +
+          offset *
+            ppm +
           VERTICAL_PADDING
         );
       },
-      [ppm]
+      [
+        ppm,
+      ]
     );
 
   const getMinuteFromY =
     useCallback(
-      (y) => {
+      (
+        y
+      ) => {
         const rawY =
           y -
           VERTICAL_PADDING;
@@ -614,7 +814,8 @@ const goToToday = () => {
           DAY_MINUTES;
 
         if (
-          realMinute < 0
+          realMinute <
+          0
         ) {
           realMinute +=
             DAY_MINUTES;
@@ -622,7 +823,9 @@ const goToToday = () => {
 
         return realMinute;
       },
-      [ppm]
+      [
+        ppm,
+      ]
     );
 
   const canvasHeight =
@@ -632,110 +835,124 @@ const goToToday = () => {
           ppm +
         VERTICAL_PADDING *
           2,
-      [ppm]
+      [
+        ppm,
+      ]
     );
 
   /* -------------------------------------------------------
      OVERLAPS
   ------------------------------------------------------- */
 
-const overlapColumns =
-  useMemo(
-    () =>
-      calculateOverlapColumns(
-        visibleTasks
-      ),
-    [visibleTasks]
-  );
+  const overlapColumns =
+    useMemo(
+      () =>
+        calculateOverlapColumns(
+          visibleTasks
+        ),
+      [
+        visibleTasks,
+      ]
+    );
 
   const taskHorizontalLayouts =
-    useMemo(() => {
-      const layouts =
-        new Map();
+    useMemo(
+      () => {
+        const layouts =
+          new Map();
 
-      const availableWidth =
-        Math.max(
-          0,
-          viewportWidth -
-            TASK_CARD_LEFT -
-            TASK_CARD_RIGHT
-        );
+        const availableWidth =
+          Math.max(
+            0,
+            viewportWidth -
+              TASK_CARD_LEFT -
+              TASK_CARD_RIGHT
+          );
 
-      visibleTasks.forEach(
-        (task) => {
-          const overlap =
-            overlapColumns.get(
-              task.id
-            ) || {
-              column: 0,
-              columnCount: 1,
-            };
+        visibleTasks.forEach(
+          (
+            task
+          ) => {
+            const overlap =
+              overlapColumns.get(
+                task.id
+              ) || {
+                column:
+                  0,
 
-          const {
-            column,
-            columnCount,
-          } = overlap;
+                columnCount:
+                  1,
+              };
 
-          if (
-            columnCount <=
-              1 ||
-            availableWidth <=
-              0
-          ) {
+            const {
+              column,
+              columnCount,
+            } =
+              overlap;
+
+            if (
+              columnCount <=
+                1 ||
+              availableWidth <=
+                0
+            ) {
+              layouts.set(
+                task.id,
+                {
+                  left:
+                    TASK_CARD_LEFT,
+
+                  right:
+                    TASK_CARD_RIGHT,
+                }
+              );
+
+              return;
+            }
+
+            const gaps =
+              OVERLAP_GAP *
+              (
+                columnCount -
+                1
+              );
+
+            const columnWidth =
+              (
+                availableWidth -
+                gaps
+              ) /
+              columnCount;
+
             layouts.set(
               task.id,
               {
                 left:
-                  TASK_CARD_LEFT,
+                  TASK_CARD_LEFT +
+                  column *
+                    (
+                      columnWidth +
+                      OVERLAP_GAP
+                    ),
+
+                width:
+                  columnWidth,
+
                 right:
-                  TASK_CARD_RIGHT,
+                  undefined,
               }
             );
-
-            return;
           }
+        );
 
-          const gaps =
-            OVERLAP_GAP *
-            (
-              columnCount -
-              1
-            );
-
-          const columnWidth =
-            (
-              availableWidth -
-              gaps
-            ) /
-            columnCount;
-
-          layouts.set(
-            task.id,
-            {
-              left:
-                TASK_CARD_LEFT +
-                column *
-                  (
-                    columnWidth +
-                    OVERLAP_GAP
-                  ),
-
-              width:
-                columnWidth,
-
-              right:
-                undefined,
-            }
-          );
-        }
-      );
-
-      return layouts;
-    }, [
-      visibleTasks,
-      overlapColumns,
-      viewportWidth,
-    ]);
+        return layouts;
+      },
+      [
+        visibleTasks,
+        overlapColumns,
+        viewportWidth,
+      ]
+    );
 
   /* -------------------------------------------------------
      AGORA
@@ -761,231 +978,238 @@ const overlapColumns =
   const initialScrollDone =
     useRef(false);
 
-  useEffect(() => {
-    if (
-      viewportHeight >
-        0 &&
-      !initialScrollDone.current &&
-      scrollRef.current
-    ) {
-      initialScrollDone.current =
-        true;
+  useEffect(
+    () => {
+      if (
+        viewportHeight >
+          0 &&
+        !initialScrollDone
+          .current &&
+        scrollRef.current
+      ) {
+        initialScrollDone.current =
+          true;
 
-      const targetY =
-        nowTop -
-        viewportHeight *
-          0.35;
+        const targetY =
+          nowTop -
+          viewportHeight *
+            0.35;
 
-      const maxScroll =
-        Math.max(
-          0,
-          canvasHeight -
-            viewportHeight
-        );
-
-      const y =
-        clamp(
-          targetY,
-          0,
-          maxScroll
-        );
-
-      scrollYRef.current =
-        y;
-
-      requestAnimationFrame(
-        () => {
-          scrollRef.current?.scrollTo(
-            {
-              y,
-              animated:
-                false,
-            }
+        const maxScroll =
+          Math.max(
+            0,
+            canvasHeight -
+              viewportHeight
           );
-        }
-      );
-    }
-  }, [
-    viewportHeight,
-    nowTop,
-    canvasHeight,
-  ]);
+
+        const y =
+          clamp(
+            targetY,
+            0,
+            maxScroll
+          );
+
+        scrollYRef.current =
+          y;
+
+        requestAnimationFrame(
+          () => {
+            scrollRef.current?.scrollTo(
+              {
+                y,
+
+                animated:
+                  false,
+              }
+            );
+          }
+        );
+      }
+    },
+    [
+      viewportHeight,
+      nowTop,
+      canvasHeight,
+    ]
+  );
 
   /* -------------------------------------------------------
      STORAGE
   ------------------------------------------------------- */
 
-  useEffect(() => {
-    const loadStoredData =
-      async () => {
-        try {
-          const storedBlocks =
-            await AsyncStorage.getItem(
-              STORAGE_KEY
-            );
-
-          const storedTasks =
-            await AsyncStorage.getItem(
-              TASKS_STORAGE_KEY
-            );
-
-          let parsedBlocks =
-            null;
-
-          if (
-            storedBlocks
-          ) {
-            const parsed =
-              JSON.parse(
-                storedBlocks
+  useEffect(
+    () => {
+      const loadStoredData =
+        async () => {
+          try {
+            /*
+             * Blocks ainda são legacy.
+             * Mantemos esta leitura enquanto
+             * EditTaskModal existir.
+             */
+            const storedBlocks =
+              await AsyncStorage.getItem(
+                STORAGE_KEY
               );
+
+            let parsedBlocks =
+              null;
 
             if (
-              Array.isArray(
-                parsed
-              ) &&
-              parsed.length >
-                0
+              storedBlocks
             ) {
-              parsedBlocks =
-                parsed;
+              const parsed =
+                JSON.parse(
+                  storedBlocks
+                );
 
-              setBlocks(
-                parsed
-              );
+              if (
+                Array.isArray(
+                  parsed
+                ) &&
+                parsed.length >
+                  0
+              ) {
+                parsedBlocks =
+                  parsed;
+
+                setBlocks(
+                  parsed
+                );
+              }
             }
-          }
 
-          if (
-            storedTasks
-          ) {
-            const parsed =
-              JSON.parse(
-                storedTasks
-              );
+            /*
+             * TASKS:
+             * o HomeScreen já não sabe
+             * onde nem como são guardadas.
+             */
+            const canonicalTasks =
+              await loadStoredTasks();
 
             if (
-              Array.isArray(
-                parsed
-              )
+              canonicalTasks.length >
+              0
             ) {
-              /*
-               * Não fazemos uma migração
-               * destrutiva aqui.
-               *
-               * getTaskStatus continua a
-               * suportar tarefas antigas
-               * que só tenham completed.
-               */
               setTasks(
-                parsed
+                canonicalTasksToLegacyView(
+                  canonicalTasks
+                )
               );
 
               return;
             }
-          }
 
-          if (
-            parsedBlocks
-          ) {
-            const migratedTasks =
-              parsedBlocks.flatMap(
-                (block) => {
-                  let currentMinute =
-                    block.startHour *
-                    60;
+            /*
+             * Compatibilidade com a estrutura
+             * ainda mais antiga baseada
+             * em blocks.
+             *
+             * Só executa se o repository
+             * não encontrar tasks.
+             */
+            if (
+              parsedBlocks
+            ) {
+              const legacyMigratedTasks =
+                parsedBlocks.flatMap(
+                  (
+                    block
+                  ) => {
+                    let currentMinute =
+                      block.startHour *
+                      60;
 
-                  return (
-                    block.tasks ||
-                    []
-                  ).map(
-                    (task) => {
-                      const startMinsPlanned =
-                        task.startMinsPlanned ??
-                        (
-                          task.timeOfDay
-                            ? parseTimeToMinutes(
-                                task.timeOfDay
-                              )
-                            : currentMinute
-                        );
-
-                      currentMinute =
-                        startMinsPlanned +
-                        (
-                          task.timeMinutes ||
-                          30
-                        );
-
-                      return {
-                        ...task,
-
-                        status:
-                          task.status ||
+                    return (
+                      block.tasks ||
+                      []
+                    ).map(
+                      (
+                        task
+                      ) => {
+                        const startMinsPlanned =
+                          task.startMinsPlanned ??
                           (
-                            task.completed
-                              ? 'completed'
-                              : 'pending'
-                          ),
+                            task.timeOfDay
+                              ? parseTimeToMinutes(
+                                  task.timeOfDay
+                                )
+                              : currentMinute
+                          );
 
-                        completed:
-                          task.status
-                            ? task.status ===
-                              'completed'
-                            : Boolean(
-                                task.completed
-                              ),
+                        currentMinute =
+                          startMinsPlanned +
+                          (
+                            task.timeMinutes ||
+                            30
+                          );
 
-                        startMinsPlanned,
+                        return {
+                          ...task,
 
-                        timeOfDay:
-                          task.timeOfDay ||
-                          formatTimeFromMinutes(
-                            startMinsPlanned
-                          ),
-                      };
-                    }
-                  );
-                }
+                          date:
+                            task.date ||
+                            getDateKey(
+                              new Date()
+                            ),
+
+                          startMinsPlanned,
+
+                          timeOfDay:
+                            task.timeOfDay ||
+                            formatTimeFromMinutes(
+                              startMinsPlanned
+                            ),
+                        };
+                      }
+                    );
+                  }
+                );
+
+              const saved =
+                await saveStoredTasks(
+                  legacyMigratedTasks
+                );
+
+              setTasks(
+                canonicalTasksToLegacyView(
+                  saved
+                )
               );
-
-            setTasks(
-              migratedTasks
-            );
-
-            await AsyncStorage.setItem(
-              TASKS_STORAGE_KEY,
-              JSON.stringify(
-                migratedTasks
-              )
+            }
+          } catch (
+            error
+          ) {
+            console.error(
+              'Erro ao carregar dados:',
+              error
             );
           }
-        } catch (
-          error
-        ) {
-          console.error(
-            'Erro ao carregar dados:',
-            error
-          );
-        }
-      };
+        };
 
-    loadStoredData();
-  }, []);
+      loadStoredData();
+    },
+    []
+  );
 
+  /*
+   * A UI continua a chamar saveTasks,
+   * mas a persistência real está agora
+   * no repository.
+   */
   const saveTasks =
     async (
       newTasks
     ) => {
-      setTasks(
-        newTasks
-      );
-
       try {
-        await AsyncStorage.setItem(
-          TASKS_STORAGE_KEY,
-          JSON.stringify(
+        const canonicalTasks =
+          await saveStoredTasks(
             newTasks
+          );
+
+        setTasks(
+          canonicalTasksToLegacyView(
+            canonicalTasks
           )
         );
       } catch (
@@ -999,7 +1223,7 @@ const overlapColumns =
     };
 
   /* -------------------------------------------------------
-     TAREFAS
+     DRAG
   ------------------------------------------------------- */
 
   const handleDragEnd = (
@@ -1008,7 +1232,9 @@ const overlapColumns =
   ) => {
     const updatedTasks =
       tasks.map(
-        (task) =>
+        (
+          task
+        ) =>
           task.id ===
           taskId
             ? {
@@ -1021,6 +1247,15 @@ const overlapColumns =
                   formatTimeFromMinutes(
                     newMins
                   ),
+
+                startTime:
+                  formatTimeFromMinutes(
+                    newMins
+                  ),
+
+                updatedAt:
+                  new Date()
+                    .toISOString(),
               }
             : task
       );
@@ -1031,18 +1266,21 @@ const overlapColumns =
   };
 
   /* -------------------------------------------------------
-     CHECKBOX:
-     pending <-> completed
-
-     abandoned não muda pelo card
+     CHECKBOX
   ------------------------------------------------------- */
 
   const toggleTaskComplete = (
     taskId
   ) => {
+    const timestamp =
+      new Date()
+        .toISOString();
+
     const updatedTasks =
       tasks.map(
-        (task) => {
+        (
+          task
+        ) => {
           if (
             task.id !==
             taskId
@@ -1055,11 +1293,6 @@ const overlapColumns =
               task
             );
 
-          /*
-           * Uma tarefa abandonada só
-           * muda de estado através dos
-           * detalhes.
-           */
           if (
             currentStatus ===
             'abandoned'
@@ -1082,6 +1315,15 @@ const overlapColumns =
             completed:
               nextStatus ===
               'completed',
+
+            completedAt:
+              nextStatus ===
+              'completed'
+                ? timestamp
+                : null,
+
+            updatedAt:
+              timestamp,
           };
         }
       );
@@ -1106,49 +1348,82 @@ const overlapColumns =
         1,
         Number(
           duration
-        ) || 30
+        ) ||
+          30
       );
 
     const startMins =
       targetSlotMinutes ??
       7 * 60;
 
+    const timestamp =
+      new Date()
+        .toISOString();
+
     const newTask = {
-      id: `task-${Date.now()}`,
-  date: selectedDateKey,
+      id:
+        `task-${Date.now()}`,
 
       title:
         title.trim(),
-
-      description:
-        description?.trim() ||
-        '',
 
       notes:
         description?.trim() ||
         '',
 
-      timeMinutes:
+      projectId:
+        null,
+
+      categoryId:
+        categoryId ||
+        'inbox',
+
+      priority:
+        'normal',
+
+      date:
+        selectedDateKey,
+
+      startTime:
+        formatTimeFromMinutes(
+          startMins
+        ),
+
+      durationMinutes:
         safeDuration,
+
+      dueDate:
+        null,
+
+      dueTime:
+        null,
 
       status:
         'pending',
 
-      completed:
-        false,
-
       repeat:
-        'Nunca',
+        'never',
 
-      categoryId,
+      subtasks:
+        [],
 
-      startMinsPlanned:
-        startMins,
+      position:
+        tasks.length,
 
-      timeOfDay:
-        formatTimeFromMinutes(
-          startMins
-        ),
+      source:
+        'app',
+
+      createdAt:
+        timestamp,
+
+      updatedAt:
+        timestamp,
+
+      completedAt:
+        null,
+
+      abandonedAt:
+        null,
     };
 
     saveTasks([
@@ -1184,12 +1459,15 @@ const overlapColumns =
         1,
         Number(
           changes.timeMinutes
-        ) || 30
+        ) ||
+          30
       );
 
     const updatedTasks =
       tasks.map(
-        (task) =>
+        (
+          task
+        ) =>
           task.id ===
           taskId
             ? {
@@ -1211,8 +1489,17 @@ const overlapColumns =
                   ) ===
                   'completed',
 
+                durationMinutes:
+                  duration,
+
                 timeMinutes:
                   duration,
+
+                startTime:
+                  changes.timeOfDay ||
+                  formatTimeFromMinutes(
+                    startMins
+                  ),
 
                 startMinsPlanned:
                   startMins,
@@ -1222,6 +1509,10 @@ const overlapColumns =
                   formatTimeFromMinutes(
                     startMins
                   ),
+
+                updatedAt:
+                  new Date()
+                    .toISOString(),
               }
             : task
       );
@@ -1240,7 +1531,9 @@ const overlapColumns =
   ) => {
     saveTasks(
       tasks.filter(
-        (task) =>
+        (
+          task
+        ) =>
           task.id !==
           taskId
       )
@@ -1259,7 +1552,8 @@ const overlapColumns =
     event
   ) => {
     const touches =
-      event.nativeEvent
+      event
+        .nativeEvent
         .touches;
 
     if (
@@ -1276,17 +1570,16 @@ const overlapColumns =
     const touch =
       touches[0];
 
-    tapStartRef.current =
-      {
-        pageX:
-          touch.pageX,
+    tapStartRef.current = {
+      pageX:
+        touch.pageX,
 
-        pageY:
-          touch.pageY,
+      pageY:
+        touch.pageY,
 
-        time:
-          Date.now(),
-      };
+      time:
+        Date.now(),
+    };
 
     touchMovedRef.current =
       false;
@@ -1305,7 +1598,8 @@ const overlapColumns =
     }
 
     const touches =
-      event.nativeEvent
+      event
+        .nativeEvent
         .touches;
 
     if (
@@ -1324,12 +1618,14 @@ const overlapColumns =
 
     const dx =
       touch.pageX -
-      tapStartRef.current
+      tapStartRef
+        .current
         .pageX;
 
     const dy =
       touch.pageY -
-      tapStartRef.current
+      tapStartRef
+        .current
         .pageY;
 
     const distance =
@@ -1359,17 +1655,21 @@ const overlapColumns =
       !start ||
       touchMovedRef.current ||
       isDragging ||
-      pinchStartDistance.current >
+      pinchStartDistance
+        .current >
         0
     ) {
       return;
     }
 
     const touch =
-      event.nativeEvent
+      event
+        .nativeEvent
         .changedTouches?.[0];
 
-    if (!touch) {
+    if (
+      !touch
+    ) {
       return;
     }
 
@@ -1385,7 +1685,8 @@ const overlapColumns =
 
     const viewportY =
       touch.pageY -
-      viewportWindowYRef.current;
+      viewportWindowYRef
+        .current;
 
     if (
       viewportY < 0 ||
@@ -1422,7 +1723,8 @@ const overlapColumns =
     requestAnimationFrame(
       () => {
         if (
-          suppressTimelineCreateRef.current
+          suppressTimelineCreateRef
+            .current
         ) {
           suppressTimelineCreateRef.current =
             false;
@@ -1454,20 +1756,34 @@ const overlapColumns =
     DAY_MINUTES;
 
   const ppmRef =
-    useRef(ppm);
+    useRef(
+      ppm
+    );
 
-  useEffect(() => {
-    ppmRef.current =
-      ppm;
-  }, [ppm]);
+  useEffect(
+    () => {
+      ppmRef.current =
+        ppm;
+    },
+    [
+      ppm,
+    ]
+  );
 
   const minPpmRef =
-    useRef(minPpm);
+    useRef(
+      minPpm
+    );
 
-  useEffect(() => {
-    minPpmRef.current =
-      minPpm;
-  }, [minPpm]);
+  useEffect(
+    () => {
+      minPpmRef.current =
+        minPpm;
+    },
+    [
+      minPpm,
+    ]
+  );
 
   const pinchStartDistance =
     useRef(0);
@@ -1478,90 +1794,106 @@ const overlapColumns =
   const zoomResponder =
     useMemo(
       () =>
-        PanResponder.create(
-          {
-            onStartShouldSetPanResponderCapture:
-              (evt) =>
-                evt.nativeEvent
+        PanResponder.create({
+          onStartShouldSetPanResponderCapture:
+            (
+              evt
+            ) =>
+              evt
+                .nativeEvent
+                .touches
+                .length ===
+              2,
+
+          onMoveShouldSetPanResponderCapture:
+            (
+              evt
+            ) =>
+              evt
+                .nativeEvent
+                .touches
+                .length ===
+              2,
+
+          onPanResponderGrant:
+            (
+              evt
+            ) => {
+              if (
+                evt
+                  .nativeEvent
                   .touches
                   .length ===
-                2,
-
-            onMoveShouldSetPanResponderCapture:
-              (evt) =>
-                evt.nativeEvent
-                  .touches
-                  .length ===
-                2,
-
-            onPanResponderGrant:
-              (evt) => {
-                if (
-                  evt.nativeEvent
-                    .touches
-                    .length ===
-                  2
-                ) {
-                  pinchStartDistance.current =
-                    getPinchDistance(
-                      evt.nativeEvent
-                        .touches
-                    );
-
-                  initialPpm.current =
-                    ppmRef.current;
-
-                  tapStartRef.current =
-                    null;
-                }
-              },
-
-            onPanResponderMove:
-              (evt) => {
-                if (
-                  evt.nativeEvent
-                    .touches
-                    .length ===
-                    2 &&
-                  pinchStartDistance.current >
-                    0
-                ) {
-                  const currentDistance =
-                    getPinchDistance(
-                      evt.nativeEvent
-                        .touches
-                    );
-
-                  const scale =
-                    currentDistance /
-                    pinchStartDistance.current;
-
-                  setPpm(
-                    clamp(
-                      initialPpm.current *
-                        scale,
-
-                      minPpmRef.current,
-
-                      MAX_PPM
-                    )
+                2
+              ) {
+                pinchStartDistance.current =
+                  getPinchDistance(
+                    evt
+                      .nativeEvent
+                      .touches
                   );
-                }
-              },
 
-            onPanResponderRelease:
-              () => {
-                pinchStartDistance.current =
-                  0;
-              },
+                initialPpm.current =
+                  ppmRef.current;
 
-            onPanResponderTerminate:
-              () => {
-                pinchStartDistance.current =
-                  0;
-              },
-          }
-        ),
+                tapStartRef.current =
+                  null;
+              }
+            },
+
+          onPanResponderMove:
+            (
+              evt
+            ) => {
+              if (
+                evt
+                  .nativeEvent
+                  .touches
+                  .length ===
+                  2 &&
+                pinchStartDistance
+                  .current >
+                  0
+              ) {
+                const currentDistance =
+                  getPinchDistance(
+                    evt
+                      .nativeEvent
+                      .touches
+                  );
+
+                const scale =
+                  currentDistance /
+                  pinchStartDistance
+                    .current;
+
+                setPpm(
+                  clamp(
+                    initialPpm
+                      .current *
+                      scale,
+
+                    minPpmRef
+                      .current,
+
+                    MAX_PPM
+                  )
+                );
+              }
+            },
+
+          onPanResponderRelease:
+            () => {
+              pinchStartDistance.current =
+                0;
+            },
+
+          onPanResponderTerminate:
+            () => {
+              pinchStartDistance.current =
+                0;
+            },
+        }),
       []
     );
 
@@ -1572,11 +1904,17 @@ const overlapColumns =
      CONTADOR
   ------------------------------------------------------- */
 
-const totalCompletedTasks =
-  visibleTasks.filter(
-    (task) =>
-      getTaskStatus(task) === 'completed'
-  ).length;
+  const totalCompletedTasks =
+    visibleTasks.filter(
+      (
+        task
+      ) =>
+        getTaskStatus(
+          task
+        ) ===
+        'completed'
+    ).length;
+
   /* -------------------------------------------------------
      RENDER
   ------------------------------------------------------- */
@@ -1592,16 +1930,26 @@ const totalCompletedTasks =
         'right',
       ]}
     >
-  <Header
-  selectedDate={selectedDate}
-  onPreviousDay={goToPreviousDay}
-  onNextDay={goToNextDay}
-  onDatePress={() => {
-    // Depois abrimos o calendário/date picker
-  }}
-  completedTasks={totalCompletedTasks}
-  totalTasks={visibleTasks.length}
-/>
+      <Header
+        selectedDate={
+          selectedDate
+        }
+        onPreviousDay={
+          goToPreviousDay
+        }
+        onNextDay={
+          goToNextDay
+        }
+        onDatePress={() => {
+          // Date picker depois
+        }}
+        completedTasks={
+          totalCompletedTasks
+        }
+        totalTasks={
+          visibleTasks.length
+        }
+      />
 
       <View
         ref={
@@ -1639,15 +1987,17 @@ const totalCompletedTasks =
 
           requestAnimationFrame(
             () => {
-              timelineViewportRef.current?.measureInWindow(
-                (
-                  x,
-                  y
-                ) => {
-                  viewportWindowYRef.current =
-                    y;
-                }
-              );
+              timelineViewportRef
+                .current
+                ?.measureInWindow(
+                  (
+                    x,
+                    y
+                  ) => {
+                    viewportWindowYRef.current =
+                      y;
+                  }
+                );
             }
           );
         }}
@@ -1756,7 +2106,8 @@ const totalCompletedTasks =
                 i
               ) => {
                 const offsetMinutes =
-                  i * 30;
+                  i *
+                  30;
 
                 const top =
                   offsetMinutes *
@@ -1764,13 +2115,15 @@ const totalCompletedTasks =
                   VERTICAL_PADDING;
 
                 const isHalfHour =
-                  i % 2 !==
+                  i %
+                    2 !==
                   0;
 
                 const displayHour =
                   (
                     Math.floor(
-                      i / 2
+                      i /
+                        2
                     ) +
                     7
                   ) %
@@ -1907,28 +2260,31 @@ const totalCompletedTasks =
 
             {/* LINHA AGORA */}
 
-          {/* LINHA AGORA — apenas no dia atual */}
+            {isViewingToday && (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.nowLine,
+                  {
+                    top:
+                      nowTop,
+                  },
+                ]}
+              >
+                <View
+                  style={
+                    styles.nowDot
+                  }
+                />
 
-{isViewingToday && (
-  <View
-    pointerEvents="none"
-    style={[
-      styles.nowLine,
-      {
-        top: nowTop,
-      },
-    ]}
-  >
-    <View
-      style={styles.nowDot}
-    />
-
-    <Image
-      source={require('../../assets/abelha.png')}
-      style={styles.nowBeeImage}
-    />
-  </View>
-)}
+                <Image
+                  source={require('../../assets/abelha.png')}
+                  style={
+                    styles.nowBeeImage
+                  }
+                />
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -1961,9 +2317,13 @@ const totalCompletedTasks =
             'create'
           );
 
-          setDetailsTask(
-            draft
-          );
+          setDetailsTask({
+            ...draft,
+
+            date:
+              draft?.date ||
+              selectedDateKey,
+          });
 
           setModalVisible(
             false
@@ -1971,7 +2331,7 @@ const totalCompletedTasks =
         }}
       />
 
-      {/* DETAILS / EDIT */}
+      {/* DETAILS */}
 
       <TaskDetailsModal
         visible={Boolean(
@@ -2000,15 +2360,22 @@ const totalCompletedTasks =
         onSave={(
           changes
         ) => {
+          const timestamp =
+            new Date()
+              .toISOString();
+
           if (
             detailsMode ===
             'create'
           ) {
             const newTask = {
-              id: `task-${Date.now()}`,
-  date:
-    changes.date ||
-    selectedDateKey,
+              id:
+                `task-${Date.now()}`,
+
+              date:
+                changes.date ||
+                selectedDateKey,
+
               ...changes,
 
               status:
@@ -2021,6 +2388,12 @@ const totalCompletedTasks =
                   'pending'
                 ) ===
                 'completed',
+
+              createdAt:
+                timestamp,
+
+              updatedAt:
+                timestamp,
             };
 
             saveTasks([
@@ -2030,29 +2403,55 @@ const totalCompletedTasks =
           } else {
             const updated =
               tasks.map(
-                (task) =>
-                  task.id ===
-                  detailsTask.id
-                    ? {
-                        ...task,
-                        ...changes,
+                (
+                  task
+                ) => {
+                  if (
+                    task.id !==
+                    detailsTask.id
+                  ) {
+                    return task;
+                  }
 
-                        status:
-                          changes.status ||
-                          getTaskStatus(
-                            task
-                          ),
+                  const nextStatus =
+                    changes.status ||
+                    getTaskStatus(
+                      task
+                    );
 
-                        completed:
-                          (
-                            changes.status ||
-                            getTaskStatus(
-                              task
-                            )
-                          ) ===
-                          'completed',
-                      }
-                    : task
+                  return {
+                    ...task,
+                    ...changes,
+
+                    status:
+                      nextStatus,
+
+                    completed:
+                      nextStatus ===
+                      'completed',
+
+                    completedAt:
+                      nextStatus ===
+                      'completed'
+                        ? (
+                            task.completedAt ||
+                            timestamp
+                          )
+                        : null,
+
+                    abandonedAt:
+                      nextStatus ===
+                      'abandoned'
+                        ? (
+                            task.abandonedAt ||
+                            timestamp
+                          )
+                        : null,
+
+                    updatedAt:
+                      timestamp,
+                  };
+                }
               );
 
             saveTasks(
@@ -2098,7 +2497,7 @@ const totalCompletedTasks =
         }
       />
 
-      {/* MODAL ANTIGO — AINDA MANTIDO POR AGORA */}
+      {/* MODAL ANTIGO */}
 
       <EditTaskModal
         visible={Boolean(
@@ -2145,7 +2544,8 @@ const styles =
       position:
         'relative',
 
-      marginTop: 2,
+      marginTop:
+        2,
     },
 
     timelineCanvas: {
@@ -2155,10 +2555,6 @@ const styles =
       backgroundColor:
         '#FFFFFF',
     },
-
-    /* -------------------------------------------------------
-       HORAS
-    ------------------------------------------------------- */
 
     hourRow: {
       position:
@@ -2186,7 +2582,8 @@ const styles =
       textAlign:
         'right',
 
-      fontSize: 12,
+      fontSize:
+        12,
 
       fontWeight:
         '500',
@@ -2196,15 +2593,12 @@ const styles =
     },
 
     hourTextOverview: {
-      fontSize: 9,
+      fontSize:
+        9,
 
       color:
         '#C7BFB9',
     },
-
-    /* -------------------------------------------------------
-       ESPINHA DORSAL
-    ------------------------------------------------------- */
 
     railContainer: {
       position:
@@ -2217,9 +2611,11 @@ const styles =
         AXIS_WIDTH -
         0.5,
 
-      width: 1,
+      width:
+        1,
 
-      zIndex: 2,
+      zIndex:
+        2,
     },
 
     railSegment: {
@@ -2228,12 +2624,16 @@ const styles =
 
       left: 0,
 
-      width: 1,
+      width:
+        1,
     },
 
     hourDot: {
-      width: 4,
-      height: 4,
+      width:
+        4,
+
+      height:
+        4,
 
       borderRadius:
         2,
@@ -2244,17 +2644,15 @@ const styles =
       marginRight:
         -2,
 
-      zIndex: 3,
+      zIndex:
+        3,
     },
-
-    /* -------------------------------------------------------
-       GRELHA
-    ------------------------------------------------------- */
 
     hourLine: {
       flex: 1,
 
-      height: 1,
+      height:
+        1,
 
       backgroundColor:
         '#F5F2EF',
@@ -2279,10 +2677,6 @@ const styles =
         'dashed',
     },
 
-    /* -------------------------------------------------------
-       AGORA
-    ------------------------------------------------------- */
-
     nowLine: {
       position:
         'absolute',
@@ -2290,11 +2684,14 @@ const styles =
       left:
         AXIS_WIDTH,
 
-      right: 10,
+      right:
+        10,
 
-      height: 1.5,
+      height:
+        1.5,
 
-      zIndex: 90,
+      zIndex:
+        90,
 
       backgroundColor:
         '#ECC94B',
@@ -2304,13 +2701,17 @@ const styles =
       position:
         'absolute',
 
-      left: -3,
+      left:
+        -3,
 
-      top: -2.5,
+      top:
+        -2.5,
 
-      width: 6.5,
+      width:
+        6.5,
 
-      height: 6.5,
+      height:
+        6.5,
 
       borderRadius:
         4,
@@ -2323,13 +2724,17 @@ const styles =
       position:
         'absolute',
 
-      right: -6,
+      right:
+        -6,
 
-      top: -10,
+      top:
+        -10,
 
-      width: 20,
+      width:
+        20,
 
-      height: 20,
+      height:
+        20,
 
       resizeMode:
         'contain',
