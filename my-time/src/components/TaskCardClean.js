@@ -57,6 +57,28 @@ const formatTimeFromMinutes = (
   )}`;
 };
 
+const formatDuration = (
+  minutes
+) => {
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours =
+    Math.floor(minutes / 60);
+
+  const mins =
+    minutes % 60;
+
+  if (mins === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h${String(
+    mins
+  ).padStart(2, '0')}`;
+};
+
 /* -------------------------------------------------------
    TEMAS
 ------------------------------------------------------- */
@@ -110,6 +132,25 @@ export default function TaskCardClean({
   ).current;
 
   /* -------------------------------------------------------
+     ESTADO
+  ------------------------------------------------------- */
+
+  const taskStatus =
+    task.status ||
+    (task.completed
+      ? 'completed'
+      : 'pending');
+
+  const isCompleted =
+    taskStatus === 'completed';
+
+  const isAbandoned =
+    taskStatus === 'abandoned';
+
+  const isNeutralized =
+    isCompleted || isAbandoned;
+
+  /* -------------------------------------------------------
      ALTURA
   ------------------------------------------------------- */
 
@@ -126,7 +167,7 @@ export default function TaskCardClean({
     );
 
   /* -------------------------------------------------------
-     TIPO DE CARTÃO - ALTURA
+     TIPO DE CARTÃO
   ------------------------------------------------------- */
 
   const isMicroTask =
@@ -173,21 +214,12 @@ export default function TaskCardClean({
     cardWidth != null &&
     cardWidth < 105;
 
-  /*
-   * Altura suficiente para
-   * aproveitar duas linhas.
-   */
   const hasRoomForMeta =
     visualHeight >= 30;
 
   const hasRoomForCompactMeta =
     visualHeight >= 18;
 
-  /*
-   * Checkbox:
-   * só desaparece quando
-   * realmente começa a apertar.
-   */
   const showCheckbox =
     !isVeryNarrow;
 
@@ -200,6 +232,26 @@ export default function TaskCardClean({
       themeIndex %
         CARD_THEMES.length
     ];
+
+  const cardBackground =
+    isNeutralized
+      ? '#F5F4F2'
+      : theme.bg;
+
+  const accentColor =
+    isNeutralized
+      ? '#C9C3BD'
+      : theme.accent;
+
+  const titleColor =
+    isAbandoned
+      ? '#AAA39D'
+      : '#403B37';
+
+  const metaColor =
+    isAbandoned
+      ? '#B5AEA8'
+      : '#8A827C';
 
   /* -------------------------------------------------------
      DRAG
@@ -440,36 +492,6 @@ export default function TaskCardClean({
      TEXTO
   ------------------------------------------------------- */
 
-  const formatDuration =
-    (minutes) => {
-      if (
-        minutes < 60
-      ) {
-        return `${minutes} min`;
-      }
-
-      const hours =
-        Math.floor(
-          minutes / 60
-        );
-
-      const mins =
-        minutes % 60;
-
-      if (
-        mins === 0
-      ) {
-        return `${hours}h`;
-      }
-
-      return `${hours}h${String(
-        mins
-      ).padStart(
-        2,
-        '0'
-      )}`;
-    };
-
   const startTimeStr =
     formatTimeFromMinutes(
       task.startMinsPlanned
@@ -485,6 +507,35 @@ export default function TaskCardClean({
     formatDuration(
       duration
     );
+
+  /* -------------------------------------------------------
+     ÍCONE DE ESTADO
+  ------------------------------------------------------- */
+
+  const renderStatusIcon =
+    (size = 10) => {
+      if (isCompleted) {
+        return (
+          <Ionicons
+            name="checkmark"
+            size={size}
+            color="#7F9B87"
+          />
+        );
+      }
+
+      if (isAbandoned) {
+        return (
+          <Ionicons
+            name="close"
+            size={size + 1}
+            color="#8F8983"
+          />
+        );
+      }
+
+      return null;
+    };
 
   /* -------------------------------------------------------
      MICRO
@@ -508,16 +559,13 @@ export default function TaskCardClean({
         }
         style={[
           styles.taskCompact,
-
           {
             top,
             height:
               visualHeight,
 
             backgroundColor:
-              task.completed
-                ? '#F5F4F2'
-                : theme.bg,
+              cardBackground,
 
             transform: [
               {
@@ -530,19 +578,15 @@ export default function TaskCardClean({
               },
             ],
           },
-
           horizontalStyle,
         ]}
       >
         <View
           style={[
             styles.taskCompactBar,
-
             {
               backgroundColor:
-                task.completed
-                  ? '#C9C3BD'
-                  : theme.accent,
+                accentColor,
             },
           ]}
         />
@@ -585,16 +629,13 @@ export default function TaskCardClean({
         }
         style={[
           styles.taskTiny,
-
           {
             top,
             height:
               visualHeight,
 
             backgroundColor:
-              task.completed
-                ? '#F5F4F2'
-                : theme.bg,
+              cardBackground,
 
             transform: [
               {
@@ -607,19 +648,15 @@ export default function TaskCardClean({
               },
             ],
           },
-
           horizontalStyle,
         ]}
       >
         <View
           style={[
             styles.taskTinyBar,
-
             {
               backgroundColor:
-                task.completed
-                  ? '#C9C3BD'
-                  : theme.accent,
+                accentColor,
             },
           ]}
         />
@@ -640,11 +677,19 @@ export default function TaskCardClean({
             style={[
               styles.tinyTitle,
 
+              {
+                color:
+                  titleColor,
+              },
+
               isVeryNarrow &&
                 styles.tinyTitleVeryNarrow,
 
-              task.completed &&
+              isCompleted &&
                 styles.taskTitleCompleted,
+
+              isAbandoned &&
+                styles.taskTitleAbandoned,
             ]}
             numberOfLines={1}
           >
@@ -677,16 +722,13 @@ export default function TaskCardClean({
         }
         style={[
           styles.taskCompact,
-
           {
             top,
             height:
               visualHeight,
 
             backgroundColor:
-              task.completed
-                ? '#F5F4F2'
-                : theme.bg,
+              cardBackground,
 
             transform: [
               {
@@ -699,19 +741,15 @@ export default function TaskCardClean({
               },
             ],
           },
-
           horizontalStyle,
         ]}
       >
         <View
           style={[
             styles.taskCompactBar,
-
             {
               backgroundColor:
-                task.completed
-                  ? '#C9C3BD'
-                  : theme.accent,
+                accentColor,
             },
           ]}
         />
@@ -732,11 +770,19 @@ export default function TaskCardClean({
             style={[
               styles.compactTitle,
 
+              {
+                color:
+                  titleColor,
+              },
+
               isVeryNarrow &&
                 styles.compactTitleVeryNarrow,
 
-              task.completed &&
+              isCompleted &&
                 styles.taskTitleCompleted,
+
+              isAbandoned &&
+                styles.taskTitleAbandoned,
             ]}
             numberOfLines={1}
           >
@@ -746,9 +792,13 @@ export default function TaskCardClean({
           {hasRoomForCompactMeta &&
             !isVeryNarrow && (
               <Text
-                style={
-                  styles.compactMetaLine
-                }
+                style={[
+                  styles.compactMetaLine,
+                  {
+                    color:
+                      metaColor,
+                  },
+                ]}
                 numberOfLines={1}
               >
                 {isNarrow
@@ -769,18 +819,15 @@ export default function TaskCardClean({
             onPress={() =>
               onToggle(task.id)
             }
-            style={
-              styles.compactCheckbox
-            }
+            style={[
+              styles.compactCheckbox,
+
+              isAbandoned &&
+                styles.abandonedCheckbox,
+            ]}
           >
-            {task.completed && (
-              <Ionicons
-                name="checkmark"
-                size={8}
-                color={
-                  theme.accent
-                }
-              />
+            {renderStatusIcon(
+              8
             )}
           </TouchableOpacity>
         )}
@@ -809,16 +856,13 @@ export default function TaskCardClean({
       }
       style={[
         styles.taskNormal,
-
         {
           top,
           height:
             visualHeight,
 
           backgroundColor:
-            task.completed
-              ? '#F5F4F2'
-              : theme.bg,
+            cardBackground,
 
           transform: [
             {
@@ -831,19 +875,15 @@ export default function TaskCardClean({
             },
           ],
         },
-
         horizontalStyle,
       ]}
     >
       <View
         style={[
           styles.taskAccentBar,
-
           {
             backgroundColor:
-              task.completed
-                ? '#C9C3BD'
-                : theme.accent,
+              accentColor,
           },
         ]}
       />
@@ -864,14 +904,22 @@ export default function TaskCardClean({
           style={[
             styles.taskTitle,
 
+            {
+              color:
+                titleColor,
+            },
+
             isNarrow &&
               styles.taskTitleNarrow,
 
             isVeryNarrow &&
               styles.taskTitleVeryNarrow,
 
-            task.completed &&
+            isCompleted &&
               styles.taskTitleCompleted,
+
+            isAbandoned &&
+              styles.taskTitleAbandoned,
           ]}
           numberOfLines={1}
         >
@@ -882,6 +930,11 @@ export default function TaskCardClean({
           <Text
             style={[
               styles.taskMeta,
+
+              {
+                color:
+                  metaColor,
+              },
 
               isNarrow &&
                 styles.taskMetaNarrow,
@@ -911,19 +964,16 @@ export default function TaskCardClean({
           style={[
             styles.universalCheckbox,
 
+            isAbandoned &&
+              styles.abandonedCheckbox,
+
             {
               marginTop: 8,
             },
           ]}
         >
-          {task.completed && (
-            <Ionicons
-              name="checkmark"
-              size={10}
-              color={
-                theme.accent
-              }
-            />
+          {renderStatusIcon(
+            10
           )}
         </TouchableOpacity>
       )}
@@ -971,7 +1021,7 @@ const styles =
 
     taskBody: {
       flex: 1,
-
+alignSelf: 'stretch',
       paddingHorizontal: 8,
 
       paddingTop: 8,
@@ -1008,6 +1058,13 @@ const styles =
         'line-through',
 
       color: '#8F8983',
+    },
+
+    taskTitleAbandoned: {
+      textDecorationLine:
+        'none',
+
+      color: '#AAA39D',
     },
 
     taskMeta: {
@@ -1051,6 +1108,14 @@ const styles =
 
       justifyContent:
         'center',
+    },
+
+    abandonedCheckbox: {
+      borderColor:
+        '#AAA39D',
+
+      backgroundColor:
+        '#F7F5F3',
     },
 
     /* ---------------------------------------------------

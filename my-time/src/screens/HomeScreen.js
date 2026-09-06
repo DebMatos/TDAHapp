@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+
 import {
   Image,
   PanResponder,
@@ -15,13 +16,16 @@ import {
   UIManager,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import EditTaskModal from '../components/modals/EditTaskModal';
+
 import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';
 
 if (
@@ -35,6 +39,7 @@ const STORAGE_KEY = '@my_time_blocks_data_v12';
 const TASKS_STORAGE_KEY = '@my_time_tasks_data_v1';
 
 const DAY_MINUTES = 24 * 60;
+
 const MAX_PPM = 1.75;
 const DEFAULT_PPM = 1.25;
 
@@ -63,190 +68,328 @@ const getRailColor = (hour) => {
 };
 
 const VERTICAL_SEGMENTS = [
-  { start: 7, duration: 2, color: '#68D391' },
-  { start: 9, duration: 3, color: '#F6E05E' },
-  { start: 12, duration: 2, color: '#F6AD55' },
-  { start: 14, duration: 4, color: '#FC8181' },
-  { start: 18, duration: 5, color: '#B794F4' },
-  { start: 23, duration: 8, color: '#7F9CF5' },
+  {
+    start: 7,
+    duration: 2,
+    color: '#68D391',
+  },
+  {
+    start: 9,
+    duration: 3,
+    color: '#F6E05E',
+  },
+  {
+    start: 12,
+    duration: 2,
+    color: '#F6AD55',
+  },
+  {
+    start: 14,
+    duration: 4,
+    color: '#FC8181',
+  },
+  {
+    start: 18,
+    duration: 5,
+    color: '#B794F4',
+  },
+  {
+    start: 23,
+    duration: 8,
+    color: '#7F9CF5',
+  },
 ];
 
-const formatTimeFromMinutes = (totalMinutes) => {
+/* -------------------------------------------------------
+   HELPERS
+------------------------------------------------------- */
+
+const formatTimeFromMinutes = (
+  totalMinutes
+) => {
   const normalized =
-    ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) %
+    ((totalMinutes % DAY_MINUTES) +
+      DAY_MINUTES) %
     DAY_MINUTES;
 
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
+  const hours =
+    Math.floor(normalized / 60);
 
-  return `${String(hours).padStart(2, '0')}:${String(
-    mins
-  ).padStart(2, '0')}`;
+  const mins =
+    normalized % 60;
+
+  return `${String(hours).padStart(
+    2,
+    '0'
+  )}:${String(mins).padStart(
+    2,
+    '0'
+  )}`;
 };
 
-const parseTimeToMinutes = (timeStr) => {
-  if (!timeStr || !timeStr.includes(':')) {
+const parseTimeToMinutes = (
+  timeStr
+) => {
+  if (
+    !timeStr ||
+    !timeStr.includes(':')
+  ) {
     return 7 * 60;
   }
 
-  const [h, m] = timeStr.split(':').map(Number);
+  const [h, m] =
+    timeStr
+      .split(':')
+      .map(Number);
 
   return (
-    (isNaN(h) ? 7 : h) * 60 +
+    (isNaN(h) ? 7 : h) *
+      60 +
     (isNaN(m) ? 0 : m)
   );
 };
 
-const clamp = (value, min, max) =>
-  Math.max(min, Math.min(max, value));
+const clamp = (
+  value,
+  min,
+  max
+) =>
+  Math.max(
+    min,
+    Math.min(
+      max,
+      value
+    )
+  );
 
-const snapMinutes = (minutes) =>
-  Math.round(minutes / SNAP_MINUTES) *
+const snapMinutes = (
+  minutes
+) =>
+  Math.round(
+    minutes /
+      SNAP_MINUTES
+  ) *
   SNAP_MINUTES;
 
-const getPinchDistance = (touches) => {
-  const [t1, t2] = touches;
+const getPinchDistance = (
+  touches
+) => {
+  const [t1, t2] =
+    touches;
 
-  const dx = t1.pageX - t2.pageX;
-  const dy = t1.pageY - t2.pageY;
+  const dx =
+    t1.pageX -
+    t2.pageX;
 
-  return Math.sqrt(dx * dx + dy * dy);
+  const dy =
+    t1.pageY -
+    t2.pageY;
+
+  return Math.sqrt(
+    dx * dx +
+      dy * dy
+  );
 };
 
-const getTaskTimelineInterval = (task) => {
+/* -------------------------------------------------------
+   ESTADO
+------------------------------------------------------- */
+
+const getTaskStatus = (
+  task
+) =>
+  task.status ||
+  (
+    task.completed
+      ? 'completed'
+      : 'pending'
+  );
+
+/* -------------------------------------------------------
+   OVERLAP
+------------------------------------------------------- */
+
+const getTaskTimelineInterval = (
+  task
+) => {
   const startMinute =
     task.startMinsPlanned ??
-    parseTimeToMinutes(task.timeOfDay);
+    parseTimeToMinutes(
+      task.timeOfDay
+    );
 
   let start =
     startMinute -
     TIMELINE_START_MINUTES;
 
   if (start < 0) {
-    start += DAY_MINUTES;
+    start +=
+      DAY_MINUTES;
   }
 
-  const duration = Math.max(
-    1,
-    Number(task.timeMinutes) || 30
-  );
+  const duration =
+    Math.max(
+      1,
+      Number(
+        task.timeMinutes
+      ) || 30
+    );
 
   return {
     id: task.id,
     start,
-    end: start + duration,
+    end:
+      start +
+      duration,
   };
 };
 
-const calculateOverlapColumns = (tasks) => {
-  const intervals = tasks
-    .map(getTaskTimelineInterval)
-    .sort((a, b) => {
-      if (a.start !== b.start) {
-        return a.start - b.start;
-      }
+const calculateOverlapColumns = (
+  tasks
+) => {
+  const intervals =
+    tasks
+      .map(
+        getTaskTimelineInterval
+      )
+      .sort(
+        (a, b) => {
+          if (
+            a.start !==
+            b.start
+          ) {
+            return (
+              a.start -
+              b.start
+            );
+          }
 
-      return b.end - a.end;
-    });
+          return (
+            b.end -
+            a.end
+          );
+        }
+      );
 
-  const result = new Map();
+  const result =
+    new Map();
 
   let group = [];
   let groupEnd = -1;
 
-  const processGroup = () => {
-    if (group.length === 0) {
-      return;
-    }
-
-    const active = [];
-    const assignments = [];
-
-    let maxColumns = 1;
-
-    group.forEach((event) => {
-      /*
-       * Libertamos colunas de tarefas
-       * que já terminaram.
-       *
-       * end === start NÃO é overlap.
-       */
-      for (
-        let i = active.length - 1;
-        i >= 0;
-        i--
+  const processGroup =
+    () => {
+      if (
+        group.length ===
+        0
       ) {
-        if (active[i].end <= event.start) {
-          active.splice(i, 1);
+        return;
+      }
+
+      const active = [];
+      const assignments = [];
+
+      let maxColumns = 1;
+
+      group.forEach(
+        (event) => {
+          for (
+            let i =
+              active.length -
+              1;
+            i >= 0;
+            i--
+          ) {
+            if (
+              active[i].end <=
+              event.start
+            ) {
+              active.splice(
+                i,
+                1
+              );
+            }
+          }
+
+          const usedColumns =
+            new Set(
+              active.map(
+                (item) =>
+                  item.column
+              )
+            );
+
+          let column = 0;
+
+          while (
+            usedColumns.has(
+              column
+            )
+          ) {
+            column += 1;
+          }
+
+          active.push({
+            end: event.end,
+            column,
+          });
+
+          assignments.push({
+            id: event.id,
+            column,
+          });
+
+          maxColumns =
+            Math.max(
+              maxColumns,
+              active.length,
+              column + 1
+            );
         }
-      }
-
-      const usedColumns =
-        new Set(
-          active.map(
-            (item) => item.column
-          )
-        );
-
-      let column = 0;
-
-      while (
-        usedColumns.has(column)
-      ) {
-        column += 1;
-      }
-
-      active.push({
-        end: event.end,
-        column,
-      });
-
-      assignments.push({
-        id: event.id,
-        column,
-      });
-
-      maxColumns = Math.max(
-        maxColumns,
-        active.length,
-        column + 1
       );
-    });
 
-    assignments.forEach(
-      ({ id, column }) => {
-        result.set(id, {
+      assignments.forEach(
+        ({
+          id,
           column,
-          columnCount:
-            maxColumns,
-        });
+        }) => {
+          result.set(
+            id,
+            {
+              column,
+              columnCount:
+                maxColumns,
+            }
+          );
+        }
+      );
+    };
+
+  intervals.forEach(
+    (event) => {
+      if (
+        group.length >
+          0 &&
+        event.start >=
+          groupEnd
+      ) {
+        processGroup();
+
+        group = [];
+        groupEnd = -1;
       }
-    );
-  };
 
-  intervals.forEach((event) => {
-    /*
-     * Se começa depois de todo o grupo
-     * anterior ter terminado, começamos
-     * um novo grupo independente.
-     */
-    if (
-      group.length > 0 &&
-      event.start >= groupEnd
-    ) {
-      processGroup();
+      group.push(
+        event
+      );
 
-      group = [];
-      groupEnd = -1;
+      groupEnd =
+        Math.max(
+          groupEnd,
+          event.end
+        );
     }
-
-    group.push(event);
-
-    groupEnd = Math.max(
-      groupEnd,
-      event.end
-    );
-  });
+  );
 
   processGroup();
 
@@ -258,54 +401,83 @@ const calculateOverlapColumns = (tasks) => {
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
-  const scrollRef = useRef(null);
-  const timelineViewportRef = useRef(null);
+  const scrollRef =
+    useRef(null);
 
-  const scrollYRef = useRef(0);
+  const timelineViewportRef =
+    useRef(null);
 
-  const viewportWindowYRef = useRef(0);
+  const scrollYRef =
+    useRef(0);
 
-  const tapStartRef = useRef(null);
-  const touchMovedRef = useRef(false);
-const [
-  detailsTask,
-  setDetailsTask,
-] = useState(null);
+  const viewportWindowYRef =
+    useRef(0);
 
-const [
-  detailsMode,
-  setDetailsMode,
-] = useState('create');
+  const tapStartRef =
+    useRef(null);
 
-  /*
-   * Quando um TaskCard recebe o toque,
-   * impede a timeline de abrir Create.
-   */
-  const suppressTimelineCreateRef = useRef(false);
+  const touchMovedRef =
+    useRef(false);
 
-const [viewportHeight, setViewportHeight] =
-  useState(0);
+  const suppressTimelineCreateRef =
+    useRef(false);
 
-const [viewportWidth, setViewportWidth] =
-  useState(0);
-  const [isDragging, setIsDragging] =
-    useState(false);
+  const [
+    detailsTask,
+    setDetailsTask,
+  ] = useState(null);
 
-  const [ppm, setPpm] =
-    useState(DEFAULT_PPM);
-
-  const [tasks, setTasks] =
-    useState([]);
-
-  const [blocks, setBlocks] = useState(
-    INITIAL_TIMELINE_BLOCKS || []
+  const [
+    detailsMode,
+    setDetailsMode,
+  ] = useState(
+    'create'
   );
 
-  const [modalVisible, setModalVisible] =
-    useState(false);
+  const [
+    viewportHeight,
+    setViewportHeight,
+  ] = useState(0);
 
-  const [editingTask, setEditingTask] =
-    useState(null);
+  const [
+    viewportWidth,
+    setViewportWidth,
+  ] = useState(0);
+
+  const [
+    isDragging,
+    setIsDragging,
+  ] = useState(false);
+
+  const [
+    ppm,
+    setPpm,
+  ] = useState(
+    DEFAULT_PPM
+  );
+
+  const [
+    tasks,
+    setTasks,
+  ] = useState([]);
+
+  const [
+    blocks,
+    setBlocks,
+  ] = useState(
+    INITIAL_TIMELINE_BLOCKS ||
+      []
+  );
+
+  const [
+    modalVisible,
+    setModalVisible,
+  ] = useState(false);
+
+  const [
+    editingTask,
+    setEditingTask,
+  ] = useState(null);
 
   const [
     targetSlotMinutes,
@@ -316,132 +488,186 @@ const [viewportWidth, setViewportWidth] =
      CONVERSÃO TEMPO <-> POSIÇÃO
   ------------------------------------------------------- */
 
-  const getVisualY = useCallback(
-    (minute) => {
-      let offset =
-        minute - TIMELINE_START_MINUTES;
+  const getVisualY =
+    useCallback(
+      (minute) => {
+        let offset =
+          minute -
+          TIMELINE_START_MINUTES;
 
-      if (offset < 0) {
-        offset += DAY_MINUTES;
-      }
+        if (
+          offset < 0
+        ) {
+          offset +=
+            DAY_MINUTES;
+        }
 
-      return (
-        offset * ppm +
-        VERTICAL_PADDING
+        return (
+          offset * ppm +
+          VERTICAL_PADDING
+        );
+      },
+      [ppm]
+    );
+
+  const getMinuteFromY =
+    useCallback(
+      (y) => {
+        const rawY =
+          y -
+          VERTICAL_PADDING;
+
+        const offset =
+          rawY /
+          ppm;
+
+        let realMinute =
+          (
+            offset +
+            TIMELINE_START_MINUTES
+          ) %
+          DAY_MINUTES;
+
+        if (
+          realMinute < 0
+        ) {
+          realMinute +=
+            DAY_MINUTES;
+        }
+
+        return realMinute;
+      },
+      [ppm]
+    );
+
+  const canvasHeight =
+    useMemo(
+      () =>
+        DAY_MINUTES *
+          ppm +
+        VERTICAL_PADDING *
+          2,
+      [ppm]
+    );
+
+  /* -------------------------------------------------------
+     OVERLAPS
+  ------------------------------------------------------- */
+
+  const overlapColumns =
+    useMemo(
+      () =>
+        calculateOverlapColumns(
+          tasks
+        ),
+      [tasks]
+    );
+
+  const taskHorizontalLayouts =
+    useMemo(() => {
+      const layouts =
+        new Map();
+
+      const availableWidth =
+        Math.max(
+          0,
+          viewportWidth -
+            TASK_CARD_LEFT -
+            TASK_CARD_RIGHT
+        );
+
+      tasks.forEach(
+        (task) => {
+          const overlap =
+            overlapColumns.get(
+              task.id
+            ) || {
+              column: 0,
+              columnCount: 1,
+            };
+
+          const {
+            column,
+            columnCount,
+          } = overlap;
+
+          if (
+            columnCount <=
+              1 ||
+            availableWidth <=
+              0
+          ) {
+            layouts.set(
+              task.id,
+              {
+                left:
+                  TASK_CARD_LEFT,
+                right:
+                  TASK_CARD_RIGHT,
+              }
+            );
+
+            return;
+          }
+
+          const gaps =
+            OVERLAP_GAP *
+            (
+              columnCount -
+              1
+            );
+
+          const columnWidth =
+            (
+              availableWidth -
+              gaps
+            ) /
+            columnCount;
+
+          layouts.set(
+            task.id,
+            {
+              left:
+                TASK_CARD_LEFT +
+                column *
+                  (
+                    columnWidth +
+                    OVERLAP_GAP
+                  ),
+
+              width:
+                columnWidth,
+
+              right:
+                undefined,
+            }
+          );
+        }
       );
-    },
-    [ppm]
-  );
 
-  const getMinuteFromY = useCallback(
-    (y) => {
-      const rawY =
-        y - VERTICAL_PADDING;
-
-      const offset =
-        rawY / ppm;
-
-      let realMinute =
-        (offset +
-          TIMELINE_START_MINUTES) %
-        DAY_MINUTES;
-
-      if (realMinute < 0) {
-        realMinute += DAY_MINUTES;
-      }
-
-      return realMinute;
-    },
-    [ppm]
-  );
-
-  const canvasHeight = useMemo(
-    () =>
-      DAY_MINUTES * ppm +
-      VERTICAL_PADDING * 2,
-    [ppm]
-  );
-
-  const overlapColumns = useMemo(
-  () =>
-    calculateOverlapColumns(tasks),
-  [tasks]
-);
-
-const taskHorizontalLayouts = useMemo(() => {
-  const layouts = new Map();
-
-  const availableWidth = Math.max(
-    0,
-    viewportWidth -
-      TASK_CARD_LEFT -
-      TASK_CARD_RIGHT
-  );
-
-  tasks.forEach((task) => {
-    const overlap =
-      overlapColumns.get(task.id) || {
-        column: 0,
-        columnCount: 1,
-      };
-
-    const {
-      column,
-      columnCount,
-    } = overlap;
-
-    if (
-      columnCount <= 1 ||
-      availableWidth <= 0
-    ) {
-      layouts.set(task.id, {
-        left: TASK_CARD_LEFT,
-        right: TASK_CARD_RIGHT,
-      });
-
-      return;
-    }
-
-    const gaps =
-      OVERLAP_GAP *
-      (columnCount - 1);
-
-    const columnWidth =
-      (availableWidth - gaps) /
-      columnCount;
-
-    layouts.set(task.id, {
-      left:
-        TASK_CARD_LEFT +
-        column *
-          (columnWidth +
-            OVERLAP_GAP),
-
-      width: columnWidth,
-
-      right: undefined,
-    });
-  });
-
-  return layouts;
-}, [
-  tasks,
-  overlapColumns,
-  viewportWidth,
-]);
+      return layouts;
+    }, [
+      tasks,
+      overlapColumns,
+      viewportWidth,
+    ]);
 
   /* -------------------------------------------------------
      AGORA
   ------------------------------------------------------- */
 
-  const now = new Date();
+  const now =
+    new Date();
 
   const currentAbsMins =
-    now.getHours() * 60 +
+    now.getHours() *
+      60 +
     now.getMinutes();
 
   const nowTop =
-    getVisualY(currentAbsMins);
+    getVisualY(
+      currentAbsMins
+    );
 
   /* -------------------------------------------------------
      SCROLL INICIAL
@@ -452,36 +678,47 @@ const taskHorizontalLayouts = useMemo(() => {
 
   useEffect(() => {
     if (
-      viewportHeight > 0 &&
+      viewportHeight >
+        0 &&
       !initialScrollDone.current &&
       scrollRef.current
     ) {
-      initialScrollDone.current = true;
+      initialScrollDone.current =
+        true;
 
       const targetY =
         nowTop -
-        viewportHeight * 0.35;
+        viewportHeight *
+          0.35;
 
-      const maxScroll = Math.max(
-        0,
-        canvasHeight -
-        viewportHeight
+      const maxScroll =
+        Math.max(
+          0,
+          canvasHeight -
+            viewportHeight
+        );
+
+      const y =
+        clamp(
+          targetY,
+          0,
+          maxScroll
+        );
+
+      scrollYRef.current =
+        y;
+
+      requestAnimationFrame(
+        () => {
+          scrollRef.current?.scrollTo(
+            {
+              y,
+              animated:
+                false,
+            }
+          );
+        }
       );
-
-      const y = clamp(
-        targetY,
-        0,
-        maxScroll
-      );
-
-      scrollYRef.current = y;
-
-      requestAnimationFrame(() => {
-        scrollRef.current?.scrollTo({
-          y,
-          animated: false,
-        });
-      });
     }
   }, [
     viewportHeight,
@@ -507,38 +744,65 @@ const taskHorizontalLayouts = useMemo(() => {
               TASKS_STORAGE_KEY
             );
 
-          let parsedBlocks = null;
+          let parsedBlocks =
+            null;
 
-          if (storedBlocks) {
+          if (
+            storedBlocks
+          ) {
             const parsed =
               JSON.parse(
                 storedBlocks
               );
 
             if (
-              Array.isArray(parsed) &&
-              parsed.length > 0
+              Array.isArray(
+                parsed
+              ) &&
+              parsed.length >
+                0
             ) {
-              parsedBlocks = parsed;
-              setBlocks(parsed);
+              parsedBlocks =
+                parsed;
+
+              setBlocks(
+                parsed
+              );
             }
           }
 
-          if (storedTasks) {
+          if (
+            storedTasks
+          ) {
             const parsed =
               JSON.parse(
                 storedTasks
               );
 
             if (
-              Array.isArray(parsed)
+              Array.isArray(
+                parsed
+              )
             ) {
-              setTasks(parsed);
+              /*
+               * Não fazemos uma migração
+               * destrutiva aqui.
+               *
+               * getTaskStatus continua a
+               * suportar tarefas antigas
+               * que só tenham completed.
+               */
+              setTasks(
+                parsed
+              );
+
               return;
             }
           }
 
-          if (parsedBlocks) {
+          if (
+            parsedBlocks
+          ) {
             const migratedTasks =
               parsedBlocks.flatMap(
                 (block) => {
@@ -547,33 +811,56 @@ const taskHorizontalLayouts = useMemo(() => {
                     60;
 
                   return (
-                    block.tasks || []
-                  ).map((task) => {
-                    const startMinsPlanned =
-                      task.startMinsPlanned ??
-                      (task.timeOfDay
-                        ? parseTimeToMinutes(
+                    block.tasks ||
+                    []
+                  ).map(
+                    (task) => {
+                      const startMinsPlanned =
+                        task.startMinsPlanned ??
+                        (
                           task.timeOfDay
-                        )
-                        : currentMinute);
+                            ? parseTimeToMinutes(
+                                task.timeOfDay
+                              )
+                            : currentMinute
+                        );
 
-                    currentMinute =
-                      startMinsPlanned +
-                      (task.timeMinutes ||
-                        30);
+                      currentMinute =
+                        startMinsPlanned +
+                        (
+                          task.timeMinutes ||
+                          30
+                        );
 
-                    return {
-                      ...task,
+                      return {
+                        ...task,
 
-                      startMinsPlanned,
+                        status:
+                          task.status ||
+                          (
+                            task.completed
+                              ? 'completed'
+                              : 'pending'
+                          ),
 
-                      timeOfDay:
-                        task.timeOfDay ||
-                        formatTimeFromMinutes(
-                          startMinsPlanned
-                        ),
-                    };
-                  });
+                        completed:
+                          task.status
+                            ? task.status ===
+                              'completed'
+                            : Boolean(
+                                task.completed
+                              ),
+
+                        startMinsPlanned,
+
+                        timeOfDay:
+                          task.timeOfDay ||
+                          formatTimeFromMinutes(
+                            startMinsPlanned
+                          ),
+                      };
+                    }
+                  );
                 }
               );
 
@@ -588,7 +875,9 @@ const taskHorizontalLayouts = useMemo(() => {
               )
             );
           }
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             'Erro ao carregar dados:',
             error
@@ -599,23 +888,30 @@ const taskHorizontalLayouts = useMemo(() => {
     loadStoredData();
   }, []);
 
-  const saveTasks = async (
-    newTasks
-  ) => {
-    setTasks(newTasks);
+  const saveTasks =
+    async (
+      newTasks
+    ) => {
+      setTasks(
+        newTasks
+      );
 
-    try {
-      await AsyncStorage.setItem(
-        TASKS_STORAGE_KEY,
-        JSON.stringify(newTasks)
-      );
-    } catch (error) {
-      console.error(
-        'Erro ao guardar tarefas:',
+      try {
+        await AsyncStorage.setItem(
+          TASKS_STORAGE_KEY,
+          JSON.stringify(
+            newTasks
+          )
+        );
+      } catch (
         error
-      );
-    }
-  };
+      ) {
+        console.error(
+          'Erro ao guardar tarefas:',
+          error
+        );
+      }
+    };
 
   /* -------------------------------------------------------
      TAREFAS
@@ -626,41 +922,93 @@ const taskHorizontalLayouts = useMemo(() => {
     newMins
   ) => {
     const updatedTasks =
-      tasks.map((t) =>
-        t.id === taskId
-          ? {
-            ...t,
+      tasks.map(
+        (task) =>
+          task.id ===
+          taskId
+            ? {
+                ...task,
 
-            startMinsPlanned:
-              newMins,
+                startMinsPlanned:
+                  newMins,
 
-            timeOfDay:
-              formatTimeFromMinutes(
-                newMins
-              ),
-          }
-          : t
+                timeOfDay:
+                  formatTimeFromMinutes(
+                    newMins
+                  ),
+              }
+            : task
       );
 
-    saveTasks(updatedTasks);
+    saveTasks(
+      updatedTasks
+    );
   };
+
+  /* -------------------------------------------------------
+     CHECKBOX:
+     pending <-> completed
+
+     abandoned não muda pelo card
+  ------------------------------------------------------- */
 
   const toggleTaskComplete = (
     taskId
   ) => {
     const updatedTasks =
-      tasks.map((t) =>
-        t.id === taskId
-          ? {
-            ...t,
-            completed:
-              !t.completed,
+      tasks.map(
+        (task) => {
+          if (
+            task.id !==
+            taskId
+          ) {
+            return task;
           }
-          : t
+
+          const currentStatus =
+            getTaskStatus(
+              task
+            );
+
+          /*
+           * Uma tarefa abandonada só
+           * muda de estado através dos
+           * detalhes.
+           */
+          if (
+            currentStatus ===
+            'abandoned'
+          ) {
+            return task;
+          }
+
+          const nextStatus =
+            currentStatus ===
+            'completed'
+              ? 'pending'
+              : 'completed';
+
+          return {
+            ...task,
+
+            status:
+              nextStatus,
+
+            completed:
+              nextStatus ===
+              'completed',
+          };
+        }
       );
 
-    saveTasks(updatedTasks);
+    saveTasks(
+      updatedTasks
+    );
   };
+
+  /* -------------------------------------------------------
+     QUICK CREATE
+  ------------------------------------------------------- */
 
   const handleSaveTask = ({
     title,
@@ -668,30 +1016,43 @@ const taskHorizontalLayouts = useMemo(() => {
     duration,
     categoryId,
   }) => {
-    const safeDuration = Math.max(
-      1,
-      Number(duration) || 30
-    );
+    const safeDuration =
+      Math.max(
+        1,
+        Number(
+          duration
+        ) || 30
+      );
 
     const startMins =
-      targetSlotMinutes ?? 7 * 60;
+      targetSlotMinutes ??
+      7 * 60;
 
     const newTask = {
       id: `task-${Date.now()}`,
 
-      title: title.trim(),
+      title:
+        title.trim(),
 
       description:
-        description?.trim() || '',
+        description?.trim() ||
+        '',
 
       notes:
-        description?.trim() || '',
+        description?.trim() ||
+        '',
 
-      timeMinutes: safeDuration,
+      timeMinutes:
+        safeDuration,
 
-      completed: false,
+      status:
+        'pending',
 
-      repeat: 'Nunca',
+      completed:
+        false,
+
+      repeat:
+        'Nunca',
 
       categoryId,
 
@@ -709,9 +1070,18 @@ const taskHorizontalLayouts = useMemo(() => {
       newTask,
     ]);
 
-    setTargetSlotMinutes(null);
-    setModalVisible(false);
+    setTargetSlotMinutes(
+      null
+    );
+
+    setModalVisible(
+      false
+    );
   };
+
+  /* -------------------------------------------------------
+     EDIT ANTIGO
+  ------------------------------------------------------- */
 
   const handleEditTask = (
     taskId,
@@ -723,38 +1093,60 @@ const taskHorizontalLayouts = useMemo(() => {
         changes.timeOfDay
       );
 
-    const duration = Math.max(
-      1,
-      Number(
-        changes.timeMinutes
-      ) || 30
-    );
-
-    const updatedTasks =
-      tasks.map((t) =>
-        t.id === taskId
-          ? {
-            ...t,
-            ...changes,
-
-            timeMinutes:
-              duration,
-
-            startMinsPlanned:
-              startMins,
-
-            timeOfDay:
-              changes.timeOfDay ||
-              formatTimeFromMinutes(
-                startMins
-              ),
-          }
-          : t
+    const duration =
+      Math.max(
+        1,
+        Number(
+          changes.timeMinutes
+        ) || 30
       );
 
-    saveTasks(updatedTasks);
+    const updatedTasks =
+      tasks.map(
+        (task) =>
+          task.id ===
+          taskId
+            ? {
+                ...task,
+                ...changes,
 
-    setEditingTask(null);
+                status:
+                  changes.status ||
+                  getTaskStatus(
+                    task
+                  ),
+
+                completed:
+                  (
+                    changes.status ||
+                    getTaskStatus(
+                      task
+                    )
+                  ) ===
+                  'completed',
+
+                timeMinutes:
+                  duration,
+
+                startMinsPlanned:
+                  startMins,
+
+                timeOfDay:
+                  changes.timeOfDay ||
+                  formatTimeFromMinutes(
+                    startMins
+                  ),
+              }
+            : task
+      );
+
+    saveTasks(
+      updatedTasks
+    );
+
+    setEditingTask(
+      null
+    );
   };
 
   const handleDeleteTask = (
@@ -762,11 +1154,15 @@ const taskHorizontalLayouts = useMemo(() => {
   ) => {
     saveTasks(
       tasks.filter(
-        (t) => t.id !== taskId
+        (task) =>
+          task.id !==
+          taskId
       )
     );
 
-    setEditingTask(null);
+    setEditingTask(
+      null
+    );
   };
 
   /* -------------------------------------------------------
@@ -777,11 +1173,13 @@ const taskHorizontalLayouts = useMemo(() => {
     event
   ) => {
     const touches =
-      event.nativeEvent.touches;
+      event.nativeEvent
+        .touches;
 
     if (
       !touches ||
-      touches.length !== 1
+      touches.length !==
+        1
     ) {
       tapStartRef.current =
         null;
@@ -789,13 +1187,20 @@ const taskHorizontalLayouts = useMemo(() => {
       return;
     }
 
-    const touch = touches[0];
+    const touch =
+      touches[0];
 
-    tapStartRef.current = {
-      pageX: touch.pageX,
-      pageY: touch.pageY,
-      time: Date.now(),
-    };
+    tapStartRef.current =
+      {
+        pageX:
+          touch.pageX,
+
+        pageY:
+          touch.pageY,
+
+        time:
+          Date.now(),
+      };
 
     touchMovedRef.current =
       false;
@@ -807,16 +1212,20 @@ const taskHorizontalLayouts = useMemo(() => {
   const handleTimelineTouchMove = (
     event
   ) => {
-    if (!tapStartRef.current) {
+    if (
+      !tapStartRef.current
+    ) {
       return;
     }
 
     const touches =
-      event.nativeEvent.touches;
+      event.nativeEvent
+        .touches;
 
     if (
       !touches ||
-      touches.length !== 1
+      touches.length !==
+        1
     ) {
       touchMovedRef.current =
         true;
@@ -824,22 +1233,28 @@ const taskHorizontalLayouts = useMemo(() => {
       return;
     }
 
-    const touch = touches[0];
+    const touch =
+      touches[0];
 
     const dx =
       touch.pageX -
-      tapStartRef.current.pageX;
+      tapStartRef.current
+        .pageX;
 
     const dy =
       touch.pageY -
-      tapStartRef.current.pageY;
+      tapStartRef.current
+        .pageY;
 
     const distance =
       Math.sqrt(
-        dx * dx + dy * dy
+        dx * dx +
+          dy * dy
       );
 
-    if (distance > 8) {
+    if (
+      distance > 8
+    ) {
       touchMovedRef.current =
         true;
     }
@@ -859,7 +1274,7 @@ const taskHorizontalLayouts = useMemo(() => {
       touchMovedRef.current ||
       isDragging ||
       pinchStartDistance.current >
-      0
+        0
     ) {
       return;
     }
@@ -876,7 +1291,9 @@ const taskHorizontalLayouts = useMemo(() => {
       Date.now() -
       start.time;
 
-    if (elapsed > 300) {
+    if (
+      elapsed > 300
+    ) {
       return;
     }
 
@@ -887,7 +1304,7 @@ const taskHorizontalLayouts = useMemo(() => {
     if (
       viewportY < 0 ||
       viewportY >
-      viewportHeight
+        viewportHeight
     ) {
       return;
     }
@@ -907,34 +1324,35 @@ const taskHorizontalLayouts = useMemo(() => {
       );
 
     snappedMinute =
-      ((snappedMinute %
-        DAY_MINUTES) +
-        DAY_MINUTES) %
+      (
+        (
+          snappedMinute %
+          DAY_MINUTES
+        ) +
+        DAY_MINUTES
+      ) %
       DAY_MINUTES;
 
-    /*
-     * Esperamos pelo onPress do TaskCard.
-     *
-     * Se o toque pertenceu a uma tarefa,
-     * suppressTimelineCreateRef será true
-     * e não abrimos o Create.
-     */
-    requestAnimationFrame(() => {
-      if (
-        suppressTimelineCreateRef.current
-      ) {
-        suppressTimelineCreateRef.current =
-          false;
+    requestAnimationFrame(
+      () => {
+        if (
+          suppressTimelineCreateRef.current
+        ) {
+          suppressTimelineCreateRef.current =
+            false;
 
-        return;
+          return;
+        }
+
+        setTargetSlotMinutes(
+          snappedMinute
+        );
+
+        setModalVisible(
+          true
+        );
       }
-
-      setTargetSlotMinutes(
-        snappedMinute
-      );
-
-      setModalVisible(true);
-    });
+    );
   };
 
   /* -------------------------------------------------------
@@ -942,15 +1360,19 @@ const taskHorizontalLayouts = useMemo(() => {
   ------------------------------------------------------- */
 
   const minPpm =
-    (viewportHeight -
-      VERTICAL_PADDING * 2) /
+    (
+      viewportHeight -
+      VERTICAL_PADDING *
+        2
+    ) /
     DAY_MINUTES;
 
   const ppmRef =
     useRef(ppm);
 
   useEffect(() => {
-    ppmRef.current = ppm;
+    ppmRef.current =
+      ppm;
   }, [ppm]);
 
   const minPpmRef =
@@ -967,93 +1389,110 @@ const taskHorizontalLayouts = useMemo(() => {
   const initialPpm =
     useRef(1);
 
-  const zoomResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponderCapture:
-          (evt) =>
-            evt.nativeEvent
-              .touches.length === 2,
+  const zoomResponder =
+    useMemo(
+      () =>
+        PanResponder.create(
+          {
+            onStartShouldSetPanResponderCapture:
+              (evt) =>
+                evt.nativeEvent
+                  .touches
+                  .length ===
+                2,
 
-        onMoveShouldSetPanResponderCapture:
-          (evt) =>
-            evt.nativeEvent
-              .touches.length === 2,
+            onMoveShouldSetPanResponderCapture:
+              (evt) =>
+                evt.nativeEvent
+                  .touches
+                  .length ===
+                2,
 
-        onPanResponderGrant:
-          (evt) => {
-            if (
-              evt.nativeEvent
-                .touches.length ===
-              2
-            ) {
-              pinchStartDistance.current =
-                getPinchDistance(
+            onPanResponderGrant:
+              (evt) => {
+                if (
                   evt.nativeEvent
                     .touches
-                );
+                    .length ===
+                  2
+                ) {
+                  pinchStartDistance.current =
+                    getPinchDistance(
+                      evt.nativeEvent
+                        .touches
+                    );
 
-              initialPpm.current =
-                ppmRef.current;
+                  initialPpm.current =
+                    ppmRef.current;
 
-              tapStartRef.current =
-                null;
-            }
-          },
+                  tapStartRef.current =
+                    null;
+                }
+              },
 
-        onPanResponderMove:
-          (evt) => {
-            if (
-              evt.nativeEvent
-                .touches.length ===
-              2 &&
-              pinchStartDistance.current >
-              0
-            ) {
-              const currentDistance =
-                getPinchDistance(
+            onPanResponderMove:
+              (evt) => {
+                if (
                   evt.nativeEvent
                     .touches
-                );
+                    .length ===
+                    2 &&
+                  pinchStartDistance.current >
+                    0
+                ) {
+                  const currentDistance =
+                    getPinchDistance(
+                      evt.nativeEvent
+                        .touches
+                    );
 
-              const scale =
-                currentDistance /
-                pinchStartDistance.current;
+                  const scale =
+                    currentDistance /
+                    pinchStartDistance.current;
 
-              setPpm(
-                clamp(
-                  initialPpm.current *
-                  scale,
+                  setPpm(
+                    clamp(
+                      initialPpm.current *
+                        scale,
 
-                  minPpmRef.current,
+                      minPpmRef.current,
 
-                  MAX_PPM
-                )
-              );
-            }
-          },
+                      MAX_PPM
+                    )
+                  );
+                }
+              },
 
-        onPanResponderRelease:
-          () => {
-            pinchStartDistance.current =
-              0;
-          },
+            onPanResponderRelease:
+              () => {
+                pinchStartDistance.current =
+                  0;
+              },
 
-        onPanResponderTerminate:
-          () => {
-            pinchStartDistance.current =
-              0;
-          },
-      }),
-    []
-  );
+            onPanResponderTerminate:
+              () => {
+                pinchStartDistance.current =
+                  0;
+              },
+          }
+        ),
+      []
+    );
 
   const isDense =
     ppm < 0.7;
 
+  /* -------------------------------------------------------
+     CONTADOR
+  ------------------------------------------------------- */
+
   const totalCompletedTasks =
     tasks.filter(
-      (t) => t.completed
+      (task) =>
+        getTaskStatus(
+          task
+        ) ===
+        'completed'
     ).length;
 
   /* -------------------------------------------------------
@@ -1062,7 +1501,9 @@ const taskHorizontalLayouts = useMemo(() => {
 
   return (
     <SafeAreaView
-      style={styles.safe}
+      style={
+        styles.safe
+      }
       edges={[
         'top',
         'left',
@@ -1095,14 +1536,20 @@ const taskHorizontalLayouts = useMemo(() => {
         onTouchEnd={
           handleTimelineTouchEnd
         }
-        onLayout={(event) => {
+        onLayout={(
+          event
+        ) => {
           setViewportHeight(
-            event.nativeEvent.layout
+            event
+              .nativeEvent
+              .layout
               .height
           );
 
           setViewportWidth(
-            event.nativeEvent.layout
+            event
+              .nativeEvent
+              .layout
               .width
           );
 
@@ -1122,18 +1569,26 @@ const taskHorizontalLayouts = useMemo(() => {
         }}
       >
         <ScrollView
-          ref={scrollRef}
+          ref={
+            scrollRef
+          }
           scrollEnabled={
             !isDragging
           }
           showsVerticalScrollIndicator={
             false
           }
-          scrollEventThrottle={16}
-          onScroll={(event) => {
+          scrollEventThrottle={
+            16
+          }
+          onScroll={(
+            event
+          ) => {
             scrollYRef.current =
-              event.nativeEvent
-                .contentOffset.y;
+              event
+                .nativeEvent
+                .contentOffset
+                .y;
           }}
           onScrollBeginDrag={() => {
             touchMovedRef.current =
@@ -1171,7 +1626,8 @@ const taskHorizontalLayouts = useMemo(() => {
                     7;
 
                   if (
-                    offsetHour < 0
+                    offsetHour <
+                    0
                   ) {
                     offsetHour +=
                       24;
@@ -1179,14 +1635,16 @@ const taskHorizontalLayouts = useMemo(() => {
 
                   return (
                     <View
-                      key={index}
+                      key={
+                        index
+                      }
                       style={[
                         styles.railSegment,
                         {
                           top:
                             offsetHour *
-                            60 *
-                            ppm +
+                              60 *
+                              ppm +
                             VERTICAL_PADDING,
 
                           height:
@@ -1204,90 +1662,106 @@ const taskHorizontalLayouts = useMemo(() => {
               )}
             </View>
 
-            {/* MARCADORES DE HORA E MEIA-HORA */}
+            {/* HORAS / MEIAS HORAS */}
 
             {Array.from({
               length: 49,
-            }).map((_, i) => {
-              const offsetMinutes =
-                i * 30;
+            }).map(
+              (
+                _,
+                i
+              ) => {
+                const offsetMinutes =
+                  i * 30;
 
-              const top =
-                offsetMinutes *
-                ppm +
-                VERTICAL_PADDING;
+                const top =
+                  offsetMinutes *
+                    ppm +
+                  VERTICAL_PADDING;
 
-              const isHalfHour =
-                i % 2 !== 0;
+                const isHalfHour =
+                  i % 2 !==
+                  0;
 
-              const displayHour =
-                (Math.floor(i / 2) +
-                  7) %
-                24;
+                const displayHour =
+                  (
+                    Math.floor(
+                      i / 2
+                    ) +
+                    7
+                  ) %
+                  24;
 
-              const hideText =
-                isHalfHour;
+                const hideText =
+                  isHalfHour;
 
-              return (
-                <View
-                  pointerEvents="none"
-                  key={i}
-                  style={[
-                    styles.hourRow,
-                    {
-                      top:
-                        top - 8,
-                    },
-                  ]}
-                >
-                  <Text
+                return (
+                  <View
+                    pointerEvents="none"
+                    key={
+                      i
+                    }
                     style={[
-                      styles.hourText,
-
-                      isDense &&
-                      styles.hourTextOverview,
+                      styles.hourRow,
+                      {
+                        top:
+                          top -
+                          8,
+                      },
                     ]}
                   >
-                    {!hideText
-                      ? String(
-                        displayHour
-                      ).padStart(
-                        2,
-                        '0'
-                      )
-                      : ''}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.hourText,
 
-                  {!isHalfHour && (
+                        isDense &&
+                          styles.hourTextOverview,
+                      ]}
+                    >
+                      {!hideText
+                        ? String(
+                            displayHour
+                          ).padStart(
+                            2,
+                            '0'
+                          )
+                        : ''}
+                    </Text>
+
+                    {!isHalfHour && (
+                      <View
+                        style={[
+                          styles.hourDot,
+                          {
+                            backgroundColor:
+                              i ===
+                              48
+                                ? '#7F9CF5'
+                                : getRailColor(
+                                    displayHour
+                                  ),
+                          },
+                        ]}
+                      />
+                    )}
+
                     <View
                       style={[
-                        styles.hourDot,
-                        {
-                          backgroundColor:
-                            i === 48
-                              ? '#7F9CF5'
-                              : getRailColor(
-                                displayHour
-                              ),
-                        },
+                        styles.hourLine,
+
+                        isHalfHour
+                          ? styles.halfHourLine
+                          : (
+                              isDense ||
+                              hideText
+                            ) &&
+                            styles.hourLineOverview,
                       ]}
                     />
-                  )}
-
-                  <View
-                    style={[
-                      styles.hourLine,
-
-                      isHalfHour
-                        ? styles.halfHourLine
-                        : (isDense ||
-                          hideText) &&
-                        styles.hourLineOverview,
-                    ]}
-                  />
-                </View>
-              );
-            })}
+                  </View>
+                );
+              }
+            )}
 
             {/* TAREFAS */}
 
@@ -1296,41 +1770,54 @@ const taskHorizontalLayouts = useMemo(() => {
                 task,
                 index
               ) => (
-<TaskCardClean
-  key={task.id}
-  task={task}
-  ppm={ppm}
-  themeIndex={index}
+                <TaskCardClean
+                  key={
+                    task.id
+                  }
+                  task={
+                    task
+                  }
+                  ppm={
+                    ppm
+                  }
+                  themeIndex={
+                    index
+                  }
+                  layoutStyle={
+                    taskHorizontalLayouts.get(
+                      task.id
+                    )
+                  }
+                  onChangeStart={
+                    handleDragEnd
+                  }
+                  onDragStateChange={
+                    setIsDragging
+                  }
+                  onToggle={
+                    toggleTaskComplete
+                  }
+                  onPress={(
+                    selectedTask
+                  ) => {
+                    suppressTimelineCreateRef.current =
+                      true;
 
-  layoutStyle={
-    taskHorizontalLayouts.get(
-      task.id
-    )
-  }
+                    setDetailsMode(
+                      'edit'
+                    );
 
-  onChangeStart={
-    handleDragEnd
-  }
-  onDragStateChange={
-    setIsDragging
-  }
-  onToggle={
-    toggleTaskComplete
-  }
-  onPress={(t) => {
-    suppressTimelineCreateRef.current =
-      true;
-
-    setDetailsMode('edit');
-    setDetailsTask(t);
-  }}
-  getVisualY={
-    getVisualY
-  }
-  getMinuteFromY={
-    getMinuteFromY
-  }
-/>
+                    setDetailsTask(
+                      selectedTask
+                    );
+                  }}
+                  getVisualY={
+                    getVisualY
+                  }
+                  getMinuteFromY={
+                    getMinuteFromY
+                  }
+                />
               )
             )}
 
@@ -1341,7 +1828,8 @@ const taskHorizontalLayouts = useMemo(() => {
               style={[
                 styles.nowLine,
                 {
-                  top: nowTop,
+                  top:
+                    nowTop,
                 },
               ]}
             >
@@ -1362,32 +1850,60 @@ const taskHorizontalLayouts = useMemo(() => {
         </ScrollView>
       </View>
 
+      {/* QUICK CREATE */}
+
       <CreateTaskModal
-        visible={modalVisible}
+        visible={
+          modalVisible
+        }
         initialMinutes={
           targetSlotMinutes
         }
         onClose={() => {
-          setModalVisible(false);
-          setTargetSlotMinutes(null);
+          setModalVisible(
+            false
+          );
+
+          setTargetSlotMinutes(
+            null
+          );
         }}
-        onSave={handleSaveTask}
-        onMoreOptions={(draft) => {
-          setDetailsMode('create');
-          setDetailsTask(draft);
-          setModalVisible(false);
+        onSave={
+          handleSaveTask
+        }
+        onMoreOptions={(
+          draft
+        ) => {
+          setDetailsMode(
+            'create'
+          );
+
+          setDetailsTask(
+            draft
+          );
+
+          setModalVisible(
+            false
+          );
         }}
       />
+
+      {/* DETAILS / EDIT */}
+
       <TaskDetailsModal
-        visible={
-          Boolean(detailsTask)
+        visible={Boolean(
+          detailsTask
+        )}
+        mode={
+          detailsMode
         }
-        mode={detailsMode}
         initialValues={
           detailsTask
         }
         onClose={() => {
-          setDetailsTask(null);
+          setDetailsTask(
+            null
+          );
 
           if (
             detailsMode ===
@@ -1398,7 +1914,9 @@ const taskHorizontalLayouts = useMemo(() => {
             );
           }
         }}
-        onSave={(changes) => {
+        onSave={(
+          changes
+        ) => {
           if (
             detailsMode ===
             'create'
@@ -1408,7 +1926,16 @@ const taskHorizontalLayouts = useMemo(() => {
 
               ...changes,
 
-              completed: false,
+              status:
+                changes.status ||
+                'pending',
+
+              completed:
+                (
+                  changes.status ||
+                  'pending'
+                ) ===
+                'completed',
             };
 
             saveTasks([
@@ -1417,47 +1944,81 @@ const taskHorizontalLayouts = useMemo(() => {
             ]);
           } else {
             const updated =
-              tasks.map((task) =>
-                task.id ===
+              tasks.map(
+                (task) =>
+                  task.id ===
                   detailsTask.id
-                  ? {
-                    ...task,
-                    ...changes,
-                  }
-                  : task
+                    ? {
+                        ...task,
+                        ...changes,
+
+                        status:
+                          changes.status ||
+                          getTaskStatus(
+                            task
+                          ),
+
+                        completed:
+                          (
+                            changes.status ||
+                            getTaskStatus(
+                              task
+                            )
+                          ) ===
+                          'completed',
+                      }
+                    : task
               );
 
-            saveTasks(updated);
+            saveTasks(
+              updated
+            );
           }
 
-          setDetailsTask(null);
-          setEditingTask(null);
-          setTargetSlotMinutes(null);
+          setDetailsTask(
+            null
+          );
+
+          setEditingTask(
+            null
+          );
+
+          setTargetSlotMinutes(
+            null
+          );
         }}
         onDelete={
-          detailsMode === 'edit'
+          detailsMode ===
+          'edit'
             ? () => {
-              saveTasks(
-                tasks.filter(
-                  (task) =>
-                    task.id !==
-                    detailsTask.id
-                )
-              );
+                saveTasks(
+                  tasks.filter(
+                    (
+                      task
+                    ) =>
+                      task.id !==
+                      detailsTask.id
+                  )
+                );
 
-              setDetailsTask(null);
-              setEditingTask(null);
-            }
+                setDetailsTask(
+                  null
+                );
+
+                setEditingTask(
+                  null
+                );
+              }
             : undefined
         }
       />
 
+      {/* MODAL ANTIGO — AINDA MANTIDO POR AGORA */}
+
       <EditTaskModal
-        visible={
-          Boolean(
-            editingTask
-          )
-        }
+        visible={Boolean(
+          editingTask
+        )}
         onClose={() =>
           setEditingTask(
             null
@@ -1472,7 +2033,9 @@ const taskHorizontalLayouts = useMemo(() => {
         task={
           editingTask
         }
-        blocks={blocks}
+        blocks={
+          blocks
+        }
       />
     </SafeAreaView>
   );
@@ -1486,18 +2049,24 @@ const styles =
   StyleSheet.create({
     safe: {
       flex: 1,
+
       backgroundColor:
         '#FFFFFF',
     },
 
     timelineViewport: {
       flex: 1,
-      position: 'relative',
+
+      position:
+        'relative',
+
       marginTop: 2,
     },
 
     timelineCanvas: {
-      position: 'relative',
+      position:
+        'relative',
+
       backgroundColor:
         '#FFFFFF',
     },
@@ -1507,26 +2076,45 @@ const styles =
     ------------------------------------------------------- */
 
     hourRow: {
-      position: 'absolute',
+      position:
+        'absolute',
+
       left: 0,
       right: 0,
+
       height: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
+
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
     },
 
     hourText: {
-      width: AXIS_WIDTH,
-      paddingRight: 10,
-      textAlign: 'right',
+      width:
+        AXIS_WIDTH,
+
+      paddingRight:
+        10,
+
+      textAlign:
+        'right',
+
       fontSize: 12,
-      fontWeight: '500',
-      color: '#9C948D',
+
+      fontWeight:
+        '500',
+
+      color:
+        '#9C948D',
     },
 
     hourTextOverview: {
       fontSize: 9,
-      color: '#C7BFB9',
+
+      color:
+        '#C7BFB9',
     },
 
     /* -------------------------------------------------------
@@ -1534,27 +2122,43 @@ const styles =
     ------------------------------------------------------- */
 
     railContainer: {
-      position: 'absolute',
+      position:
+        'absolute',
+
       top: 0,
       bottom: 0,
+
       left:
-        AXIS_WIDTH - 0.5,
+        AXIS_WIDTH -
+        0.5,
+
       width: 1,
+
       zIndex: 2,
     },
 
     railSegment: {
-      position: 'absolute',
+      position:
+        'absolute',
+
       left: 0,
+
       width: 1,
     },
 
     hourDot: {
       width: 4,
       height: 4,
-      borderRadius: 2,
-      marginLeft: -2,
-      marginRight: -2,
+
+      borderRadius:
+        2,
+
+      marginLeft:
+        -2,
+
+      marginRight:
+        -2,
+
       zIndex: 3,
     },
 
@@ -1564,7 +2168,9 @@ const styles =
 
     hourLine: {
       flex: 1,
+
       height: 1,
+
       backgroundColor:
         '#F5F2EF',
     },
@@ -1577,10 +2183,15 @@ const styles =
     halfHourLine: {
       backgroundColor:
         'transparent',
-      borderBottomWidth: 1,
+
+      borderBottomWidth:
+        1,
+
       borderBottomColor:
         '#FAF8F6',
-      borderStyle: 'dashed',
+
+      borderStyle:
+        'dashed',
     },
 
     /* -------------------------------------------------------
@@ -1588,9 +2199,12 @@ const styles =
     ------------------------------------------------------- */
 
     nowLine: {
-      position: 'absolute',
+      position:
+        'absolute',
 
-      left: AXIS_WIDTH,
+      left:
+        AXIS_WIDTH,
+
       right: 10,
 
       height: 1.5,
@@ -1602,34 +2216,43 @@ const styles =
     },
 
     nowDot: {
-      position: 'absolute',
+      position:
+        'absolute',
 
       left: -3,
+
       top: -2.5,
 
       width: 6.5,
+
       height: 6.5,
 
-      borderRadius: 4,
+      borderRadius:
+        4,
 
       backgroundColor:
         '#ECC94B',
     },
 
     nowBeeImage: {
-      position: 'absolute',
+      position:
+        'absolute',
 
       right: -6,
+
       top: -10,
 
       width: 20,
+
       height: 20,
 
-      resizeMode: 'contain',
+      resizeMode:
+        'contain',
 
       transform: [
         {
-          rotate: '90deg',
+          rotate:
+            '90deg',
         },
       ],
     },
