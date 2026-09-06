@@ -1,421 +1,1051 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ScrollView,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+} from '@expo/vector-icons';
+
+/* -------------------------------------------------------
+   OPÇÕES
+------------------------------------------------------- */
 
 const DURATION_OPTIONS = [
-  { label: '5min', value: 5 },
-  { label: '10min', value: 10 },
-  { label: '15min', value: 15 },
-  { label: '20min', value: 20 },
-  { label: '30min', value: 30 },
-  { label: '45min', value: 45 },
-  { label: '1h', value: 60 },
-  { label: '1.5h', value: 90 },
-  { label: '2h', value: 120 },
+  5,
+  10,
+  15,
+  20,
+  30,
+  45,
+  60,
+  90,
+  120,
 ];
 
-const ENERGY_OPTIONS = [
-  { id: 'high', label: 'Alto Foco', icon: 'flash', color: '#E3789B' },
-  { id: 'medium', label: 'Médio', icon: 'battery-charging', color: '#D4A017' },
-  { id: 'low', label: 'Baixo / Leve', icon: 'cafe', color: '#4A90B2' },
-  { id: 'recovery', label: 'Recuperação / Pausa', icon: 'leaf', color: '#34A853' },
+const CATEGORY_OPTIONS = [
+  {
+    id: 'inbox',
+    label: 'Caixa de Entrada',
+    icon: 'archive-outline',
+    color: '#4F75E2',
+  },
+  {
+    id: 'work',
+    label: 'Trabalho',
+    icon: 'briefcase-outline',
+    color: '#E0783E',
+  },
+  {
+    id: 'personal',
+    label: 'Pessoal',
+    icon: 'home-outline',
+    color: '#FC8181',
+  },
+  {
+    id: 'exercise',
+    label: 'Exercício',
+    icon: 'barbell-outline',
+    color: '#38A169',
+  },
+  {
+    id: 'shopping',
+    label: 'Compras',
+    icon: 'cube-outline',
+    color: '#B794F4',
+  },
 ];
+
+/* -------------------------------------------------------
+   HELPERS
+------------------------------------------------------- */
+
+const formatTimeFromMinutes = (
+  totalMinutes
+) => {
+  const normalized =
+    ((totalMinutes % 1440) +
+      1440) %
+    1440;
+
+  const hours =
+    Math.floor(normalized / 60);
+
+  const mins =
+    normalized % 60;
+
+  return `${String(hours).padStart(
+    2,
+    '0'
+  )}:${String(mins).padStart(
+    2,
+    '0'
+  )}`;
+};
+
+const formatDuration = (
+  minutes
+) => {
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  if (minutes % 60 === 0) {
+    return `${minutes / 60} h`;
+  }
+
+  const hours =
+    Math.floor(minutes / 60);
+
+  const mins =
+    minutes % 60;
+
+  return `${hours} h ${mins} min`;
+};
+
+/* -------------------------------------------------------
+   COMPONENTE
+------------------------------------------------------- */
 
 export default function CreateTaskModal({
   visible,
   onClose,
   onSave,
-  initialBlockId,
-  initialTask,
-  blocks = [],
+  onMoreOptions,
+  initialMinutes = null,
 }) {
-  const [taskTitle, setTaskTitle] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState(30);
-  const [selectedEnergy, setSelectedEnergy] = useState('medium');
-  const [selectedBlockId, setSelectedBlockId] = useState(initialBlockId);
-  
-  const [durationPickerVisible, setDurationPickerVisible] = useState(false);
-  const [blockPickerVisible, setBlockPickerVisible] = useState(false);
-  const [energyPickerVisible, setEnergyPickerVisible] = useState(false);
+  const [title, setTitle] =
+    useState('');
+
+  const [
+    description,
+    setDescription,
+  ] = useState('');
+
+  const [
+    duration,
+    setDuration,
+  ] = useState(30);
+
+  const [
+    categoryId,
+    setCategoryId,
+  ] = useState('inbox');
+
+  const [
+    durationPickerVisible,
+    setDurationPickerVisible,
+  ] = useState(false);
+
+  const [
+    categoryPickerVisible,
+    setCategoryPickerVisible,
+  ] = useState(false);
+
+  const selectedCategory =
+    useMemo(
+      () =>
+        CATEGORY_OPTIONS.find(
+          (item) =>
+            item.id === categoryId
+        ) ||
+        CATEGORY_OPTIONS[0],
+      [categoryId]
+    );
+
+  /* -------------------------------------------------------
+     RESET AO ABRIR
+  ------------------------------------------------------- */
 
   useEffect(() => {
-    if (visible) {
-      setSelectedBlockId(initialTask?.blockId || initialBlockId);
-      setTaskTitle(initialTask?.title || '');
-      setSelectedDuration(initialTask?.timeMinutes || 30);
-      setSelectedEnergy(initialTask?.energy || 'medium');
+    if (!visible) {
+      return;
     }
-  }, [visible, initialBlockId, initialTask]);
 
-  const currentBlock = blocks.find((b) => b.id === selectedBlockId) || blocks[0];
-  const currentEnergy = ENERGY_OPTIONS.find((e) => e.id === selectedEnergy) || ENERGY_OPTIONS[1];
+    setTitle('');
+    setDescription('');
+    setDuration(30);
+    setCategoryId('inbox');
+  }, [visible]);
+
+  /* -------------------------------------------------------
+     GUARDAR
+  ------------------------------------------------------- */
 
   const handleSave = () => {
-    if (!taskTitle.trim() || !selectedBlockId) return;
-    onSave(selectedBlockId, taskTitle, selectedDuration, selectedEnergy);
-    onClose();
+    if (!title.trim()) {
+      return;
+    }
+
+    onSave({
+      title:
+        title.trim(),
+
+      description:
+        description.trim(),
+
+      duration,
+
+      categoryId,
+    });
   };
 
-  const formatDurationLabel = (mins) => {
-    if (mins >= 60) {
-      return mins % 60 === 0 ? `${mins / 60}H` : `${(mins / 60).toFixed(1)}H`;
-    }
-    return `${mins}M`;
-  };
+  /* -------------------------------------------------------
+     MAIS OPÇÕES
+  ------------------------------------------------------- */
+
+const handleMoreOptions = () => {
+  onMoreOptions?.({
+    title: title.trim(),
+    description: description.trim(),
+
+    startMinsPlanned:
+      initialMinutes,
+
+    timeOfDay:
+      initialMinutes != null
+        ? formatTimeFromMinutes(
+            initialMinutes
+          )
+        : null,
+
+    timeMinutes:
+      duration,
+
+    duration,
+
+    categoryId,
+  });
+};
+
+  /* -------------------------------------------------------
+     LABEL DA HORA
+  ------------------------------------------------------- */
+
+  const timeLabel =
+    initialMinutes == null
+      ? '--:--'
+      : formatTimeFromMinutes(
+          initialMinutes
+        );
+
+  /* -------------------------------------------------------
+     RENDER
+  ------------------------------------------------------- */
 
   return (
     <>
-      <Modal visible={visible} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <TouchableOpacity style={styles.dismissArea} activeOpacity={1} onPress={onClose} />
+      {/* ---------------------------------------------------
+          QUICK CREATE
+      --------------------------------------------------- */}
 
-          <View style={styles.modalContent}>
-            <TextInput
-              style={styles.input}
-              placeholder={initialTask ? 'Editar tarefa' : 'Qual é o próximo?'}
-              placeholderTextColor="#A0958E"
-              value={taskTitle}
-              onChangeText={setTaskTitle}
-              autoFocus={true}
-              returnKeyType="done"
-              onSubmitEditing={handleSave}
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior="padding"
+          keyboardVerticalOffset={0}
+        >
+          {/* FUNDO */}
+
+          <Pressable
+            style={
+              styles.backdrop
+            }
+            onPress={onClose}
+          />
+
+          {/* SHEET */}
+
+          <View
+            style={styles.sheet}
+          >
+            {/* HANDLE */}
+
+            <View
+              style={styles.handle}
             />
 
-            {/* Pílulas de Ação */}
-            <View style={styles.pillsRow}>
-              {/* Pílula: Bloco / Intervalo */}
-              <TouchableOpacity
-                style={styles.pill}
-                activeOpacity={0.7}
-                onPress={() => setBlockPickerVisible(true)}
+            {/* TÍTULO */}
+
+            <TextInput
+              style={
+                styles.titleInput
+              }
+              value={title}
+              onChangeText={
+                setTitle
+              }
+              placeholder="O que vais fazer?"
+              placeholderTextColor="#A79F99"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={
+                handleSave
+              }
+            />
+
+            {/* DESCRIÇÃO */}
+
+            <TextInput
+              style={
+                styles.descriptionInput
+              }
+              value={
+                description
+              }
+              onChangeText={
+                setDescription
+              }
+              placeholder="Descrição (opcional)"
+              placeholderTextColor="#A79F99"
+              multiline
+            />
+
+            {/* ------------------------------------------------
+                AÇÕES
+            ------------------------------------------------ */}
+
+            <View
+              style={
+                styles.actionsSection
+              }
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={
+                  false
+                }
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={
+                  styles.actionsRow
+                }
               >
-                {currentBlock?.iconFamily === 'MaterialCommunityIcons' ? (
-                  <MaterialCommunityIcons
-                    name={currentBlock?.iconName || 'weather-hazy'}
-                    size={16}
-                    color="#4A403B"
-                    style={{ marginRight: 6 }}
-                  />
-                ) : (
+                {/* HORA */}
+
+                <View
+                  style={
+                    styles.actionPill
+                  }
+                >
                   <Ionicons
-                    name={currentBlock?.iconName || 'leaf'}
-                    size={15}
-                    color="#4A403B"
-                    style={{ marginRight: 6 }}
+                    name="calendar-outline"
+                    size={17}
+                    color="#4E4844"
                   />
-                )}
-                <Text style={styles.pillText}>{currentBlock?.title?.toUpperCase()}</Text>
-              </TouchableOpacity>
 
-              {/* Pílula: Duração */}
-              <TouchableOpacity
-                style={styles.pill}
-                activeOpacity={0.7}
-                onPress={() => setDurationPickerVisible(true)}
-              >
-                <Text style={styles.pillText}>{formatDurationLabel(selectedDuration)}</Text>
-              </TouchableOpacity>
+                  <Text
+                    style={
+                      styles.actionText
+                    }
+                  >
+                    Hoje, {timeLabel}
+                  </Text>
+                </View>
 
-              {/* Pílula: Energia */}
-              <TouchableOpacity
-                style={styles.pill}
-                activeOpacity={0.7}
-                onPress={() => setEnergyPickerVisible(true)}
-              >
-                <Ionicons
-                  name={currentEnergy.icon}
-                  size={14}
-                  color={currentEnergy.color}
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.pillText}>{currentEnergy.label.toUpperCase()}</Text>
-              </TouchableOpacity>
+                {/* DURAÇÃO */}
 
-              {/* Botão Submeter */}
-              <TouchableOpacity
-                onPress={handleSave}
-                style={styles.savePillButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-up" size={16} color="#FFF" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={
+                    styles.actionPill
+                  }
+                  activeOpacity={
+                    0.75
+                  }
+                  onPress={() =>
+                    setDurationPickerVisible(
+                      true
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="timer-outline"
+                    size={17}
+                    color="#4E4844"
+                  />
+
+                  <Text
+                    style={
+                      styles.actionText
+                    }
+                  >
+                    {formatDuration(
+                      duration
+                    )}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* CATEGORIA */}
+
+                <TouchableOpacity
+                  style={
+                    styles.iconButton
+                  }
+                  activeOpacity={
+                    0.75
+                  }
+                  onPress={() =>
+                    setCategoryPickerVisible(
+                      true
+                    )
+                  }
+                >
+                  <Ionicons
+                    name={
+                      selectedCategory.icon
+                    }
+                    size={19}
+                    color={
+                      selectedCategory.color
+                    }
+                  />
+                </TouchableOpacity>
+
+                {/* PRIORIDADE */}
+
+                <TouchableOpacity
+                  style={
+                    styles.iconButton
+                  }
+                  activeOpacity={
+                    0.75
+                  }
+                >
+                  <Ionicons
+                    name="flag-outline"
+                    size={19}
+                    color="#57504B"
+                  />
+                </TouchableOpacity>
+
+                {/* ETIQUETA */}
+
+                <TouchableOpacity
+                  style={
+                    styles.iconButton
+                  }
+                  activeOpacity={
+                    0.75
+                  }
+                >
+                  <Ionicons
+                    name="pricetag-outline"
+                    size={19}
+                    color="#57504B"
+                  />
+                </TouchableOpacity>
+
+                {/* MAIS */}
+
+                <TouchableOpacity
+                  style={
+                    styles.iconButton
+                  }
+                  activeOpacity={
+                    0.75
+                  }
+                  onPress={
+                    handleMoreOptions
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name="dots-horizontal"
+                    size={22}
+                    color="#57504B"
+                  />
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* ----------------------------------------------
+                  CRIAR
+                  Só existe depois de escrever.
+              ---------------------------------------------- */}
+
+              {title.trim().length >
+                0 && (
+                <View
+                  style={
+                    styles.saveRow
+                  }
+                >
+                  <TouchableOpacity
+                    style={
+                      styles.saveButton
+                    }
+                    activeOpacity={
+                      0.75
+                    }
+                    onPress={
+                      handleSave
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.saveButtonText
+                      }
+                    >
+                      Criar
+                    </Text>
+
+                    <Image
+                      source={require('../../../assets/abelha.png')}
+                      style={
+                        styles.saveBee
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Seletor de Duração */}
-      <Modal visible={durationPickerVisible} animationType="fade" transparent={true}>
-        <View style={styles.pickerOverlay}>
-          <View style={styles.pickerCard}>
-            <Text style={styles.pickerTitle}>Selecionar duração</Text>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {DURATION_OPTIONS.map((item) => {
-                const isSelected = selectedDuration === item.value;
-                return (
+      {/* ---------------------------------------------------
+          PICKER DURAÇÃO
+      --------------------------------------------------- */}
+
+      <Modal
+        visible={
+          durationPickerVisible
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setDurationPickerVisible(
+            false
+          )
+        }
+      >
+        <Pressable
+          style={
+            styles.pickerOverlay
+          }
+          onPress={() =>
+            setDurationPickerVisible(
+              false
+            )
+          }
+        >
+          <View
+            style={
+              styles.pickerCard
+            }
+          >
+            <Text
+              style={
+                styles.pickerTitle
+              }
+            >
+              Duração
+            </Text>
+
+            <ScrollView
+              style={
+                styles.pickerScroll
+              }
+              keyboardShouldPersistTaps="handled"
+            >
+              {DURATION_OPTIONS.map(
+                (item) => (
                   <TouchableOpacity
-                    key={item.value}
-                    style={styles.pickerRow}
-                    activeOpacity={0.7}
+                    key={item}
+                    style={
+                      styles.pickerRow
+                    }
+                    activeOpacity={
+                      0.7
+                    }
                     onPress={() => {
-                      setSelectedDuration(item.value);
-                      setDurationPickerVisible(false);
+                      setDuration(
+                        item
+                      );
+
+                      setDurationPickerVisible(
+                        false
+                      );
                     }}
                   >
-                    <Text style={[styles.pickerRowText, isSelected && styles.pickerRowTextActive]}>
+                    <Text
+                      style={[
+                        styles.pickerRowText,
+
+                        item ===
+                          duration &&
+                          styles.pickerRowTextActive,
+                      ]}
+                    >
+                      {formatDuration(
+                        item
+                      )}
+                    </Text>
+
+                    {item ===
+                      duration && (
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color="#4F75E2"
+                      />
+                    )}
+                  </TouchableOpacity>
+                )
+              )}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ---------------------------------------------------
+          PICKER CATEGORIA
+      --------------------------------------------------- */}
+
+      <Modal
+        visible={
+          categoryPickerVisible
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setCategoryPickerVisible(
+            false
+          )
+        }
+      >
+        <Pressable
+          style={
+            styles.pickerOverlay
+          }
+          onPress={() =>
+            setCategoryPickerVisible(
+              false
+            )
+          }
+        >
+          <View
+            style={
+              styles.categoryCard
+            }
+          >
+            <Text
+              style={
+                styles.pickerTitle
+              }
+            >
+              Categoria
+            </Text>
+
+            {CATEGORY_OPTIONS.map(
+              (item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={
+                    styles.categoryRow
+                  }
+                  activeOpacity={
+                    0.7
+                  }
+                  onPress={() => {
+                    setCategoryId(
+                      item.id
+                    );
+
+                    setCategoryPickerVisible(
+                      false
+                    );
+                  }}
+                >
+                  <View
+                    style={
+                      styles.categoryLeft
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        item.icon
+                      }
+                      size={20}
+                      color={
+                        item.color
+                      }
+                    />
+
+                    <Text
+                      style={[
+                        styles.categoryText,
+
+                        item.id ===
+                          categoryId &&
+                          styles.categoryTextActive,
+                      ]}
+                    >
                       {item.label}
                     </Text>
-                    <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-                      {isSelected && <View style={styles.radioInner} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.pickerCloseButton}
-              onPress={() => setDurationPickerVisible(false)}
-            >
-              <Text style={styles.pickerCloseText}>Fechar</Text>
-            </TouchableOpacity>
+                  </View>
+
+                  {item.id ===
+                    categoryId && (
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="#4F75E2"
+                    />
+                  )}
+                </TouchableOpacity>
+              )
+            )}
           </View>
-        </View>
-      </Modal>
-
-      {/* Seletor de Bloco */}
-      <Modal visible={blockPickerVisible} animationType="fade" transparent={true}>
-        <View style={styles.pickerOverlay}>
-          <View style={styles.pickerCard}>
-            <Text style={styles.pickerTitle}>Selecionar intervalo</Text>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {blocks.map((b) => {
-                const isSelected = selectedBlockId === b.id;
-                return (
-                  <TouchableOpacity
-                    key={b.id}
-                    style={styles.pickerRow}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setSelectedBlockId(b.id);
-                      setBlockPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      {b.iconFamily === 'MaterialCommunityIcons' ? (
-                        <MaterialCommunityIcons
-                          name={b.iconName}
-                          size={18}
-                          color={b.iconColor}
-                          style={{ marginRight: 10 }}
-                        />
-                      ) : (
-                        <Ionicons
-                          name={b.iconName}
-                          size={18}
-                          color={b.iconColor}
-                          style={{ marginRight: 10 }}
-                        />
-                      )}
-                      <Text style={[styles.pickerRowText, isSelected && styles.pickerRowTextActive]}>
-                        {b.title}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-                      {isSelected && <View style={styles.radioInner} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.pickerCloseButton}
-              onPress={() => setBlockPickerVisible(false)}
-            >
-              <Text style={styles.pickerCloseText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Seletor de Nível de Energia */}
-      <Modal visible={energyPickerVisible} animationType="fade" transparent={true}>
-        <View style={styles.pickerOverlay}>
-          <View style={styles.pickerCard}>
-            <Text style={styles.pickerTitle}>Selecionar energia</Text>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {ENERGY_OPTIONS.map((item) => {
-                const isSelected = selectedEnergy === item.id;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.pickerRow}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setSelectedEnergy(item.id);
-                      setEnergyPickerVisible(false);
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons
-                        name={item.icon}
-                        size={18}
-                        color={item.color}
-                        style={{ marginRight: 10 }}
-                      />
-                      <Text style={[styles.pickerRowText, isSelected && styles.pickerRowTextActive]}>
-                        {item.label}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-                      {isSelected && <View style={styles.radioInner} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.pickerCloseButton}
-              onPress={() => setEnergyPickerVisible(false)}
-            >
-              <Text style={styles.pickerCloseText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </Pressable>
       </Modal>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(44, 37, 33, 0.4)',
-  },
-  dismissArea: { flex: 1 },
-  modalContent: {
-    backgroundColor: '#FAF5F0',
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderColor: '#EFE6E1',
-  },
-  input: {
-    fontSize: 18,
-    color: '#2C2521',
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  pillsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFE6E1',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 20,
-  },
-  pillText: {
-    color: '#2C2521',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  savePillButton: {
-    marginLeft: 'auto',
-    backgroundColor: '#4A90B2',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(44, 37, 33, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  pickerCard: {
-    backgroundColor: '#FFFDF9',
-    width: '100%',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#EFE6E1',
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2C2521',
-    marginBottom: 16,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFE6E1',
-  },
-  pickerRowText: {
-    fontSize: 15,
-    color: '#5C524B',
-  },
-  pickerRowTextActive: {
-    color: '#2C2521',
-    fontWeight: '700',
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#D4C7BF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterActive: {
-    borderColor: '#4A90B2',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4A90B2',
-  },
-  pickerCloseButton: {
-    marginTop: 16,
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  pickerCloseText: {
-    color: '#8C827B',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-});
+/* -------------------------------------------------------
+   STYLES
+------------------------------------------------------- */
+
+const styles =
+  StyleSheet.create({
+    /* ---------------------------------------------------
+       MODAL
+    --------------------------------------------------- */
+
+    overlay: {
+      flex: 1,
+      justifyContent:
+        'flex-end',
+    },
+
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+
+      backgroundColor:
+        'rgba(32, 28, 25, 0.34)',
+    },
+
+    sheet: {
+      backgroundColor:
+        '#FFFDFC',
+
+      paddingHorizontal: 16,
+      paddingTop: 10,
+
+      paddingBottom:
+        Platform.OS === 'ios'
+          ? 18
+          : 12,
+
+      borderTopLeftRadius:
+        22,
+
+      borderTopRightRadius:
+        22,
+
+      borderWidth: 1,
+      borderBottomWidth: 0,
+
+      borderColor:
+        '#EEE8E4',
+    },
+
+    handle: {
+      alignSelf: 'center',
+
+      width: 42,
+      height: 4,
+
+      borderRadius: 2,
+
+      backgroundColor:
+        '#C8C2BE',
+
+      marginBottom: 14,
+    },
+
+    /* ---------------------------------------------------
+       INPUTS
+    --------------------------------------------------- */
+
+    titleInput: {
+      minHeight: 46,
+
+      borderRadius: 12,
+
+      backgroundColor:
+        '#F7F4F2',
+
+      paddingHorizontal: 12,
+
+      fontSize: 17,
+      fontWeight: '500',
+
+      color: '#2F2A27',
+
+      marginBottom: 4,
+    },
+
+    descriptionInput: {
+      minHeight: 34,
+
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+
+      fontSize: 14,
+
+      color: '#5B544F',
+    },
+
+    /* ---------------------------------------------------
+       AÇÕES
+    --------------------------------------------------- */
+
+    actionsSection: {
+      marginTop: 8,
+    },
+
+    actionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+
+      gap: 5,
+
+      paddingRight: 4,
+    },
+
+    actionPill: {
+      height: 34,
+
+      paddingHorizontal: 9,
+
+      borderRadius: 10,
+
+      backgroundColor:
+        '#F4F1EF',
+
+      flexDirection: 'row',
+      alignItems: 'center',
+
+      gap: 5,
+    },
+
+    actionText: {
+      fontSize: 12,
+      fontWeight: '500',
+
+      color: '#4E4844',
+    },
+
+    iconButton: {
+      width: 34,
+      height: 34,
+
+      borderRadius: 10,
+
+      alignItems: 'center',
+      justifyContent:
+        'center',
+
+      backgroundColor:
+        '#F4F1EF',
+    },
+
+    /* ---------------------------------------------------
+       CRIAR
+    --------------------------------------------------- */
+
+    saveRow: {
+      flexDirection: 'row',
+
+      justifyContent:
+        'flex-end',
+
+      marginTop: 8,
+    },
+
+    saveButton: {
+      height: 40,
+
+      paddingHorizontal: 14,
+
+      flexDirection: 'row',
+
+      alignItems: 'center',
+      justifyContent:
+        'center',
+
+      gap: 7,
+
+      borderRadius: 10,
+
+      backgroundColor:
+        '#F4F1EF',
+    },
+
+    saveButtonText: {
+      fontSize: 14,
+
+      fontWeight: '600',
+
+      color: '#403B37',
+    },
+
+    saveBee: {
+      width: 21,
+      height: 21,
+
+      resizeMode: 'contain',
+
+      transform: [
+        {
+          rotate: '90deg',
+        },
+      ],
+    },
+
+    /* ---------------------------------------------------
+       PICKERS
+    --------------------------------------------------- */
+
+    pickerOverlay: {
+      flex: 1,
+
+      justifyContent:
+        'flex-end',
+
+      backgroundColor:
+        'rgba(32, 28, 25, 0.28)',
+    },
+
+    pickerCard: {
+      backgroundColor:
+        '#FFFDFC',
+
+      borderTopLeftRadius:
+        20,
+
+      borderTopRightRadius:
+        20,
+
+      paddingHorizontal: 18,
+
+      paddingTop: 18,
+      paddingBottom: 24,
+    },
+
+    categoryCard: {
+      backgroundColor:
+        '#FFFDFC',
+
+      borderTopLeftRadius:
+        20,
+
+      borderTopRightRadius:
+        20,
+
+      paddingHorizontal: 18,
+
+      paddingTop: 18,
+      paddingBottom: 24,
+    },
+
+    pickerTitle: {
+      fontSize: 17,
+
+      fontWeight: '700',
+
+      color: '#2F2A27',
+
+      marginBottom: 10,
+    },
+
+    pickerScroll: {
+      maxHeight: 360,
+    },
+
+    pickerRow: {
+      minHeight: 48,
+
+      flexDirection: 'row',
+
+      alignItems: 'center',
+
+      justifyContent:
+        'space-between',
+
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
+
+      borderBottomColor:
+        '#E8E2DE',
+    },
+
+    pickerRowText: {
+      fontSize: 15,
+
+      color: '#625A55',
+    },
+
+    pickerRowTextActive: {
+      fontWeight: '700',
+
+      color: '#2F2A27',
+    },
+
+    categoryRow: {
+      minHeight: 50,
+
+      flexDirection: 'row',
+
+      alignItems: 'center',
+
+      justifyContent:
+        'space-between',
+
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
+
+      borderBottomColor:
+        '#E8E2DE',
+    },
+
+    categoryLeft: {
+      flexDirection: 'row',
+
+      alignItems: 'center',
+
+      gap: 12,
+    },
+
+    categoryText: {
+      fontSize: 15,
+
+      color: '#625A55',
+    },
+
+    categoryTextActive: {
+      fontWeight: '700',
+
+      color: '#2F2A27',
+    },
+  });

@@ -1,4 +1,9 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
+
 import {
   Animated,
   PanResponder,
@@ -7,34 +12,54 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 
 const DAY_MINUTES = 24 * 60;
-const SNAP_MINUTES = 15;
+const SNAP_MINUTES = 5;
 
 const CARD_LEFT = 56;
 const CARD_RIGHT = 16;
 
 const LONG_PRESS_DELAY_MS = 350;
 
+/* -------------------------------------------------------
+   HELPERS
+------------------------------------------------------- */
+
 const clamp = (value, min, max) =>
   Math.max(min, Math.min(max, value));
 
 const snap = (minutes) =>
-  Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+  Math.round(minutes / SNAP_MINUTES) *
+  SNAP_MINUTES;
 
-const formatTimeFromMinutes = (totalMinutes) => {
+const formatTimeFromMinutes = (
+  totalMinutes
+) => {
   const normalized =
-    ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) %
+    ((totalMinutes % DAY_MINUTES) +
+      DAY_MINUTES) %
     DAY_MINUTES;
 
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
+  const hours =
+    Math.floor(normalized / 60);
 
-  return `${String(hours).padStart(2, '0')}:${String(
-    mins
-  ).padStart(2, '0')}`;
+  const mins =
+    normalized % 60;
+
+  return `${String(hours).padStart(
+    2,
+    '0'
+  )}:${String(mins).padStart(
+    2,
+    '0'
+  )}`;
 };
+
+/* -------------------------------------------------------
+   TEMAS
+------------------------------------------------------- */
 
 const CARD_THEMES = [
   {
@@ -55,16 +80,26 @@ const CARD_THEMES = [
   },
 ];
 
+/* -------------------------------------------------------
+   COMPONENTE
+------------------------------------------------------- */
+
 export default function TaskCardClean({
   task,
   ppm,
+
   onChangeStart,
   onDragStateChange,
+
   onPress,
   onToggle,
+
   themeIndex = 0,
+
   getVisualY,
   getMinuteFromY,
+
+  layoutStyle,
 }) {
   const dragY = useRef(
     new Animated.Value(0)
@@ -78,27 +113,87 @@ export default function TaskCardClean({
      ALTURA
   ------------------------------------------------------- */
 
-  const duration = task.timeMinutes || 30;
+  const duration =
+    task.timeMinutes || 30;
 
-  const rawHeight = duration * ppm;
+  const rawHeight =
+    duration * ppm;
 
-  const visualHeight = Math.max(
-    rawHeight,
-    4
-  );
+  const visualHeight =
+    Math.max(
+      rawHeight,
+      4
+    );
 
   /* -------------------------------------------------------
-     TIPO DE CARTÃO
+     TIPO DE CARTÃO - ALTURA
   ------------------------------------------------------- */
 
-const isMicroTask = visualHeight < 8;
-const isTinyTask = visualHeight >= 8 && visualHeight < 12;
-const isCompactTask = visualHeight >= 12 && visualHeight < 30;
-const isNormalTask = visualHeight >= 30;
+  const isMicroTask =
+    visualHeight < 8;
 
-  const top = getVisualY(
-    task.startMinsPlanned || 0
-  );
+  const isTinyTask =
+    visualHeight >= 8 &&
+    visualHeight < 12;
+
+  const isCompactTask =
+    visualHeight >= 12 &&
+    visualHeight < 30;
+
+  const isNormalTask =
+    visualHeight >= 30;
+
+  /* -------------------------------------------------------
+     POSIÇÃO
+  ------------------------------------------------------- */
+
+  const top =
+    getVisualY(
+      task.startMinsPlanned || 0
+    );
+
+  const horizontalStyle =
+    layoutStyle || {
+      left: CARD_LEFT,
+      right: CARD_RIGHT,
+    };
+
+  /* -------------------------------------------------------
+     LARGURA / OVERLAP
+  ------------------------------------------------------- */
+
+  const cardWidth =
+    layoutStyle?.width ?? null;
+
+  const isNarrow =
+    cardWidth != null &&
+    cardWidth < 180;
+
+  const isVeryNarrow =
+    cardWidth != null &&
+    cardWidth < 105;
+
+  /*
+   * Altura suficiente para
+   * aproveitar duas linhas.
+   */
+  const hasRoomForMeta =
+    visualHeight >= 30;
+
+  const hasRoomForCompactMeta =
+    visualHeight >= 18;
+
+  /*
+   * Checkbox:
+   * só desaparece quando
+   * realmente começa a apertar.
+   */
+  const showCheckbox =
+    !isVeryNarrow;
+
+  /* -------------------------------------------------------
+     TEMA
+  ------------------------------------------------------- */
 
   const theme =
     CARD_THEMES[
@@ -116,229 +211,264 @@ const isNormalTask = visualHeight >= 30;
   const isDragActive =
     useRef(false);
 
-  const initialTouch = useRef({
-    x: 0,
-    y: 0,
-  });
+  const initialTouch =
+    useRef({
+      x: 0,
+      y: 0,
+    });
 
-  const clearTimer = useCallback(
-    () => {
-      if (longPressTimer.current) {
+  const clearTimer =
+    useCallback(() => {
+      if (
+        longPressTimer.current
+      ) {
         clearTimeout(
           longPressTimer.current
         );
 
-        longPressTimer.current = null;
+        longPressTimer.current =
+          null;
       }
-    },
-    []
-  );
+    }, []);
 
-  const resetAll = useCallback(
-    () => {
+  const resetAll =
+    useCallback(() => {
       clearTimer();
 
-      isDragActive.current = false;
+      isDragActive.current =
+        false;
 
-      onDragStateChange?.(false);
+      onDragStateChange?.(
+        false
+      );
 
       Animated.spring(
         scaleAnim,
         {
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver:
+            true,
           friction: 6,
         }
       ).start();
-    },
-    [
+    }, [
       clearTimer,
       onDragStateChange,
       scaleAnim,
-    ]
-  );
+    ]);
 
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder:
-          () => false,
+  const responder =
+    useMemo(
+      () =>
+        PanResponder.create({
+          onStartShouldSetPanResponder:
+            () => false,
 
-        onStartShouldSetPanResponderCapture:
-          () => false,
+          onStartShouldSetPanResponderCapture:
+            () => false,
 
-        onMoveShouldSetPanResponder:
-          () =>
-            isDragActive.current,
+          onMoveShouldSetPanResponder:
+            () =>
+              isDragActive.current,
 
-        onMoveShouldSetPanResponderCapture:
-          () =>
-            isDragActive.current,
+          onMoveShouldSetPanResponderCapture:
+            () =>
+              isDragActive.current,
 
-        onPanResponderTerminationRequest:
-          () =>
-            !isDragActive.current,
+          onPanResponderTerminationRequest:
+            () =>
+              !isDragActive.current,
 
-        onPanResponderGrant: () => {
-          dragY.setValue(0);
-        },
+          onPanResponderGrant:
+            () => {
+              dragY.setValue(
+                0
+              );
+            },
 
-        onPanResponderMove: (
-          _,
-          gesture
-        ) => {
-          if (
-            isDragActive.current
-          ) {
-            dragY.setValue(
-              gesture.dy
-            );
-          }
-        },
+          onPanResponderMove:
+            (
+              _,
+              gesture
+            ) => {
+              if (
+                isDragActive.current
+              ) {
+                dragY.setValue(
+                  gesture.dy
+                );
+              }
+            },
 
-        onPanResponderRelease: (
-          _,
-          gesture
-        ) => {
-          if (
-            isDragActive.current
-          ) {
-            const finalY =
-              top + gesture.dy;
+          onPanResponderRelease:
+            (
+              _,
+              gesture
+            ) => {
+              if (
+                isDragActive.current
+              ) {
+                const finalY =
+                  top +
+                  gesture.dy;
 
-            const finalMins =
-              clamp(
-                snap(
-                  getMinuteFromY(
-                    finalY
-                  )
-                ),
-                0,
-                DAY_MINUTES -
-                  duration
+                const finalMins =
+                  clamp(
+                    snap(
+                      getMinuteFromY(
+                        finalY
+                      )
+                    ),
+                    0,
+                    DAY_MINUTES -
+                      duration
+                  );
+
+                dragY.setValue(
+                  0
+                );
+
+                onChangeStart(
+                  task.id,
+                  finalMins
+                );
+              }
+
+              resetAll();
+            },
+
+          onPanResponderTerminate:
+            () => {
+              dragY.setValue(
+                0
               );
 
-            dragY.setValue(0);
+              resetAll();
+            },
+        }),
+      [
+        dragY,
+        top,
+        getMinuteFromY,
+        duration,
+        onChangeStart,
+        task.id,
+        resetAll,
+      ]
+    );
 
-            onChangeStart(
-              task.id,
-              finalMins
-            );
-          }
+  /* -------------------------------------------------------
+     TOUCH
+  ------------------------------------------------------- */
 
-          resetAll();
-        },
-
-        onPanResponderTerminate:
-          () => {
-            dragY.setValue(0);
-            resetAll();
-          },
-      }),
-    [
-      dragY,
-      top,
-      getMinuteFromY,
-      duration,
-      onChangeStart,
-      task.id,
-      resetAll,
-    ]
-  );
-
-  const handleTouchStart = (
-    e
-  ) => {
-    const {
-      pageX,
-      pageY,
-    } = e.nativeEvent;
-
-    initialTouch.current = {
-      x: pageX,
-      y: pageY,
-    };
-
-    clearTimer();
-
-    longPressTimer.current =
-      setTimeout(() => {
-        isDragActive.current =
-          true;
-
-        onDragStateChange?.(
-          true
-        );
-
-        Animated.spring(
-          scaleAnim,
-          {
-            toValue: 1.03,
-            useNativeDriver: true,
-            friction: 4,
-          }
-        ).start();
-      }, LONG_PRESS_DELAY_MS);
-  };
-
-  const handleTouchMove = (e) => {
-    if (
-      !isDragActive.current
-    ) {
+  const handleTouchStart =
+    (e) => {
       const {
         pageX,
         pageY,
       } = e.nativeEvent;
 
-      const dx = Math.abs(
-        pageX -
-          initialTouch.current.x
-      );
+      initialTouch.current = {
+        x: pageX,
+        y: pageY,
+      };
 
-      const dy = Math.abs(
-        pageY -
-          initialTouch.current.y
-      );
+      clearTimer();
 
-      if (dx > 8 || dy > 8) {
+      longPressTimer.current =
+        setTimeout(() => {
+          isDragActive.current =
+            true;
+
+          onDragStateChange?.(
+            true
+          );
+
+          Animated.spring(
+            scaleAnim,
+            {
+              toValue: 1.03,
+              useNativeDriver:
+                true,
+              friction: 4,
+            }
+          ).start();
+        }, LONG_PRESS_DELAY_MS);
+    };
+
+  const handleTouchMove =
+    (e) => {
+      if (
+        !isDragActive.current
+      ) {
+        const {
+          pageX,
+          pageY,
+        } = e.nativeEvent;
+
+        const dx =
+          Math.abs(
+            pageX -
+              initialTouch.current.x
+          );
+
+        const dy =
+          Math.abs(
+            pageY -
+              initialTouch.current.y
+          );
+
+        if (
+          dx > 8 ||
+          dy > 8
+        ) {
+          clearTimer();
+        }
+      }
+    };
+
+  const handleTouchEnd =
+    () => {
+      if (
+        !isDragActive.current
+      ) {
         clearTimer();
       }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (
-      !isDragActive.current
-    ) {
-      clearTimer();
-    }
-  };
+    };
 
   /* -------------------------------------------------------
      TEXTO
   ------------------------------------------------------- */
 
-  const formatDuration = (
-    minutes
-  ) => {
-    if (minutes < 60) {
-      return `${minutes} min`;
-    }
+  const formatDuration =
+    (minutes) => {
+      if (
+        minutes < 60
+      ) {
+        return `${minutes} min`;
+      }
 
-    const hours =
-      Math.floor(minutes / 60);
+      const hours =
+        Math.floor(
+          minutes / 60
+        );
 
-    const mins =
-      minutes % 60;
+      const mins =
+        minutes % 60;
 
-    if (mins === 0) {
-      return `${hours}h`;
-    }
+      if (
+        mins === 0
+      ) {
+        return `${hours}h`;
+      }
 
-    return `${hours}h${String(
-      mins
-    ).padStart(2, '0')}`;
-  };
+      return `${hours}h${String(
+        mins
+      ).padStart(
+        2,
+        '0'
+      )}`;
+    };
 
   const startTimeStr =
     formatTimeFromMinutes(
@@ -352,16 +482,10 @@ const isNormalTask = visualHeight >= 30;
     );
 
   const durationStr =
-    formatDuration(duration);
-console.log(
-  task.title,
-  duration,
-  'min ->',
-  visualHeight.toFixed(1),
-  'px',
-  'ppm:',
-  ppm.toFixed(3)
-);
+    formatDuration(
+      duration
+    );
+
   /* -------------------------------------------------------
      MICRO
   ------------------------------------------------------- */
@@ -384,15 +508,17 @@ console.log(
         }
         style={[
           styles.taskCompact,
+
           {
             top,
             height:
               visualHeight,
-            left: CARD_LEFT,
-            right: CARD_RIGHT,
-          backgroundColor: task.completed
-  ? '#F5F4F2'
-  : theme.bg,
+
+            backgroundColor:
+              task.completed
+                ? '#F5F4F2'
+                : theme.bg,
+
             transform: [
               {
                 translateY:
@@ -404,16 +530,19 @@ console.log(
               },
             ],
           },
-       
+
+          horizontalStyle,
         ]}
       >
         <View
           style={[
             styles.taskCompactBar,
+
             {
-           backgroundColor: task.completed
-  ? '#C9C3BD'
-  : theme.accent,
+              backgroundColor:
+                task.completed
+                  ? '#C9C3BD'
+                  : theme.accent,
             },
           ]}
         />
@@ -433,70 +562,99 @@ console.log(
       </Animated.View>
     );
   }
-/* -------------------------------------------------------
-   TINY -pensar
-------------------------------------------------------- */
-/* -------------------------------------------------------
-   TINY
-------------------------------------------------------- */
 
-if (isTinyTask) {
-  return (
-    <Animated.View
-      {...responder.panHandlers}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      style={[
-        styles.taskTiny,
-        {
-          top,
-          height: visualHeight,
-          left: CARD_LEFT,
-          right: CARD_RIGHT,
-          backgroundColor: task.completed
-            ? '#F5F4F2'
-            : theme.bg,
-          transform: [
-            { translateY: dragY },
-            { scale: scaleAnim },
-          ],
-        },
-      ]}
-    >
-      <View
+  /* -------------------------------------------------------
+     TINY
+  ------------------------------------------------------- */
+
+  if (isTinyTask) {
+    return (
+      <Animated.View
+        {...responder.panHandlers}
+        onTouchStart={
+          handleTouchStart
+        }
+        onTouchMove={
+          handleTouchMove
+        }
+        onTouchEnd={
+          handleTouchEnd
+        }
+        onTouchCancel={
+          handleTouchEnd
+        }
         style={[
-          styles.taskTinyBar,
-          {
-            backgroundColor: task.completed
-              ? '#C9C3BD'
-              : theme.accent,
-          },
-        ]}
-      />
+          styles.taskTiny,
 
-      <TouchableOpacity
-        style={styles.tinyClickArea}
-        onPress={() => {
-          if (!isDragActive.current) {
-            onPress(task);
-          }
-        }}
+          {
+            top,
+            height:
+              visualHeight,
+
+            backgroundColor:
+              task.completed
+                ? '#F5F4F2'
+                : theme.bg,
+
+            transform: [
+              {
+                translateY:
+                  dragY,
+              },
+              {
+                scale:
+                  scaleAnim,
+              },
+            ],
+          },
+
+          horizontalStyle,
+        ]}
       >
-        <Text
+        <View
           style={[
-            styles.tinyTitle,
-            task.completed && styles.taskTitleCompleted,
+            styles.taskTinyBar,
+
+            {
+              backgroundColor:
+                task.completed
+                  ? '#C9C3BD'
+                  : theme.accent,
+            },
           ]}
-          numberOfLines={1}
+        />
+
+        <TouchableOpacity
+          style={
+            styles.tinyClickArea
+          }
+          onPress={() => {
+            if (
+              !isDragActive.current
+            ) {
+              onPress(task);
+            }
+          }}
         >
-          {task.title}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
+          <Text
+            style={[
+              styles.tinyTitle,
+
+              isVeryNarrow &&
+                styles.tinyTitleVeryNarrow,
+
+              task.completed &&
+                styles.taskTitleCompleted,
+            ]}
+            numberOfLines={1}
+          >
+            {task.title}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+
   /* -------------------------------------------------------
      COMPACTO
   ------------------------------------------------------- */
@@ -519,15 +677,17 @@ if (isTinyTask) {
         }
         style={[
           styles.taskCompact,
+
           {
             top,
             height:
               visualHeight,
-            left: CARD_LEFT,
-            right: CARD_RIGHT,
-          backgroundColor: task.completed
-  ? '#F5F4F2'
-  : theme.bg,
+
+            backgroundColor:
+              task.completed
+                ? '#F5F4F2'
+                : theme.bg,
+
             transform: [
               {
                 translateY:
@@ -539,17 +699,19 @@ if (isTinyTask) {
               },
             ],
           },
-          task.completed &&
-            styles.taskCompletedOpacity,
+
+          horizontalStyle,
         ]}
       >
         <View
           style={[
             styles.taskCompactBar,
+
             {
-           backgroundColor: task.completed
-  ? '#C9C3BD'
-  : theme.accent,
+              backgroundColor:
+                task.completed
+                  ? '#C9C3BD'
+                  : theme.accent,
             },
           ]}
         />
@@ -569,46 +731,59 @@ if (isTinyTask) {
           <Text
             style={[
               styles.compactTitle,
+
+              isVeryNarrow &&
+                styles.compactTitleVeryNarrow,
+
               task.completed &&
                 styles.taskTitleCompleted,
             ]}
             numberOfLines={1}
           >
-            {task.title}{' '}
-            <Text
-              style={
-                styles.compactMeta
-              }
-            >
-              · {startTimeStr}–
-              {endTimeStr} (
-              {durationStr})
-            </Text>
+            {task.title}
           </Text>
+
+          {hasRoomForCompactMeta &&
+            !isVeryNarrow && (
+              <Text
+                style={
+                  styles.compactMetaLine
+                }
+                numberOfLines={1}
+              >
+                {isNarrow
+                  ? durationStr
+                  : `${startTimeStr} · ${durationStr}`}
+              </Text>
+            )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          hitSlop={{
-            top: 8,
-            bottom: 8,
-            left: 8,
-            right: 8,
-          }}
-          onPress={() =>
-            onToggle(task.id)
-          }
-         style={styles.compactCheckbox}
-        >
-          {task.completed && (
-            <Ionicons
-              name="checkmark"
-              size={8}
-              color={
-                theme.accent
-              }
-            />
-          )}
-        </TouchableOpacity>
+        {showCheckbox && (
+          <TouchableOpacity
+            hitSlop={{
+              top: 8,
+              bottom: 8,
+              left: 8,
+              right: 8,
+            }}
+            onPress={() =>
+              onToggle(task.id)
+            }
+            style={
+              styles.compactCheckbox
+            }
+          >
+            {task.completed && (
+              <Ionicons
+                name="checkmark"
+                size={8}
+                color={
+                  theme.accent
+                }
+              />
+            )}
+          </TouchableOpacity>
+        )}
       </Animated.View>
     );
   }
@@ -634,15 +809,17 @@ if (isTinyTask) {
       }
       style={[
         styles.taskNormal,
+
         {
           top,
           height:
             visualHeight,
-          left: CARD_LEFT,
-          right: CARD_RIGHT,
-        backgroundColor: task.completed
-  ? '#F5F4F2'
-  : theme.bg,
+
+          backgroundColor:
+            task.completed
+              ? '#F5F4F2'
+              : theme.bg,
+
           transform: [
             {
               translateY:
@@ -654,22 +831,27 @@ if (isTinyTask) {
             },
           ],
         },
-    
+
+        horizontalStyle,
       ]}
     >
       <View
         style={[
           styles.taskAccentBar,
+
           {
-         backgroundColor: task.completed
-  ? '#C9C3BD'
-  : theme.accent,
+            backgroundColor:
+              task.completed
+                ? '#C9C3BD'
+                : theme.accent,
           },
         ]}
       />
 
       <TouchableOpacity
-        style={styles.taskBody}
+        style={
+          styles.taskBody
+        }
         onPress={() => {
           if (
             !isDragActive.current
@@ -681,6 +863,13 @@ if (isTinyTask) {
         <Text
           style={[
             styles.taskTitle,
+
+            isNarrow &&
+              styles.taskTitleNarrow,
+
+            isVeryNarrow &&
+              styles.taskTitleVeryNarrow,
+
             task.completed &&
               styles.taskTitleCompleted,
           ]}
@@ -689,43 +878,55 @@ if (isTinyTask) {
           {task.title}
         </Text>
 
-        <Text
-          style={styles.taskMeta}
-          numberOfLines={1}
-        >
-          {startTimeStr}–
-          {endTimeStr} ·{' '}
-          {durationStr}
-        </Text>
-      </TouchableOpacity>
+        {hasRoomForMeta && (
+          <Text
+            style={[
+              styles.taskMeta,
 
-      <TouchableOpacity
-        hitSlop={{
-          top: 10,
-          bottom: 10,
-          left: 10,
-          right: 10,
-        }}
-        onPress={() =>
-          onToggle(task.id)
-        }
-        style={[
-          styles.universalCheckbox,
-          {
-            marginTop: 8,
-          },
-        ]}
-      >
-        {task.completed && (
-          <Ionicons
-            name="checkmark"
-            size={10}
-            color={
-              theme.accent
-            }
-          />
+              isNarrow &&
+                styles.taskMetaNarrow,
+            ]}
+            numberOfLines={1}
+          >
+            {isVeryNarrow
+              ? durationStr
+              : isNarrow
+                ? `${startTimeStr} · ${durationStr}`
+                : `${startTimeStr}–${endTimeStr} · ${durationStr}`}
+          </Text>
         )}
       </TouchableOpacity>
+
+      {showCheckbox && (
+        <TouchableOpacity
+          hitSlop={{
+            top: 10,
+            bottom: 10,
+            left: 10,
+            right: 10,
+          }}
+          onPress={() =>
+            onToggle(task.id)
+          }
+          style={[
+            styles.universalCheckbox,
+
+            {
+              marginTop: 8,
+            },
+          ]}
+        >
+          {task.completed && (
+            <Ionicons
+              name="checkmark"
+              size={10}
+              color={
+                theme.accent
+              }
+            />
+          )}
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -736,6 +937,10 @@ if (isTinyTask) {
 
 const styles =
   StyleSheet.create({
+    /* ---------------------------------------------------
+       NORMAL
+    --------------------------------------------------- */
+
     taskNormal: {
       position: 'absolute',
 
@@ -743,9 +948,14 @@ const styles =
 
       borderWidth: 0,
 
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
+
+      borderBottomColor:
+        '#E7E3DF',
+
       flexDirection: 'row',
-borderBottomWidth: StyleSheet.hairlineWidth,
-borderBottomColor: '#e7e3df',
+
       alignItems:
         'flex-start',
 
@@ -785,10 +995,19 @@ borderBottomColor: '#e7e3df',
       lineHeight: 15,
     },
 
+    taskTitleNarrow: {
+      fontSize: 12,
+    },
+
+    taskTitleVeryNarrow: {
+      fontSize: 10,
+    },
+
     taskTitleCompleted: {
       textDecorationLine:
         'line-through',
-       color: '#8F8983',
+
+      color: '#8F8983',
     },
 
     taskMeta: {
@@ -806,59 +1025,8 @@ borderBottomColor: '#e7e3df',
       lineHeight: 12,
     },
 
-    taskCompact: {
-      position: 'absolute',
-
-      borderRadius: 3,
-
-      borderWidth: 0,
-borderBottomWidth: StyleSheet.hairlineWidth,
-borderBottomColor: '#E4E0DC',
-      flexDirection: 'row',
-
-      alignItems: 'center',
-
-      overflow: 'hidden',
-    },
-
-    taskCompactBar: {
-      width: 3,
-
-      alignSelf:
-        'stretch',
-    },
-compactClickArea: {
-  flex: 1,
-  height: '100%',
-  paddingHorizontal: 7,
-  justifyContent: 'center',
-},
-
-    compactTitle: {
-      fontSize: 10,
-
-      fontWeight: '600',
-
-      color: '#403B37',
-
-      includeFontPadding:
-        false,
-    },
-compactCheckbox: {
-  width: 11,
-  height: 11,
-  marginRight: 6,
-  borderRadius: 2.5,
-  borderWidth: 1,
-  borderColor: '#C7BFB9',
-  backgroundColor: '#FFFFFF',
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-    compactMeta: {
-      fontWeight: '400',
-
-      color: '#8A827C',
+    taskMetaNarrow: {
+      fontSize: 9,
     },
 
     universalCheckbox: {
@@ -885,36 +1053,157 @@ compactCheckbox: {
         'center',
     },
 
-taskTiny: {
-  position: 'absolute',
-  borderRadius: 2,
-  borderWidth: 0,
+    /* ---------------------------------------------------
+       COMPACT
+    --------------------------------------------------- */
 
-  borderBottomWidth: StyleSheet.hairlineWidth,
-  borderBottomColor: '#E4E0DC',
+    taskCompact: {
+      position: 'absolute',
 
-  flexDirection: 'row',
-  alignItems: 'center',
-  overflow: 'hidden',
-},
+      borderRadius: 3,
 
-taskTinyBar: {
-  width: 3,
-  height: '100%',
-},
+      borderWidth: 0,
 
-tinyClickArea: {
-  flex: 1,
-  height: '100%',
-  paddingHorizontal: 6,
-  justifyContent: 'center',
-},
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
 
-tinyTitle: {
-  fontSize: 8,
-  lineHeight: 9,
-  fontWeight: '600',
-  color: '#403B37',
-  includeFontPadding: false,
-},
+      borderBottomColor:
+        '#E4E0DC',
+
+      flexDirection: 'row',
+
+      alignItems: 'center',
+
+      overflow: 'hidden',
+    },
+
+    taskCompactBar: {
+      width: 3,
+
+      alignSelf:
+        'stretch',
+    },
+
+    compactClickArea: {
+      flex: 1,
+
+      height: '100%',
+
+      paddingHorizontal: 7,
+
+      justifyContent:
+        'center',
+    },
+
+    compactTitle: {
+      fontSize: 10,
+
+      fontWeight: '600',
+
+      color: '#403B37',
+
+      includeFontPadding:
+        false,
+    },
+
+    compactTitleVeryNarrow: {
+      fontSize: 9,
+    },
+
+    compactMetaLine: {
+      marginTop: 1,
+
+      fontSize: 8,
+
+      lineHeight: 9,
+
+      fontWeight: '400',
+
+      color: '#8A827C',
+
+      includeFontPadding:
+        false,
+    },
+
+    compactCheckbox: {
+      width: 11,
+
+      height: 11,
+
+      marginRight: 6,
+
+      borderRadius: 2.5,
+
+      borderWidth: 1,
+
+      borderColor:
+        '#C7BFB9',
+
+      backgroundColor:
+        '#FFFFFF',
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+    },
+
+    /* ---------------------------------------------------
+       TINY
+    --------------------------------------------------- */
+
+    taskTiny: {
+      position: 'absolute',
+
+      borderRadius: 2,
+
+      borderWidth: 0,
+
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
+
+      borderBottomColor:
+        '#E4E0DC',
+
+      flexDirection: 'row',
+
+      alignItems: 'center',
+
+      overflow: 'hidden',
+    },
+
+    taskTinyBar: {
+      width: 3,
+
+      height: '100%',
+    },
+
+    tinyClickArea: {
+      flex: 1,
+
+      height: '100%',
+
+      paddingHorizontal: 6,
+
+      justifyContent:
+        'center',
+    },
+
+    tinyTitle: {
+      fontSize: 8,
+
+      lineHeight: 9,
+
+      fontWeight: '600',
+
+      color: '#403B37',
+
+      includeFontPadding:
+        false,
+    },
+
+    tinyTitleVeryNarrow: {
+      fontSize: 7,
+    },
   });
