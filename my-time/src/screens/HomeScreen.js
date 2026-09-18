@@ -1950,7 +1950,7 @@ const handleSaveTask = async ({
           date:
             changes.date ||
             selectedDateKey,
-        })
+        }, tasks)
       : await taskService.updateTask(
           detailsTask.id,
           changes,
@@ -1971,7 +1971,8 @@ const handleSaveTask = async ({
     ? async () => {
         const savedTasks =
           await taskService.deleteTask(
-            detailsTask.id
+            detailsTask.id, 
+            tasks
           );
 
         setTasks(

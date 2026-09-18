@@ -14,6 +14,7 @@ export const createTask = async (
     currentTasks = null
 ) => {
   const tasks =
+  currentTasks ??
     await loadTasks();
 
   const task =
