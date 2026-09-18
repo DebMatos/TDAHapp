@@ -427,3 +427,106 @@ export const createTask = (
     },
     options
   );
+
+  /* -------------------------------------------------------
+   UPDATE
+------------------------------------------------------- */
+
+export const updateTask = (
+  task,
+  changes = {},
+  options = {}
+) => {
+  const now =
+    options.now ||
+    new Date().toISOString();
+
+  const previous =
+    normalizeTask(task, {
+      ...options,
+      now,
+    });
+
+  const nextStatus =
+    changes.status ??
+    previous.status;
+
+  return normalizeTask(
+    {
+      ...previous,
+      ...changes,
+
+      id: previous.id,
+
+      createdAt:
+        previous.createdAt,
+
+      status: nextStatus,
+
+      completedAt:
+        nextStatus === 'completed'
+          ? (
+              changes.completedAt ??
+              previous.completedAt ??
+              now
+            )
+          : null,
+
+      abandonedAt:
+        nextStatus === 'abandoned'
+          ? (
+              changes.abandonedAt ??
+              previous.abandonedAt ??
+              now
+            )
+          : null,
+    },
+    {
+      ...options,
+      now,
+    }
+  );
+};
+
+  export const toggleTaskCompletion = (
+  task,
+  options = {}
+) => {
+  const now =
+    options.now ||
+    new Date().toISOString();
+
+  const canonical =
+    normalizeTask(task, {
+      ...options,
+      now,
+    });
+
+  if (
+    canonical.status ===
+    'abandoned'
+  ) {
+    return canonical;
+  }
+
+  const isCompleted =
+    canonical.status ===
+    'completed';
+
+  return updateTask(
+    canonical,
+    {
+      status: isCompleted
+        ? 'pending'
+        : 'completed',
+
+      completedAt: isCompleted
+        ? null
+        : now,
+    },
+    {
+      ...options,
+      now,
+    }
+  );
+};

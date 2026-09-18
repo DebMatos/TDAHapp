@@ -16,17 +16,15 @@ import {
   UIManager,
   View,
 } from 'react-native';
-
+import * as taskService from
+  '../services/taskService';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
-import EditTaskModal from '../components/modals/EditTaskModal';
 
-import { INITIAL_TIMELINE_BLOCKS } from '../utils/acordionData';
 
 import {
   taskToLegacyView,
@@ -34,7 +32,6 @@ import {
 
 import {
   loadTasks as loadStoredTasks,
-  saveTasks as saveStoredTasks,
 } from '../data/taskRepository';
 
 if (
@@ -46,12 +43,6 @@ if (
   );
 }
 
-/* -------------------------------------------------------
-   STORAGE LEGACY DOS BLOCOS
-------------------------------------------------------- */
-
-const STORAGE_KEY =
-  '@my_time_blocks_data_v12';
 
 /* -------------------------------------------------------
    TIMELINE
@@ -229,7 +220,7 @@ const parseTimeToMinutes = (
         ? 7
         : h
     ) *
-      60 +
+    60 +
     (
       Number.isNaN(m)
         ? 0
@@ -256,7 +247,7 @@ const snapMinutes = (
 ) =>
   Math.round(
     minutes /
-      SNAP_MINUTES
+    SNAP_MINUTES
   ) *
   SNAP_MINUTES;
 
@@ -269,7 +260,7 @@ const getDateKey = (
   const month =
     String(
       date.getMonth() +
-        1
+      1
     ).padStart(
       2,
       '0'
@@ -291,11 +282,11 @@ const isSameDay = (
   b
 ) =>
   a.getFullYear() ===
-    b.getFullYear() &&
+  b.getFullYear() &&
   a.getMonth() ===
-    b.getMonth() &&
+  b.getMonth() &&
   a.getDate() ===
-    b.getDate();
+  b.getDate();
 
 const addDays = (
   date,
@@ -310,7 +301,7 @@ const addDays = (
 
   next.setDate(
     next.getDate() +
-      amount
+    amount
   );
 
   return next;
@@ -335,7 +326,7 @@ const getPinchDistance = (
 
   return Math.sqrt(
     dx * dx +
-      dy * dy
+    dy * dy
   );
 };
 
@@ -390,7 +381,7 @@ const getTaskTimelineInterval = (
       Number(
         task.timeMinutes
       ) ||
-        30
+      30
     );
 
   return {
@@ -526,7 +517,7 @@ const calculateOverlapColumns = (
               maxColumns,
               active.length,
               column +
-                1
+              1
             );
         }
       );
@@ -555,9 +546,9 @@ const calculateOverlapColumns = (
     ) => {
       if (
         group.length >
-          0 &&
+        0 &&
         event.start >=
-          groupEnd
+        groupEnd
       ) {
         processGroup();
 
@@ -709,14 +700,6 @@ export default function TimelineScreen() {
       ]
     );
 
-  const [
-    blocks,
-    setBlocks,
-  ] =
-    useState(
-      INITIAL_TIMELINE_BLOCKS ||
-        []
-    );
 
   const [
     modalVisible,
@@ -724,11 +707,6 @@ export default function TimelineScreen() {
   ] =
     useState(false);
 
-  const [
-    editingTask,
-    setEditingTask,
-  ] =
-    useState(null);
 
   const [
     targetSlotMinutes,
@@ -784,7 +762,7 @@ export default function TimelineScreen() {
 
         return (
           offset *
-            ppm +
+          ppm +
           VERTICAL_PADDING
         );
       },
@@ -832,9 +810,9 @@ export default function TimelineScreen() {
     useMemo(
       () =>
         DAY_MINUTES *
-          ppm +
+        ppm +
         VERTICAL_PADDING *
-          2,
+        2,
       [
         ppm,
       ]
@@ -865,8 +843,8 @@ export default function TimelineScreen() {
           Math.max(
             0,
             viewportWidth -
-              TASK_CARD_LEFT -
-              TASK_CARD_RIGHT
+            TASK_CARD_LEFT -
+            TASK_CARD_RIGHT
           );
 
         visibleTasks.forEach(
@@ -892,9 +870,9 @@ export default function TimelineScreen() {
 
             if (
               columnCount <=
-                1 ||
+              1 ||
               availableWidth <=
-                0
+              0
             ) {
               layouts.set(
                 task.id,
@@ -930,10 +908,10 @@ export default function TimelineScreen() {
                 left:
                   TASK_CARD_LEFT +
                   column *
-                    (
-                      columnWidth +
-                      OVERLAP_GAP
-                    ),
+                  (
+                    columnWidth +
+                    OVERLAP_GAP
+                  ),
 
                 width:
                   columnWidth,
@@ -963,7 +941,7 @@ export default function TimelineScreen() {
 
   const currentAbsMins =
     now.getHours() *
-      60 +
+    60 +
     now.getMinutes();
 
   const nowTop =
@@ -982,7 +960,7 @@ export default function TimelineScreen() {
     () => {
       if (
         viewportHeight >
-          0 &&
+        0 &&
         !initialScrollDone
           .current &&
         scrollRef.current
@@ -993,13 +971,13 @@ export default function TimelineScreen() {
         const targetY =
           nowTop -
           viewportHeight *
-            0.35;
+          0.35;
 
         const maxScroll =
           Math.max(
             0,
             canvasHeight -
-              viewportHeight
+            viewportHeight
           );
 
         const y =
@@ -1037,512 +1015,114 @@ export default function TimelineScreen() {
      STORAGE
   ------------------------------------------------------- */
 
-  useEffect(
-    () => {
-      const loadStoredData =
-        async () => {
-          try {
-            /*
-             * Blocks ainda são legacy.
-             * Mantemos esta leitura enquanto
-             * EditTaskModal existir.
-             */
-            const storedBlocks =
-              await AsyncStorage.getItem(
-                STORAGE_KEY
-              );
+useEffect(() => {
+  const loadStoredData = async () => {
+    const canonicalTasks =
+      await loadStoredTasks();
 
-            let parsedBlocks =
-              null;
+    setTasks(
+      canonicalTasks.map(
+        taskToLegacyView
+      )
+    );
+  };
 
-            if (
-              storedBlocks
-            ) {
-              const parsed =
-                JSON.parse(
-                  storedBlocks
-                );
-
-              if (
-                Array.isArray(
-                  parsed
-                ) &&
-                parsed.length >
-                  0
-              ) {
-                parsedBlocks =
-                  parsed;
-
-                setBlocks(
-                  parsed
-                );
-              }
-            }
-
-            /*
-             * TASKS:
-             * o HomeScreen já não sabe
-             * onde nem como são guardadas.
-             */
-            const canonicalTasks =
-              await loadStoredTasks();
-
-            if (
-              canonicalTasks.length >
-              0
-            ) {
-              setTasks(
-                canonicalTasksToLegacyView(
-                  canonicalTasks
-                )
-              );
-
-              return;
-            }
-
-            /*
-             * Compatibilidade com a estrutura
-             * ainda mais antiga baseada
-             * em blocks.
-             *
-             * Só executa se o repository
-             * não encontrar tasks.
-             */
-            if (
-              parsedBlocks
-            ) {
-              const legacyMigratedTasks =
-                parsedBlocks.flatMap(
-                  (
-                    block
-                  ) => {
-                    let currentMinute =
-                      block.startHour *
-                      60;
-
-                    return (
-                      block.tasks ||
-                      []
-                    ).map(
-                      (
-                        task
-                      ) => {
-                        const startMinsPlanned =
-                          task.startMinsPlanned ??
-                          (
-                            task.timeOfDay
-                              ? parseTimeToMinutes(
-                                  task.timeOfDay
-                                )
-                              : currentMinute
-                          );
-
-                        currentMinute =
-                          startMinsPlanned +
-                          (
-                            task.timeMinutes ||
-                            30
-                          );
-
-                        return {
-                          ...task,
-
-                          date:
-                            task.date ||
-                            getDateKey(
-                              new Date()
-                            ),
-
-                          startMinsPlanned,
-
-                          timeOfDay:
-                            task.timeOfDay ||
-                            formatTimeFromMinutes(
-                              startMinsPlanned
-                            ),
-                        };
-                      }
-                    );
-                  }
-                );
-
-              const saved =
-                await saveStoredTasks(
-                  legacyMigratedTasks
-                );
-
-              setTasks(
-                canonicalTasksToLegacyView(
-                  saved
-                )
-              );
-            }
-          } catch (
-            error
-          ) {
-            console.error(
-              'Erro ao carregar dados:',
-              error
-            );
-          }
-        };
-
-      loadStoredData();
-    },
-    []
-  );
-
-  /*
-   * A UI continua a chamar saveTasks,
-   * mas a persistência real está agora
-   * no repository.
-   */
-  const saveTasks =
-    async (
-      newTasks
-    ) => {
-      try {
-        const canonicalTasks =
-          await saveStoredTasks(
-            newTasks
-          );
-
-        setTasks(
-          canonicalTasksToLegacyView(
-            canonicalTasks
-          )
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          'Erro ao guardar tarefas:',
-          error
-        );
-      }
-    };
-
+  loadStoredData();
+}, []);
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
 
-  const handleDragEnd = (
-    taskId,
-    newMins
-  ) => {
-    const updatedTasks =
-      tasks.map(
-        (
-          task
-        ) =>
-          task.id ===
-          taskId
-            ? {
-                ...task,
+const handleDragEnd = async (
+  taskId,
+  newMins
+) => {
+  const savedTasks =
+    await taskService.moveTask({
+      tasks,
 
-                startMinsPlanned:
-                  newMins,
+      taskId,
 
-                timeOfDay:
-                  formatTimeFromMinutes(
-                    newMins
-                  ),
+      schedule: {
+        startTime:
+          formatTimeFromMinutes(
+            newMins
+          ),
+      },
+    });
 
-                startTime:
-                  formatTimeFromMinutes(
-                    newMins
-                  ),
-
-                updatedAt:
-                  new Date()
-                    .toISOString(),
-              }
-            : task
-      );
-
-    saveTasks(
-      updatedTasks
-    );
-  };
+  setTasks(
+    savedTasks.map(
+      taskToLegacyView
+    )
+  );
+};
 
   /* -------------------------------------------------------
      CHECKBOX
   ------------------------------------------------------- */
 
-  const toggleTaskComplete = (
-    taskId
-  ) => {
-    const timestamp =
-      new Date()
-        .toISOString();
-
-    const updatedTasks =
-      tasks.map(
-        (
-          task
-        ) => {
-          if (
-            task.id !==
-            taskId
-          ) {
-            return task;
-          }
-
-          const currentStatus =
-            getTaskStatus(
-              task
-            );
-
-          if (
-            currentStatus ===
-            'abandoned'
-          ) {
-            return task;
-          }
-
-          const nextStatus =
-            currentStatus ===
-            'completed'
-              ? 'pending'
-              : 'completed';
-
-          return {
-            ...task,
-
-            status:
-              nextStatus,
-
-            completed:
-              nextStatus ===
-              'completed',
-
-            completedAt:
-              nextStatus ===
-              'completed'
-                ? timestamp
-                : null,
-
-            updatedAt:
-              timestamp,
-          };
-        }
-      );
-
-    saveTasks(
-      updatedTasks
+const toggleTaskComplete = async (
+  taskId
+) => {
+  const savedTasks =
+    await taskService.toggleCompletion(
+      taskId,
+      tasks
     );
-  };
 
+  setTasks(
+    savedTasks.map(
+      taskToLegacyView
+    )
+  );
+};
   /* -------------------------------------------------------
      QUICK CREATE
   ------------------------------------------------------- */
 
-  const handleSaveTask = ({
-    title,
-    description,
-    duration,
-    categoryId,
-  }) => {
-    const safeDuration =
-      Math.max(
-        1,
-        Number(
-          duration
-        ) ||
-          30
-      );
+const handleSaveTask = async ({
+  title,
+  description,
+  duration,
+  categoryId,
+}) => {
+  const startMins =
+    targetSlotMinutes ??
+    7 * 60;
 
-    const startMins =
-      targetSlotMinutes ??
-      7 * 60;
+ const savedTasks =
+  await taskService.createTask(
+    {
+      title,
 
-    const timestamp =
-      new Date()
-        .toISOString();
-
-    const newTask = {
-      id:
-        `task-${Date.now()}`,
-
-      title:
-        title.trim(),
-
-      notes:
-        description?.trim() ||
-        '',
-
-      projectId:
-        null,
+      notes: description,
 
       categoryId:
-        categoryId ||
-        'inbox',
+        categoryId || 'inbox',
 
-      priority:
-        'normal',
-
-      date:
-        selectedDateKey,
+      date: selectedDateKey,
 
       startTime:
         formatTimeFromMinutes(
           startMins
         ),
 
-      durationMinutes:
-        safeDuration,
+      durationMinutes: duration,
+    },
+    tasks
+  );
 
-      dueDate:
-        null,
+  setTasks(
+    savedTasks.map(
+      taskToLegacyView
+    )
+  );
 
-      dueTime:
-        null,
+  setTargetSlotMinutes(null);
+  setModalVisible(false);
+};
 
-      status:
-        'pending',
-
-      repeat:
-        'never',
-
-      subtasks:
-        [],
-
-      position:
-        tasks.length,
-
-      source:
-        'app',
-
-      createdAt:
-        timestamp,
-
-      updatedAt:
-        timestamp,
-
-      completedAt:
-        null,
-
-      abandonedAt:
-        null,
-    };
-
-    saveTasks([
-      ...tasks,
-      newTask,
-    ]);
-
-    setTargetSlotMinutes(
-      null
-    );
-
-    setModalVisible(
-      false
-    );
-  };
-
-  /* -------------------------------------------------------
-     EDIT ANTIGO
-  ------------------------------------------------------- */
-
-  const handleEditTask = (
-    taskId,
-    targetBlockId,
-    changes
-  ) => {
-    const startMins =
-      parseTimeToMinutes(
-        changes.timeOfDay
-      );
-
-    const duration =
-      Math.max(
-        1,
-        Number(
-          changes.timeMinutes
-        ) ||
-          30
-      );
-
-    const updatedTasks =
-      tasks.map(
-        (
-          task
-        ) =>
-          task.id ===
-          taskId
-            ? {
-                ...task,
-                ...changes,
-
-                status:
-                  changes.status ||
-                  getTaskStatus(
-                    task
-                  ),
-
-                completed:
-                  (
-                    changes.status ||
-                    getTaskStatus(
-                      task
-                    )
-                  ) ===
-                  'completed',
-
-                durationMinutes:
-                  duration,
-
-                timeMinutes:
-                  duration,
-
-                startTime:
-                  changes.timeOfDay ||
-                  formatTimeFromMinutes(
-                    startMins
-                  ),
-
-                startMinsPlanned:
-                  startMins,
-
-                timeOfDay:
-                  changes.timeOfDay ||
-                  formatTimeFromMinutes(
-                    startMins
-                  ),
-
-                updatedAt:
-                  new Date()
-                    .toISOString(),
-              }
-            : task
-      );
-
-    saveTasks(
-      updatedTasks
-    );
-
-    setEditingTask(
-      null
-    );
-  };
-
-  const handleDeleteTask = (
-    taskId
-  ) => {
-    saveTasks(
-      tasks.filter(
-        (
-          task
-        ) =>
-          task.id !==
-          taskId
-      )
-    );
-
-    setEditingTask(
-      null
-    );
-  };
 
   /* -------------------------------------------------------
      TOQUE NA TIMELINE -> CRIAR
@@ -1559,7 +1139,7 @@ export default function TimelineScreen() {
     if (
       !touches ||
       touches.length !==
-        1
+      1
     ) {
       tapStartRef.current =
         null;
@@ -1605,7 +1185,7 @@ export default function TimelineScreen() {
     if (
       !touches ||
       touches.length !==
-        1
+      1
     ) {
       touchMovedRef.current =
         true;
@@ -1631,7 +1211,7 @@ export default function TimelineScreen() {
     const distance =
       Math.sqrt(
         dx * dx +
-          dy * dy
+        dy * dy
       );
 
     if (
@@ -1657,7 +1237,7 @@ export default function TimelineScreen() {
       isDragging ||
       pinchStartDistance
         .current >
-        0
+      0
     ) {
       return;
     }
@@ -1691,7 +1271,7 @@ export default function TimelineScreen() {
     if (
       viewportY < 0 ||
       viewportY >
-        viewportHeight
+      viewportHeight
     ) {
       return;
     }
@@ -1751,7 +1331,7 @@ export default function TimelineScreen() {
     (
       viewportHeight -
       VERTICAL_PADDING *
-        2
+      2
     ) /
     DAY_MINUTES;
 
@@ -1850,10 +1430,10 @@ export default function TimelineScreen() {
                   .nativeEvent
                   .touches
                   .length ===
-                  2 &&
+                2 &&
                 pinchStartDistance
                   .current >
-                  0
+                0
               ) {
                 const currentDistance =
                   getPinchDistance(
@@ -1871,7 +1451,7 @@ export default function TimelineScreen() {
                   clamp(
                     initialPpm
                       .current *
-                      scale,
+                    scale,
 
                     minPpmRef
                       .current,
@@ -2077,8 +1657,8 @@ export default function TimelineScreen() {
                         {
                           top:
                             offsetHour *
-                              60 *
-                              ppm +
+                            60 *
+                            ppm +
                             VERTICAL_PADDING,
 
                           height:
@@ -2111,19 +1691,19 @@ export default function TimelineScreen() {
 
                 const top =
                   offsetMinutes *
-                    ppm +
+                  ppm +
                   VERTICAL_PADDING;
 
                 const isHalfHour =
                   i %
-                    2 !==
+                  2 !==
                   0;
 
                 const displayHour =
                   (
                     Math.floor(
                       i /
-                        2
+                      2
                     ) +
                     7
                   ) %
@@ -2152,16 +1732,16 @@ export default function TimelineScreen() {
                         styles.hourText,
 
                         isDense &&
-                          styles.hourTextOverview,
+                        styles.hourTextOverview,
                       ]}
                     >
                       {!hideText
                         ? String(
-                            displayHour
-                          ).padStart(
-                            2,
-                            '0'
-                          )
+                          displayHour
+                        ).padStart(
+                          2,
+                          '0'
+                        )
                         : ''}
                     </Text>
 
@@ -2172,11 +1752,11 @@ export default function TimelineScreen() {
                           {
                             backgroundColor:
                               i ===
-                              48
+                                48
                                 ? '#7F9CF5'
                                 : getRailColor(
-                                    displayHour
-                                  ),
+                                  displayHour
+                                ),
                           },
                         ]}
                       />
@@ -2189,10 +1769,10 @@ export default function TimelineScreen() {
                         isHalfHour
                           ? styles.halfHourLine
                           : (
-                              isDense ||
-                              hideText
-                            ) &&
-                            styles.hourLineOverview,
+                            isDense ||
+                            hideText
+                          ) &&
+                          styles.hourLineOverview,
                       ]}
                     />
                   </View>
@@ -2231,9 +1811,11 @@ export default function TimelineScreen() {
                   onDragStateChange={
                     setIsDragging
                   }
-                  onToggle={
-                    toggleTaskComplete
-                  }
+                  onToggle={(taskId) =>{
+                    suppressTimelineCreateRef.current =
+                      true;
+                    toggleTaskComplete(taskId);
+                  }}
                   onPress={(
                     selectedTask
                   ) => {
@@ -2357,170 +1939,53 @@ export default function TimelineScreen() {
             );
           }
         }}
-        onSave={(
-          changes
-        ) => {
-          const timestamp =
-            new Date()
-              .toISOString();
+     onSave={async (
+  changes
+) => {
+  const savedTasks =
+    detailsMode === 'create'
+      ? await taskService.createTask({
+          ...changes,
 
-          if (
-            detailsMode ===
-            'create'
-          ) {
-            const newTask = {
-              id:
-                `task-${Date.now()}`,
+          date:
+            changes.date ||
+            selectedDateKey,
+        })
+      : await taskService.updateTask(
+          detailsTask.id,
+          changes,
+          tasks
+        );
 
-              date:
-                changes.date ||
-                selectedDateKey,
+  setTasks(
+    savedTasks.map(
+      taskToLegacyView
+    )
+  );
 
-              ...changes,
-
-              status:
-                changes.status ||
-                'pending',
-
-              completed:
-                (
-                  changes.status ||
-                  'pending'
-                ) ===
-                'completed',
-
-              createdAt:
-                timestamp,
-
-              updatedAt:
-                timestamp,
-            };
-
-            saveTasks([
-              ...tasks,
-              newTask,
-            ]);
-          } else {
-            const updated =
-              tasks.map(
-                (
-                  task
-                ) => {
-                  if (
-                    task.id !==
-                    detailsTask.id
-                  ) {
-                    return task;
-                  }
-
-                  const nextStatus =
-                    changes.status ||
-                    getTaskStatus(
-                      task
-                    );
-
-                  return {
-                    ...task,
-                    ...changes,
-
-                    status:
-                      nextStatus,
-
-                    completed:
-                      nextStatus ===
-                      'completed',
-
-                    completedAt:
-                      nextStatus ===
-                      'completed'
-                        ? (
-                            task.completedAt ||
-                            timestamp
-                          )
-                        : null,
-
-                    abandonedAt:
-                      nextStatus ===
-                      'abandoned'
-                        ? (
-                            task.abandonedAt ||
-                            timestamp
-                          )
-                        : null,
-
-                    updatedAt:
-                      timestamp,
-                  };
-                }
-              );
-
-            saveTasks(
-              updated
-            );
-          }
-
-          setDetailsTask(
-            null
+  setDetailsTask(null);
+  setTargetSlotMinutes(null);
+}}
+    onDelete={
+  detailsMode === 'edit'
+    ? async () => {
+        const savedTasks =
+          await taskService.deleteTask(
+            detailsTask.id
           );
 
-          setEditingTask(
-            null
-          );
-
-          setTargetSlotMinutes(
-            null
-          );
-        }}
-        onDelete={
-          detailsMode ===
-          'edit'
-            ? () => {
-                saveTasks(
-                  tasks.filter(
-                    (
-                      task
-                    ) =>
-                      task.id !==
-                      detailsTask.id
-                  )
-                );
-
-                setDetailsTask(
-                  null
-                );
-
-                setEditingTask(
-                  null
-                );
-              }
-            : undefined
-        }
-      />
-
-      {/* MODAL ANTIGO */}
-
-      <EditTaskModal
-        visible={Boolean(
-          editingTask
-        )}
-        onClose={() =>
-          setEditingTask(
-            null
+        setTasks(
+          savedTasks.map(
+            taskToLegacyView
           )
-        }
-        onSave={
-          handleEditTask
-        }
-        onDelete={
-          handleDeleteTask
-        }
-        task={
-          editingTask
-        }
-        blocks={
-          blocks
-        }
+        );
+
+        setDetailsTask(null);
+      }
+    : undefined
+}
       />
+
     </SafeAreaView>
   );
 }

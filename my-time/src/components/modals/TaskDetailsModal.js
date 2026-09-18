@@ -1930,41 +1930,16 @@ export default function TaskDetailsModal({
         currentSnapshot
       );
 
-      onSave({
-        title:
-          title.trim(),
-
-        date:
-  dateInputToStorageDate(dateValue),
-        startMinsPlanned:
-          startMinutes,
-
-        timeOfDay:
-          formatTime(
-            startMinutes
-          ),
-
-        timeMinutes:
-          duration,
-
-        duration,
-
-        categoryId,
-
-        notes:
-          notes.trim(),
-
-        description:
-          notes.trim(),
-
-        repeat,
-
-        status,
-
-        completed:
-          status ===
-          'completed',
-      });
+   onSave({
+  title: title.trim(),
+  date: dateInputToStorageDate(dateValue),
+  startTime: formatTime(startMinutes),
+  durationMinutes: duration,
+  categoryId,
+  notes: notes.trim(),
+  repeat,
+  status,
+});
     };
 
   const closeInlineEditor =
