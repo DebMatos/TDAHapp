@@ -67,11 +67,18 @@ const POSTPONE_OPTIONS = [
 ];
 
 const REPEAT_OPTIONS = [
-  'Nunca',
-  'Todos os dias',
-  'Dias úteis',
-  'Todas as semanas',
+  'never',
+  'daily',
+  'weekdays',
+  'weekly',
 ];
+
+const REPEAT_LABELS = {
+  never: 'Nunca',
+  daily: 'Todos os dias',
+  weekdays: 'Dias úteis',
+  weekly: 'Todas as semanas',
+};
 
 const STATUS_OPTIONS = [
   {
@@ -206,7 +213,7 @@ const parseTime = (
 
   return normalizeMinutes(
     hours * 60 +
-      minutes
+    minutes
   );
 };
 
@@ -408,11 +415,11 @@ const isValidDateInput = (
 
   return (
     date.getFullYear() ===
-      year &&
+    year &&
     date.getMonth() ===
-      month - 1 &&
+    month - 1 &&
     date.getDate() ===
-      day
+    day
   );
 };
 
@@ -467,7 +474,7 @@ const addDaysToDateInput = (
 
   date.setDate(
     date.getDate() +
-      days
+    days
   );
 
   return formatDateForInput(
@@ -519,30 +526,30 @@ function StatusIcon({
         styles.statusIconSquare,
 
         selected &&
-          styles.statusIconSquareSelected,
+        styles.statusIconSquareSelected,
       ]}
     >
       {type ===
         'completed' && (
-        <Ionicons
-          name="checkmark"
-          size={15}
-          color={
-            iconColor
-          }
-        />
-      )}
+          <Ionicons
+            name="checkmark"
+            size={15}
+            color={
+              iconColor
+            }
+          />
+        )}
 
       {type ===
         'abandoned' && (
-        <Ionicons
-          name="close"
-          size={15}
-          color={
-            iconColor
-          }
-        />
-      )}
+          <Ionicons
+            name="close"
+            size={15}
+            color={
+              iconColor
+            }
+          />
+        )}
     </View>
   );
 }
@@ -643,7 +650,7 @@ export default function TaskDetailsModal({
     setRepeat,
   ] =
     useState(
-      'Nunca'
+      'never'
     );
 
   const [
@@ -768,7 +775,7 @@ export default function TaskDetailsModal({
 
   const canSave =
     title.trim().length >
-      0 &&
+    0 &&
     isValidDateInput(
       dateValue
     ) &&
@@ -782,7 +789,7 @@ export default function TaskDetailsModal({
   const isDirty =
     savedSnapshot !== null &&
     currentSnapshot !==
-      savedSnapshot;
+    savedSnapshot;
 
   const saveIconColor =
     !canSave
@@ -804,7 +811,7 @@ export default function TaskDetailsModal({
         MIN_SHEET_HEIGHT,
 
         baseHeight -
-          bottomValue
+        bottomValue
       );
 
     Animated.parallel([
@@ -930,11 +937,11 @@ export default function TaskDetailsModal({
               gesture
             ) =>
               keyboardHeight ===
-                0 &&
+              0 &&
               Math.abs(
                 gesture.dy
               ) >
-                3,
+              3,
 
           onPanResponderGrant:
             () => {
@@ -952,7 +959,7 @@ export default function TaskDetailsModal({
               const nextHeight =
                 clamp(
                   dragStartHeightRef.current -
-                    gesture.dy,
+                  gesture.dy,
 
                   MIN_SHEET_HEIGHT,
 
@@ -971,15 +978,15 @@ export default function TaskDetailsModal({
             ) => {
               const draggedUp =
                 gesture.dy <
-                  -45 ||
+                -45 ||
                 gesture.vy <
-                  -0.55;
+                -0.55;
 
               const draggedDown =
                 gesture.dy >
-                  55 ||
+                55 ||
                 gesture.vy >
-                  0.65;
+                0.65;
 
               if (
                 !isExpanded
@@ -1051,13 +1058,13 @@ export default function TaskDetailsModal({
 
     const showEvent =
       Platform.OS ===
-      'ios'
+        'ios'
         ? 'keyboardWillShow'
         : 'keyboardDidShow';
 
     const hideEvent =
       Platform.OS ===
-      'ios'
+        'ios'
         ? 'keyboardWillHide'
         : 'keyboardDidHide';
 
@@ -1280,25 +1287,16 @@ export default function TaskDetailsModal({
     }
 
     const initialStart =
-      initialValues?.timeOfDay ||
-      (
-        initialValues?.startMinsPlanned !=
-        null
-          ? formatTime(
-              initialValues.startMinsPlanned
-            )
-          : '07:00'
-      );
+      initialValues?.startTime ??
+      '07:00';
 
     const initialDuration =
       Math.max(
         1,
 
         Number(
-          initialValues?.timeMinutes ??
-            initialValues?.duration
-        ) ||
-          30
+          initialValues?.durationMinutes
+        ) || 30
       );
 
     const startMinutes =
@@ -1309,16 +1307,12 @@ export default function TaskDetailsModal({
     const initialEnd =
       formatTime(
         startMinutes +
-          initialDuration
+        initialDuration
       );
 
     const initialStatus =
-      initialValues?.status ||
-      (
-        initialValues?.completed
-          ? 'completed'
-          : 'pending'
-      );
+      initialValues?.status ??
+      'pending';
 
     let initialDate =
       getTodayDateInput();
@@ -1356,13 +1350,12 @@ export default function TaskDetailsModal({
       initialValues?.categoryId ||
       'inbox';
 
-    const initialRepeat =
-      initialValues?.repeat ||
-      'Nunca';
+ const initialRepeat =
+  initialValues?.repeat ??
+  'never';
 
     const initialNotes =
-      initialValues?.notes ||
-      initialValues?.description ||
+      initialValues?.notes ??
       '';
 
     scheduleBaseRef.current = {
@@ -1558,7 +1551,7 @@ export default function TaskDetailsModal({
     setEndTime(
       formatTime(
         startMinutes +
-          duration
+        duration
       )
     );
 
@@ -1614,7 +1607,7 @@ export default function TaskDetailsModal({
         1,
 
         endMinutes -
-          startMinutes
+        startMinutes
       );
 
     setDuration(
@@ -1648,7 +1641,7 @@ export default function TaskDetailsModal({
         Number(
           value
         ) ||
-          1
+        1
       );
 
     setDuration(
@@ -1671,7 +1664,7 @@ export default function TaskDetailsModal({
     setEndTime(
       formatTime(
         startMinutes +
-          safeValue
+        safeValue
       )
     );
   };
@@ -1752,7 +1745,7 @@ export default function TaskDetailsModal({
       setEndTime(
         formatTime(
           baseStart +
-            duration
+          duration
         )
       );
 
@@ -1810,7 +1803,7 @@ export default function TaskDetailsModal({
       const dayOffset =
         Math.floor(
           rawStart /
-            DAY_MINUTES
+          DAY_MINUTES
         );
 
       const nextStart =
@@ -1834,7 +1827,7 @@ export default function TaskDetailsModal({
       setEndTime(
         formatTime(
           nextStart +
-            duration
+          duration
         )
       );
 
@@ -1900,7 +1893,7 @@ export default function TaskDetailsModal({
       setEndTime(
         formatTime(
           baseStart +
-            duration
+          duration
         )
       );
 
@@ -1930,16 +1923,16 @@ export default function TaskDetailsModal({
         currentSnapshot
       );
 
-   onSave({
-  title: title.trim(),
-  date: dateInputToStorageDate(dateValue),
-  startTime: formatTime(startMinutes),
-  durationMinutes: duration,
-  categoryId,
-  notes: notes.trim(),
-  repeat,
-  status,
-});
+      onSave({
+        title: title.trim(),
+        date: dateInputToStorageDate(dateValue),
+        startTime: formatTime(startMinutes),
+        durationMinutes: duration,
+        categoryId,
+        notes: notes.trim(),
+        repeat,
+        status,
+      });
     };
 
   const closeInlineEditor =
@@ -1971,7 +1964,7 @@ export default function TaskDetailsModal({
     () => {
       const dateContent =
         activeScheduleField ===
-        'date' ? (
+          'date' ? (
           <TextInput
             ref={
               dateInputRef
@@ -2026,7 +2019,7 @@ export default function TaskDetailsModal({
 
       const timeContent =
         activeScheduleField ===
-        'time' ? (
+          'time' ? (
           <View
             style={
               styles.inlineTimeEditor
@@ -2111,7 +2104,7 @@ export default function TaskDetailsModal({
 
       const durationContent =
         activeScheduleField ===
-        'duration' ? (
+          'duration' ? (
           <View
             style={
               styles.inlineDurationEditor
@@ -2123,9 +2116,9 @@ export default function TaskDetailsModal({
               ) => {
                 const selected =
                   duration ===
-                    preset &&
+                  preset &&
                   customDuration ===
-                    '';
+                  '';
 
                 return (
                   <TouchableOpacity
@@ -2136,7 +2129,7 @@ export default function TaskDetailsModal({
                       styles.inlineDurationPreset,
 
                       selected &&
-                        styles.inlineDurationPresetSelected,
+                      styles.inlineDurationPresetSelected,
                     ]}
                     activeOpacity={
                       0.7
@@ -2152,11 +2145,11 @@ export default function TaskDetailsModal({
                         styles.inlineDurationPresetText,
 
                         selected &&
-                          styles.inlineDurationPresetTextSelected,
+                        styles.inlineDurationPresetTextSelected,
                       ]}
                     >
                       {preset ===
-                      60
+                        60
                         ? '1 h'
                         : `${preset} min`}
                     </Text>
@@ -2370,7 +2363,7 @@ export default function TaskDetailsModal({
                 styles.saveIconButton,
 
                 !canSave &&
-                  styles.saveIconButtonDisabled,
+                styles.saveIconButtonDisabled,
               ]}
               disabled={
                 !canSave
@@ -2555,7 +2548,7 @@ export default function TaskDetailsModal({
                           styles.postponeButton,
 
                           selected &&
-                            styles.postponeButtonSelected,
+                          styles.postponeButtonSelected,
                         ]}
                         activeOpacity={
                           0.7
@@ -2573,7 +2566,7 @@ export default function TaskDetailsModal({
                             styles.postponeButtonText,
 
                             selected &&
-                              styles.postponeButtonTextSelected,
+                            styles.postponeButtonTextSelected,
                           ]}
                         >
                           {
@@ -2590,8 +2583,8 @@ export default function TaskDetailsModal({
                     styles.postponeButton,
 
                     postponeSelection ===
-                      'tomorrow' &&
-                      styles.postponeButtonSelected,
+                    'tomorrow' &&
+                    styles.postponeButtonSelected,
                   ]}
                   activeOpacity={
                     0.7
@@ -2607,7 +2600,7 @@ export default function TaskDetailsModal({
                     size={14}
                     color={
                       postponeSelection ===
-                      'tomorrow'
+                        'tomorrow'
                         ? colors.selection
                         : colors.text
                     }
@@ -2618,8 +2611,8 @@ export default function TaskDetailsModal({
                       styles.postponeButtonText,
 
                       postponeSelection ===
-                        'tomorrow' &&
-                        styles.postponeButtonTextSelected,
+                      'tomorrow' &&
+                      styles.postponeButtonTextSelected,
                     ]}
                   >
                     Amanhã
@@ -2663,7 +2656,7 @@ export default function TaskDetailsModal({
                         styles.selectorItem,
 
                         selected &&
-                          styles.selectorItemSelected,
+                        styles.selectorItemSelected,
                       ]}
                       onPress={() => {
                         closeInlineEditor();
@@ -2750,7 +2743,7 @@ export default function TaskDetailsModal({
                         styles.selectorItem,
 
                         selected &&
-                          styles.selectorItemSelected,
+                        styles.selectorItemSelected,
                       ]}
                       onPress={() => {
                         closeInlineEditor();
@@ -2833,8 +2826,8 @@ export default function TaskDetailsModal({
                     styles.repeatRestText
                   }
                 >
-                  {repeat}
-                </Text>
+{REPEAT_LABELS[repeat]} 
+               </Text>
               </TouchableOpacity>
             ) : (
               <View
@@ -2878,7 +2871,7 @@ export default function TaskDetailsModal({
                             styles.repeatOption,
 
                             selected &&
-                              styles.repeatOptionSelected,
+                            styles.repeatOptionSelected,
                           ]}
                           activeOpacity={
                             0.7
@@ -2898,16 +2891,10 @@ export default function TaskDetailsModal({
                               styles.repeatOptionText,
 
                               selected &&
-                                styles.repeatOptionTextSelected,
+                              styles.repeatOptionTextSelected,
                             ]}
                           >
-                            {item ===
-                            'Todos os dias'
-                              ? 'Diário'
-                              : item ===
-                                  'Todas as semanas'
-                                ? 'Semanal'
-                                : item}
+                         {REPEAT_LABELS[item]}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -3094,7 +3081,7 @@ const styles =
 
       paddingBottom:
         Platform.OS ===
-        'ios'
+          'ios'
           ? 40
           : 56,
     },

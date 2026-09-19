@@ -27,10 +27,6 @@ import CreateTaskModal from '../components/modals/CreateTaskModal';
 
 
 import {
-  taskToLegacyView,
-} from '../domain/taskAdapter';
-
-import {
   loadTasks as loadStoredTasks,
 } from '../data/taskRepository';
 
@@ -330,39 +326,19 @@ const getPinchDistance = (
   );
 };
 
-/* -------------------------------------------------------
-   COMPATIBILIDADE
-------------------------------------------------------- */
-
-const getTaskStatus = (
-  task
-) =>
-  task.status ||
-  (
-    task.completed
-      ? 'completed'
-      : 'pending'
-  );
-
-const canonicalTasksToLegacyView = (
-  canonicalTasks
-) =>
-  canonicalTasks.map(
-    taskToLegacyView
-  );
 
 /* -------------------------------------------------------
    OVERLAP
 ------------------------------------------------------- */
 
+
 const getTaskTimelineInterval = (
   task
 ) => {
-  const startMinute =
-    task.startMinsPlanned ??
-    parseTimeToMinutes(
-      task.timeOfDay
-    );
+const startMinute =
+  parseTimeToMinutes(
+    task.startTime
+  );
 
   let start =
     startMinute -
@@ -375,14 +351,13 @@ const getTaskTimelineInterval = (
       DAY_MINUTES;
   }
 
-  const duration =
-    Math.max(
-      1,
-      Number(
-        task.timeMinutes
-      ) ||
-      30
-    );
+const duration =
+  Math.max(
+    1,
+    Number(
+      task.durationMinutes
+    ) || 30
+  );
 
   return {
     id:
@@ -1020,11 +995,7 @@ useEffect(() => {
     const canonicalTasks =
       await loadStoredTasks();
 
-    setTasks(
-      canonicalTasks.map(
-        taskToLegacyView
-      )
-    );
+   setTasks(canonicalTasks);
   };
 
   loadStoredData();
@@ -1051,11 +1022,7 @@ const handleDragEnd = async (
       },
     });
 
-  setTasks(
-    savedTasks.map(
-      taskToLegacyView
-    )
-  );
+setTasks(savedTasks);
 };
 
   /* -------------------------------------------------------
@@ -1071,11 +1038,7 @@ const toggleTaskComplete = async (
       tasks
     );
 
-  setTasks(
-    savedTasks.map(
-      taskToLegacyView
-    )
-  );
+setTasks(savedTasks);
 };
   /* -------------------------------------------------------
      QUICK CREATE
@@ -1083,8 +1046,8 @@ const toggleTaskComplete = async (
 
 const handleSaveTask = async ({
   title,
-  description,
-  duration,
+  notes,
+  durationMinutes,
   categoryId,
 }) => {
   const startMins =
@@ -1096,7 +1059,7 @@ const handleSaveTask = async ({
     {
       title,
 
-      notes: description,
+      notes,
 
       categoryId:
         categoryId || 'inbox',
@@ -1108,16 +1071,12 @@ const handleSaveTask = async ({
           startMins
         ),
 
-      durationMinutes: duration,
+      durationMinutes
     },
     tasks
   );
 
-  setTasks(
-    savedTasks.map(
-      taskToLegacyView
-    )
-  );
+setTasks(savedTasks);
 
   setTargetSlotMinutes(null);
   setModalVisible(false);
@@ -1489,10 +1448,8 @@ const handleSaveTask = async ({
       (
         task
       ) =>
-        getTaskStatus(
-          task
-        ) ===
-        'completed'
+    task.status ===
+'completed'
     ).length;
 
   /* -------------------------------------------------------
@@ -1957,11 +1914,7 @@ const handleSaveTask = async ({
           tasks
         );
 
-  setTasks(
-    savedTasks.map(
-      taskToLegacyView
-    )
-  );
+setTasks(savedTasks);
 
   setDetailsTask(null);
   setTargetSlotMinutes(null);
@@ -1975,11 +1928,7 @@ const handleSaveTask = async ({
             tasks
           );
 
-        setTasks(
-          savedTasks.map(
-            taskToLegacyView
-          )
-        );
+        setTasks(savedTasks);
 
         setDetailsTask(null);
       }
