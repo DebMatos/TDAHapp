@@ -25,7 +25,7 @@ import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
-
+import colors from '../theme/colors';
 
 import {
   loadTasks as loadStoredTasks,
@@ -122,36 +122,12 @@ const getRailColor = (
 };
 
 const VERTICAL_SEGMENTS = [
-  {
-    start: 7,
-    duration: 2,
-    color: '#68D391',
-  },
-  {
-    start: 9,
-    duration: 3,
-    color: '#F6E05E',
-  },
-  {
-    start: 12,
-    duration: 2,
-    color: '#F6AD55',
-  },
-  {
-    start: 14,
-    duration: 4,
-    color: '#FC8181',
-  },
-  {
-    start: 18,
-    duration: 5,
-    color: '#B794F4',
-  },
-  {
-    start: 23,
-    duration: 8,
-    color: '#7F9CF5',
-  },
+  { start: 7,  duration: 2, color: '#88C096' }, // Manhã cedo (Verde suave)
+  { start: 9,  duration: 3, color: '#E2C268' }, // Manhã (Dourado/Amarelo suave)
+  { start: 12, duration: 2, color: '#C86D51' }, // Almoço (O teu Tijolo/Terracota)
+  { start: 14, duration: 4, color: '#D28873' }, // Tarde (Terracota suave)
+  { start: 18, duration: 5, color: '#9E8BB3' }, // Fim de tarde / Noite (Crepúsculo)
+  { start: 23, duration: 8, color: '#798CAE' }, // Madrugada (Azul noturno lavado)
 ];
 
 /* -------------------------------------------------------
@@ -337,10 +313,10 @@ const getPinchDistance = (
 const getTaskTimelineInterval = (
   task
 ) => {
-const startMinute =
-  parseTimeToMinutes(
-    task.startTime
-  );
+  const startMinute =
+    parseTimeToMinutes(
+      task.startTime
+    );
 
   let start =
     startMinute -
@@ -353,13 +329,13 @@ const startMinute =
       DAY_MINUTES;
   }
 
-const duration =
-  Math.max(
-    1,
-    Number(
-      task.durationMinutes
-    ) || 30
-  );
+  const duration =
+    Math.max(
+      1,
+      Number(
+        task.durationMinutes
+      ) || 30
+    );
 
   return {
     id:
@@ -552,13 +528,12 @@ const calculateOverlapColumns = (
 
   return result;
 };
-
 /* -------------------------------------------------------
    SCREEN
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
-    const handleMenuPress = () => {
+  const handleMenuPress = () => {
     Alert.alert(
       'Terminar sessão',
       'Queres terminar sessão nesta app?',
@@ -1019,97 +994,97 @@ export default function TimelineScreen() {
      STORAGE
   ------------------------------------------------------- */
 
-useEffect(() => {
-  const loadStoredData = async () => {
-    const canonicalTasks =
-      await loadStoredTasks();
+  useEffect(() => {
+    const loadStoredData = async () => {
+      const canonicalTasks =
+        await loadStoredTasks();
 
-   setTasks(canonicalTasks);
-  };
+      setTasks(canonicalTasks);
+    };
 
-  loadStoredData();
-}, []);
+    loadStoredData();
+  }, []);
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
 
-const handleDragEnd = async (
-  taskId,
-  newMins
-) => {
-  const savedTasks =
-    await taskService.moveTask({
-      tasks,
+  const handleDragEnd = async (
+    taskId,
+    newMins
+  ) => {
+    const savedTasks =
+      await taskService.moveTask({
+        tasks,
 
-      taskId,
+        taskId,
 
-      schedule: {
-        startTime:
-          formatTimeFromMinutes(
-            newMins
-          ),
-      },
-    });
+        schedule: {
+          startTime:
+            formatTimeFromMinutes(
+              newMins
+            ),
+        },
+      });
 
-setTasks(savedTasks);
-};
+    setTasks(savedTasks);
+  };
 
   /* -------------------------------------------------------
      CHECKBOX
   ------------------------------------------------------- */
 
-const toggleTaskComplete = async (
-  taskId
-) => {
-  const savedTasks =
-    await taskService.toggleCompletion(
-      taskId,
-      tasks
-    );
+  const toggleTaskComplete = async (
+    taskId
+  ) => {
+    const savedTasks =
+      await taskService.toggleCompletion(
+        taskId,
+        tasks
+      );
 
-setTasks(savedTasks);
-};
+    setTasks(savedTasks);
+  };
   /* -------------------------------------------------------
      QUICK CREATE
   ------------------------------------------------------- */
 
-const handleSaveTask = async ({
-  title,
-  notes,
-  durationMinutes,
-  categoryId,
-}) => {
-  const startMins =
-    targetSlotMinutes ??
-    7 * 60;
+  const handleSaveTask = async ({
+    title,
+    notes,
+    durationMinutes,
+    categoryId,
+  }) => {
+    const startMins =
+      targetSlotMinutes ??
+      7 * 60;
 
- const savedTasks =
-  await taskService.createTask(
-    {
-      title,
+    const savedTasks =
+      await taskService.createTask(
+        {
+          title,
 
-      notes,
+          notes,
 
-      categoryId:
-        categoryId || 'inbox',
+          categoryId:
+            categoryId || 'inbox',
 
-      date: selectedDateKey,
+          date: selectedDateKey,
 
-      startTime:
-        formatTimeFromMinutes(
-          startMins
-        ),
+          startTime:
+            formatTimeFromMinutes(
+              startMins
+            ),
 
-      durationMinutes
-    },
-    tasks
-  );
+          durationMinutes
+        },
+        tasks
+      );
 
-setTasks(savedTasks);
+    setTasks(savedTasks);
 
-  setTargetSlotMinutes(null);
-  setModalVisible(false);
-};
+    setTargetSlotMinutes(null);
+    setModalVisible(false);
+  };
 
 
   /* -------------------------------------------------------
@@ -1477,14 +1452,34 @@ setTasks(savedTasks);
       (
         task
       ) =>
-    task.status ===
-'completed'
+        task.status ===
+        'completed'
     ).length;
 
+/* -------------------------------------------------------
+   NOW BUTTON
+------------------------------------------------------- */
+const handleGoToNow = () => {
+  const today = new Date();
+
+  if (!isSameDay(selectedDate, today)) {
+    // 1. Se não for hoje, muda a data selecionada para hoje
+    setSelectedDate(today);
+  } else {
+    // 2. Se já for hoje, calcula a posição Y da hora atual e faz scroll
+    const targetY = nowTop - viewportHeight * 0.35;
+    const maxScroll = Math.max(0, canvasHeight - viewportHeight);
+    const y = clamp(targetY, 0, maxScroll);
+
+    scrollRef.current?.scrollTo({
+      y,
+      animated: true, // Scroll suave até à linha da abelha
+    });
+  }
+};
   /* -------------------------------------------------------
      RENDER
   ------------------------------------------------------- */
-
   return (
     <SafeAreaView
       style={
@@ -1498,24 +1493,11 @@ setTasks(savedTasks);
     >
       <Header
         onMenuPress={handleMenuPress}
-        selectedDate={
-          selectedDate
-        }
-        onPreviousDay={
-          goToPreviousDay
-        }
-        onNextDay={
-          goToNextDay
-        }
-        onDatePress={() => {
-          // Date picker depois
-        }}
-        completedTasks={
-          totalCompletedTasks
-        }
-        totalTasks={
-          visibleTasks.length
-        }
+        selectedDate={selectedDate}
+        onSelectDate={(newDate) => setSelectedDate(newDate)}
+        onGoToNow={handleGoToNow} // <-- Nova prop de ação
+        completedTasks={totalCompletedTasks}
+        totalTasks={visibleTasks.length}
       />
 
       <View
@@ -1798,7 +1780,7 @@ setTasks(savedTasks);
                   onDragStateChange={
                     setIsDragging
                   }
-                  onToggle={(taskId) =>{
+                  onToggle={(taskId) => {
                     suppressTimelineCreateRef.current =
                       true;
                     toggleTaskComplete(taskId);
@@ -1926,44 +1908,44 @@ setTasks(savedTasks);
             );
           }
         }}
-     onSave={async (
-  changes
-) => {
-  const savedTasks =
-    detailsMode === 'create'
-      ? await taskService.createTask({
-          ...changes,
+        onSave={async (
+          changes
+        ) => {
+          const savedTasks =
+            detailsMode === 'create'
+              ? await taskService.createTask({
+                ...changes,
 
-          date:
-            changes.date ||
-            selectedDateKey,
-        }, tasks)
-      : await taskService.updateTask(
-          detailsTask.id,
-          changes,
-          tasks
-        );
+                date:
+                  changes.date ||
+                  selectedDateKey,
+              }, tasks)
+              : await taskService.updateTask(
+                detailsTask.id,
+                changes,
+                tasks
+              );
 
-setTasks(savedTasks);
+          setTasks(savedTasks);
 
-  setDetailsTask(null);
-  setTargetSlotMinutes(null);
-}}
-    onDelete={
-  detailsMode === 'edit'
-    ? async () => {
-        const savedTasks =
-          await taskService.deleteTask(
-            detailsTask.id, 
-            tasks
-          );
+          setDetailsTask(null);
+          setTargetSlotMinutes(null);
+        }}
+        onDelete={
+          detailsMode === 'edit'
+            ? async () => {
+              const savedTasks =
+                await taskService.deleteTask(
+                  detailsTask.id,
+                  tasks
+                );
 
-        setTasks(savedTasks);
+              setTasks(savedTasks);
 
-        setDetailsTask(null);
-      }
-    : undefined
-}
+              setDetailsTask(null);
+            }
+            : undefined
+        }
       />
 
     </SafeAreaView>
@@ -1979,8 +1961,7 @@ const styles =
     safe: {
       flex: 1,
 
-      backgroundColor:
-        '#FFFFFF',
+    backgroundColor: colors.surface, 
     },
 
     timelineViewport: {

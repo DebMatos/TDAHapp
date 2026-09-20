@@ -14,6 +14,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/HomeScreen';
 import TimelineSpike from './src/screens/TimelineSpike';
+import colors from './src/theme/colors';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,17 +26,17 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#3A9BB7',
-        tabBarInactiveTintColor: '#A0958E',
+        tabBarActiveTintColor: colors.selectionText, // #6F765D ou cores.selection (#8A9273)
+        tabBarInactiveTintColor: colors.textFaint,    // #AAA19B
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
         },
         tabBarStyle: {
-          backgroundColor: '#FFFDF9',
-          borderTopColor: '#EFE6E1',
-          
-       
+          backgroundColor: colors.surface,
+          borderTopColor: colors.borderSoft,
+
+
           paddingBottom: Math.max(insets.bottom, 10) + (Platform.OS === 'ios' ? 0 : 8),
           paddingTop: 8,
           // Definimos uma altura mínima para garantir que o conteúdo cabe sempre
@@ -91,13 +92,12 @@ export default function App() {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#FFFDF9',
+          backgroundColor: colors.surface,
         }}
       >
         <ActivityIndicator
           size="large"
-          color="#4A90B2"
-        />
+          color={colors.selection} />
       </View>
     );
   }
