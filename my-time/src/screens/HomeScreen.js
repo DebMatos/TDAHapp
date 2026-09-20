@@ -15,6 +15,7 @@ import {
   Text,
   UIManager,
   View,
+  Alert,
 } from 'react-native';
 import * as taskService from
   '../services/taskService';
@@ -29,6 +30,7 @@ import CreateTaskModal from '../components/modals/CreateTaskModal';
 import {
   loadTasks as loadStoredTasks,
 } from '../data/taskRepository';
+import { supabase } from '../lib/supabase';
 
 if (
   Platform.OS === 'android' &&
@@ -556,6 +558,33 @@ const calculateOverlapColumns = (
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
+    const handleMenuPress = () => {
+    Alert.alert(
+      'Terminar sessão',
+      'Queres terminar sessão nesta app?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Terminar sessão',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } =
+              await supabase.auth.signOut();
+
+            if (error) {
+              Alert.alert(
+                'Não foi possível terminar sessão',
+                error.message
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
   const [
     selectedDate,
     setSelectedDate,
@@ -1468,6 +1497,7 @@ setTasks(savedTasks);
       ]}
     >
       <Header
+        onMenuPress={handleMenuPress}
         selectedDate={
           selectedDate
         }
