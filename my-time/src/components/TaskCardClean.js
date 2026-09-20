@@ -14,13 +14,12 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import colors from '../theme/colors';
 
 const DAY_MINUTES = 24 * 60;
 const SNAP_MINUTES = 5;
-
-const CARD_LEFT = 56;
+const CARD_LEFT = 58; // Ajustado ligeiramente para afastar da espinha
 const CARD_RIGHT = 16;
-
 const LONG_PRESS_DELAY_MS = 350;
 
 /* -------------------------------------------------------
@@ -34,95 +33,70 @@ const snap = (minutes) =>
   Math.round(minutes / SNAP_MINUTES) *
   SNAP_MINUTES;
 
-const formatTimeFromMinutes = (
-  totalMinutes
-) => {
+const formatTimeFromMinutes = (totalMinutes) => {
   const normalized =
-    ((totalMinutes % DAY_MINUTES) +
-      DAY_MINUTES) %
-    DAY_MINUTES;
+    ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
 
-  const hours =
-    Math.floor(normalized / 60);
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
 
-  const mins =
-    normalized % 60;
-
-  return `${String(hours).padStart(
-    2,
-    '0'
-  )}:${String(mins).padStart(
-    2,
-    '0'
-  )}`;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
-const timeToMinutes = (
-  value
-) => {
-  if (
-    !value ||
-    !value.includes(':')
-  ) {
+
+const timeToMinutes = (value) => {
+  if (!value || !value.includes(':')) {
     return 7 * 60;
   }
 
-  const [hours, minutes] =
-    value.split(':').map(Number);
+  const [hours, minutes] = value.split(':').map(Number);
 
-  if (
-    !Number.isInteger(hours) ||
-    !Number.isInteger(minutes)
-  ) {
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
     return 7 * 60;
   }
 
   return hours * 60 + minutes;
 };
 
-const formatDuration = (
-  minutes
-) => {
+const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
   }
 
-  const hours =
-    Math.floor(minutes / 60);
-
-  const mins =
-    minutes % 60;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
 
   if (mins === 0) {
     return `${hours}h`;
   }
 
-  return `${hours}h${String(
-    mins
-  ).padStart(2, '0')}`;
+  return `${hours}h${String(mins).padStart(2, '0')}`;
 };
 
 /* -------------------------------------------------------
-   TEMAS
+   TEMAS POR CATEGORIA (Corrigido)
 ------------------------------------------------------- */
+const getCategoryTheme = (category) => {
+  const cat = category ? String(category).toLowerCase().trim() : 'inbox';
 
-const CARD_THEMES = [
-  {
-    bg: '#F4F7FD',
-    accent: '#4F75E2',
-  },
-  {
-    bg: '#F7F4FC',
-    accent: '#7A55D6',
-  },
-  {
-    bg: '#FDF6F0',
-    accent: '#E0783E',
-  },
-  {
-    bg: '#F1F8F4',
-    accent: '#38A169',
-  },
-];
+  switch (cat) {
+    case 'work':
+    case 'trabalho':
+      return { bg: '#FBF0EC', accent: colors.categoryWork }; // Fundo terracota lavado
+    case 'personal':
+    case 'pessoal':
+      return { bg: '#FDF6ED', accent: colors.categoryPersonal }; // Fundo mostarda lavado
+    case 'exercise':
+    case 'exercicio':
+    case 'exercício':
+      return { bg: '#F4F7F5', accent: colors.categoryExercise }; // Fundo sálvia lavado
+    case 'shopping':
+    case 'compras':
+      return { bg: '#F8F6F9', accent: colors.categoryShopping }; // Fundo violeta lavado
+    case 'inbox':
+    default:
+      return { bg: '#F4F6F7', accent: colors.categoryInbox }; // Fundo azul ardósia lavado
+  }
+};
 
 /* -------------------------------------------------------
    COMPONENTE
@@ -138,428 +112,209 @@ export default function TaskCardClean({
   onPress,
   onToggle,
 
-  themeIndex = 0,
-
   getVisualY,
   getMinuteFromY,
 
   layoutStyle,
 }) {
-  const dragY = useRef(
-    new Animated.Value(0)
-  ).current;
-
-  const scaleAnim = useRef(
-    new Animated.Value(1)
-  ).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   /* -------------------------------------------------------
      ESTADO
   ------------------------------------------------------- */
 
-const taskStatus =
-  task.status ?? 'pending';
+  const taskStatus = task.status ?? 'pending';
+  const isCompleted = taskStatus === 'completed';
+  const isAbandoned = taskStatus === 'abandoned';
+  const isNeutralized = isCompleted || isAbandoned;
 
-const isCompleted =
-  taskStatus === 'completed';
-
-const isAbandoned =
-  taskStatus === 'abandoned';
-
-const isNeutralized =
-  isCompleted || isAbandoned;
-
-const startMinutes =
-  timeToMinutes(
-    task.startTime
-  );
+  const startMinutes = timeToMinutes(task.startTime);
 
   /* -------------------------------------------------------
      ALTURA
   ------------------------------------------------------- */
 
-const duration =
-  task.durationMinutes ?? 30;
-
-  const rawHeight =
-    duration * ppm;
-
-  const visualHeight =
-    Math.max(
-      rawHeight,
-      4
-    );
+  const duration = task.durationMinutes ?? 30;
+  const rawHeight = duration * ppm;
+  const visualHeight = Math.max(rawHeight, 4);
 
   /* -------------------------------------------------------
      TIPO DE CARTÃO
   ------------------------------------------------------- */
 
-  const isMicroTask =
-    visualHeight < 8;
-
-  const isTinyTask =
-    visualHeight >= 8 &&
-    visualHeight < 12;
-
-  const isCompactTask =
-    visualHeight >= 12 &&
-    visualHeight < 30;
-
-  const isNormalTask =
-    visualHeight >= 30;
+  const isMicroTask = visualHeight < 8;
+  const isTinyTask = visualHeight >= 8 && visualHeight < 12;
+  const isCompactTask = visualHeight >= 12 && visualHeight < 30;
+  const isNormalTask = visualHeight >= 30;
 
   /* -------------------------------------------------------
      POSIÇÃO
   ------------------------------------------------------- */
 
-const top =
-  getVisualY(
-    startMinutes
-  );
+  const top = getVisualY(startMinutes);
 
-  const horizontalStyle =
-    layoutStyle || {
-      left: CARD_LEFT,
-      right: CARD_RIGHT,
-    };
+  const horizontalStyle = layoutStyle || {
+    left: CARD_LEFT,
+    right: CARD_RIGHT,
+  };
 
   /* -------------------------------------------------------
      LARGURA / OVERLAP
   ------------------------------------------------------- */
 
-  const cardWidth =
-    layoutStyle?.width ?? null;
+  const cardWidth = layoutStyle?.width ?? null;
+  const isNarrow = cardWidth != null && cardWidth < 180;
+  const isVeryNarrow = cardWidth != null && cardWidth < 105;
 
-  const isNarrow =
-    cardWidth != null &&
-    cardWidth < 180;
-
-  const isVeryNarrow =
-    cardWidth != null &&
-    cardWidth < 105;
-
-  const hasRoomForMeta =
-    visualHeight >= 30;
-
-  const hasRoomForCompactMeta =
-    visualHeight >= 18;
-
-  const showCheckbox =
-    !isVeryNarrow;
+  const hasRoomForMeta = visualHeight >= 30;
+  const hasRoomForCompactMeta = visualHeight >= 18;
+  const showCheckbox = !isVeryNarrow;
 
   /* -------------------------------------------------------
-     TEMA
+     TEMA DINÂMICO
   ------------------------------------------------------- */
 
-  const theme =
-    CARD_THEMES[
-      themeIndex %
-        CARD_THEMES.length
-    ];
+  const categoryId = task.categoryId ?? task.category ?? 'inbox';
+  const theme = getCategoryTheme(categoryId);
 
-  const cardBackground =
-    isNeutralized
-      ? '#F5F4F2'
-      : theme.bg;
+  const cardBackground = isNeutralized ? '#F5F4F2' : theme.bg;
+  const accentColor = isNeutralized ? '#C7BFB9' : theme.accent;
 
-  const accentColor =
-    isNeutralized
-      ? '#C9C3BD'
-      : theme.accent;
-
-  const titleColor =
-    isAbandoned
-      ? '#AAA39D'
-      : '#403B37';
-
-  const metaColor =
-    isAbandoned
-      ? '#B5AEA8'
-      : '#8A827C';
+  const titleColor = isAbandoned ? '#AAA19B' : colors.text;
+  const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
 
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
 
-  const longPressTimer =
-    useRef(null);
+  const longPressTimer = useRef(null);
+  const isDragActive = useRef(false);
+  const initialTouch = useRef({ x: 0, y: 0 });
 
-  const isDragActive =
-    useRef(false);
+  const clearTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
 
-  const initialTouch =
-    useRef({
-      x: 0,
-      y: 0,
-    });
+  const resetAll = useCallback(() => {
+    clearTimer();
+    isDragActive.current = false;
+    onDragStateChange?.(false);
 
-  const clearTimer =
-    useCallback(() => {
-      if (
-        longPressTimer.current
-      ) {
-        clearTimeout(
-          longPressTimer.current
-        );
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+    }).start();
+  }, [clearTimer, onDragStateChange, scaleAnim]);
 
-        longPressTimer.current =
-          null;
-      }
-    }, []);
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: () => isDragActive.current,
+        onMoveShouldSetPanResponderCapture: () => isDragActive.current,
+        onPanResponderTerminationRequest: () => !isDragActive.current,
 
-  const resetAll =
-    useCallback(() => {
-      clearTimer();
+        onPanResponderGrant: () => {
+          dragY.setValue(0);
+        },
 
-      isDragActive.current =
-        false;
+        onPanResponderMove: (_, gesture) => {
+          if (isDragActive.current) {
+            dragY.setValue(gesture.dy);
+          }
+        },
 
-      onDragStateChange?.(
-        false
-      );
+        onPanResponderRelease: (_, gesture) => {
+          if (isDragActive.current) {
+            const finalY = top + gesture.dy;
+            const finalMins = clamp(
+              snap(getMinuteFromY(finalY)),
+              0,
+              DAY_MINUTES - duration
+            );
 
-      Animated.spring(
-        scaleAnim,
-        {
-          toValue: 1,
-          useNativeDriver:
-            true,
-          friction: 6,
-        }
-      ).start();
-    }, [
-      clearTimer,
-      onDragStateChange,
-      scaleAnim,
-    ]);
+            dragY.setValue(0);
+            onChangeStart(task.id, finalMins);
+          }
+          resetAll();
+        },
 
-  const responder =
-    useMemo(
-      () =>
-        PanResponder.create({
-          onStartShouldSetPanResponder:
-            () => false,
-
-          onStartShouldSetPanResponderCapture:
-            () => false,
-
-          onMoveShouldSetPanResponder:
-            () =>
-              isDragActive.current,
-
-          onMoveShouldSetPanResponderCapture:
-            () =>
-              isDragActive.current,
-
-          onPanResponderTerminationRequest:
-            () =>
-              !isDragActive.current,
-
-          onPanResponderGrant:
-            () => {
-              dragY.setValue(
-                0
-              );
-            },
-
-          onPanResponderMove:
-            (
-              _,
-              gesture
-            ) => {
-              if (
-                isDragActive.current
-              ) {
-                dragY.setValue(
-                  gesture.dy
-                );
-              }
-            },
-
-          onPanResponderRelease:
-            (
-              _,
-              gesture
-            ) => {
-              if (
-                isDragActive.current
-              ) {
-                const finalY =
-                  top +
-                  gesture.dy;
-
-                const finalMins =
-                  clamp(
-                    snap(
-                      getMinuteFromY(
-                        finalY
-                      )
-                    ),
-                    0,
-                    DAY_MINUTES -
-                      duration
-                  );
-
-                dragY.setValue(
-                  0
-                );
-
-                onChangeStart(
-                  task.id,
-                  finalMins
-                );
-              }
-
-              resetAll();
-            },
-
-          onPanResponderTerminate:
-            () => {
-              dragY.setValue(
-                0
-              );
-
-              resetAll();
-            },
-        }),
-      [
-        dragY,
-        top,
-        getMinuteFromY,
-        duration,
-        onChangeStart,
-        task.id,
-        resetAll,
-      ]
-    );
+        onPanResponderTerminate: () => {
+          dragY.setValue(0);
+          resetAll();
+        },
+      }),
+    [dragY, top, getMinuteFromY, duration, onChangeStart, task.id, resetAll]
+  );
 
   /* -------------------------------------------------------
      TOUCH
   ------------------------------------------------------- */
 
-  const handleTouchStart =
-    (e) => {
-      const {
-        pageX,
-        pageY,
-      } = e.nativeEvent;
+  const handleTouchStart = (e) => {
+    const { pageX, pageY } = e.nativeEvent;
+    initialTouch.current = { x: pageX, y: pageY };
+    clearTimer();
 
-      initialTouch.current = {
-        x: pageX,
-        y: pageY,
-      };
+    longPressTimer.current = setTimeout(() => {
+      isDragActive.current = true;
+      onDragStateChange?.(true);
 
-      clearTimer();
+      Animated.spring(scaleAnim, {
+        toValue: 1.03,
+        useNativeDriver: true,
+        friction: 4,
+      }).start();
+    }, LONG_PRESS_DELAY_MS);
+  };
 
-      longPressTimer.current =
-        setTimeout(() => {
-          isDragActive.current =
-            true;
+  const handleTouchMove = (e) => {
+    if (!isDragActive.current) {
+      const { pageX, pageY } = e.nativeEvent;
+      const dx = Math.abs(pageX - initialTouch.current.x);
+      const dy = Math.abs(pageY - initialTouch.current.y);
 
-          onDragStateChange?.(
-            true
-          );
-
-          Animated.spring(
-            scaleAnim,
-            {
-              toValue: 1.03,
-              useNativeDriver:
-                true,
-              friction: 4,
-            }
-          ).start();
-        }, LONG_PRESS_DELAY_MS);
-    };
-
-  const handleTouchMove =
-    (e) => {
-      if (
-        !isDragActive.current
-      ) {
-        const {
-          pageX,
-          pageY,
-        } = e.nativeEvent;
-
-        const dx =
-          Math.abs(
-            pageX -
-              initialTouch.current.x
-          );
-
-        const dy =
-          Math.abs(
-            pageY -
-              initialTouch.current.y
-          );
-
-        if (
-          dx > 8 ||
-          dy > 8
-        ) {
-          clearTimer();
-        }
-      }
-    };
-
-  const handleTouchEnd =
-    () => {
-      if (
-        !isDragActive.current
-      ) {
+      if (dx > 8 || dy > 8) {
         clearTimer();
       }
-    };
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragActive.current) {
+      clearTimer();
+    }
+  };
 
   /* -------------------------------------------------------
      TEXTO
   ------------------------------------------------------- */
 
-const startTimeStr =
-  formatTimeFromMinutes(
-    startMinutes
-  );
-
-const endTimeStr =
-  formatTimeFromMinutes(
-    startMinutes +
-      duration
-  );
-
-  const durationStr =
-    formatDuration(
-      duration
-    );
+  const startTimeStr = formatTimeFromMinutes(startMinutes);
+  const endTimeStr = formatTimeFromMinutes(startMinutes + duration);
+  const durationStr = formatDuration(duration);
 
   /* -------------------------------------------------------
      ÍCONE DE ESTADO
   ------------------------------------------------------- */
 
-  const renderStatusIcon =
-    (size = 10) => {
-      if (isCompleted) {
-        return (
-          <Ionicons
-            name="checkmark"
-            size={size}
-            color="#7F9B87"
-          />
-        );
-      }
+  const renderStatusIcon = (size = 10) => {
+    if (isCompleted) {
+      return <Ionicons name="checkmark" size={size} color="#7F9B87" />;
+    }
 
-      if (isAbandoned) {
-        return (
-          <Ionicons
-            name="close"
-            size={size + 1}
-            color="#8F8983"
-          />
-        );
-      }
+    if (isAbandoned) {
+      return <Ionicons name="close" size={size + 1} color="#8F8983" />;
+    }
 
-      return null;
-    };
+    return null;
+  };
 
   /* -------------------------------------------------------
      MICRO
@@ -569,37 +324,19 @@ const endTimeStr =
     return (
       <Animated.View
         {...responder.panHandlers}
-        onTouchStart={
-          handleTouchStart
-        }
-        onTouchMove={
-          handleTouchMove
-        }
-        onTouchEnd={
-          handleTouchEnd
-        }
-        onTouchCancel={
-          handleTouchEnd
-        }
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={[
           styles.taskCompact,
           {
             top,
-            height:
-              visualHeight,
-
-            backgroundColor:
-              cardBackground,
-
+            height: visualHeight,
+            backgroundColor: cardBackground,
             transform: [
-              {
-                translateY:
-                  dragY,
-              },
-              {
-                scale:
-                  scaleAnim,
-              },
+              { translateY: dragY },
+              { scale: scaleAnim },
             ],
           },
           horizontalStyle,
@@ -608,21 +345,14 @@ const endTimeStr =
         <View
           style={[
             styles.taskCompactBar,
-            {
-              backgroundColor:
-                accentColor,
-            },
+            { backgroundColor: accentColor },
           ]}
         />
 
         <TouchableOpacity
-          style={
-            StyleSheet.absoluteFill
-          }
+          style={StyleSheet.absoluteFill}
           onPress={() => {
-            if (
-              !isDragActive.current
-            ) {
+            if (!isDragActive.current) {
               onPress(task);
             }
           }}
@@ -639,37 +369,19 @@ const endTimeStr =
     return (
       <Animated.View
         {...responder.panHandlers}
-        onTouchStart={
-          handleTouchStart
-        }
-        onTouchMove={
-          handleTouchMove
-        }
-        onTouchEnd={
-          handleTouchEnd
-        }
-        onTouchCancel={
-          handleTouchEnd
-        }
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={[
           styles.taskTiny,
           {
             top,
-            height:
-              visualHeight,
-
-            backgroundColor:
-              cardBackground,
-
+            height: visualHeight,
+            backgroundColor: cardBackground,
             transform: [
-              {
-                translateY:
-                  dragY,
-              },
-              {
-                scale:
-                  scaleAnim,
-              },
+              { translateY: dragY },
+              { scale: scaleAnim },
             ],
           },
           horizontalStyle,
@@ -678,21 +390,14 @@ const endTimeStr =
         <View
           style={[
             styles.taskTinyBar,
-            {
-              backgroundColor:
-                accentColor,
-            },
+            { backgroundColor: accentColor },
           ]}
         />
 
         <TouchableOpacity
-          style={
-            styles.tinyClickArea
-          }
+          style={styles.tinyClickArea}
           onPress={() => {
-            if (
-              !isDragActive.current
-            ) {
+            if (!isDragActive.current) {
               onPress(task);
             }
           }}
@@ -700,20 +405,10 @@ const endTimeStr =
           <Text
             style={[
               styles.tinyTitle,
-
-              {
-                color:
-                  titleColor,
-              },
-
-              isVeryNarrow &&
-                styles.tinyTitleVeryNarrow,
-
-              isCompleted &&
-                styles.taskTitleCompleted,
-
-              isAbandoned &&
-                styles.taskTitleAbandoned,
+              { color: titleColor },
+              isVeryNarrow && styles.tinyTitleVeryNarrow,
+              isCompleted && styles.taskTitleCompleted,
+              isAbandoned && styles.taskTitleAbandoned,
             ]}
             numberOfLines={1}
           >
@@ -732,37 +427,19 @@ const endTimeStr =
     return (
       <Animated.View
         {...responder.panHandlers}
-        onTouchStart={
-          handleTouchStart
-        }
-        onTouchMove={
-          handleTouchMove
-        }
-        onTouchEnd={
-          handleTouchEnd
-        }
-        onTouchCancel={
-          handleTouchEnd
-        }
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={[
           styles.taskCompact,
           {
             top,
-            height:
-              visualHeight,
-
-            backgroundColor:
-              cardBackground,
-
+            height: visualHeight,
+            backgroundColor: cardBackground,
             transform: [
-              {
-                translateY:
-                  dragY,
-              },
-              {
-                scale:
-                  scaleAnim,
-              },
+              { translateY: dragY },
+              { scale: scaleAnim },
             ],
           },
           horizontalStyle,
@@ -771,21 +448,14 @@ const endTimeStr =
         <View
           style={[
             styles.taskCompactBar,
-            {
-              backgroundColor:
-                accentColor,
-            },
+            { backgroundColor: accentColor },
           ]}
         />
 
         <TouchableOpacity
-          style={
-            styles.compactClickArea
-          }
+          style={styles.compactClickArea}
           onPress={() => {
-            if (
-              !isDragActive.current
-            ) {
+            if (!isDragActive.current) {
               onPress(task);
             }
           }}
@@ -793,66 +463,41 @@ const endTimeStr =
           <Text
             style={[
               styles.compactTitle,
-
-              {
-                color:
-                  titleColor,
-              },
-
-              isVeryNarrow &&
-                styles.compactTitleVeryNarrow,
-
-              isCompleted &&
-                styles.taskTitleCompleted,
-
-              isAbandoned &&
-                styles.taskTitleAbandoned,
+              { color: titleColor },
+              isVeryNarrow && styles.compactTitleVeryNarrow,
+              isCompleted && styles.taskTitleCompleted,
+              isAbandoned && styles.taskTitleAbandoned,
             ]}
             numberOfLines={1}
           >
             {task.title}
           </Text>
 
-          {hasRoomForCompactMeta &&
-            !isVeryNarrow && (
-              <Text
-                style={[
-                  styles.compactMetaLine,
-                  {
-                    color:
-                      metaColor,
-                  },
-                ]}
-                numberOfLines={1}
-              >
-                {isNarrow
-                  ? durationStr
-                  : `${startTimeStr} · ${durationStr}`}
-              </Text>
-            )}
+          {hasRoomForCompactMeta && !isVeryNarrow && (
+            <Text
+              style={[
+                styles.compactMetaLine,
+                { color: metaColor },
+              ]}
+              numberOfLines={1}
+            >
+              {isNarrow
+                ? durationStr
+                : `${startTimeStr} · ${durationStr}`}
+            </Text>
+          )}
         </TouchableOpacity>
 
         {showCheckbox && (
           <TouchableOpacity
-            hitSlop={{
-              top: 8,
-              bottom: 8,
-              left: 8,
-              right: 8,
-            }}
-            onPress={() =>
-              onToggle(task.id)
-            }
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => onToggle(task.id)}
             style={[
               styles.compactCheckbox,
-
-              isAbandoned &&
-                styles.abandonedCheckbox,
+              isAbandoned && styles.abandonedCheckbox,
             ]}
           >
-            {renderStatusIcon(
-              8
-            )}
+            {renderStatusIcon(8)}
           </TouchableOpacity>
         )}
       </Animated.View>
@@ -866,37 +511,19 @@ const endTimeStr =
   return (
     <Animated.View
       {...responder.panHandlers}
-      onTouchStart={
-        handleTouchStart
-      }
-      onTouchMove={
-        handleTouchMove
-      }
-      onTouchEnd={
-        handleTouchEnd
-      }
-      onTouchCancel={
-        handleTouchEnd
-      }
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={[
         styles.taskNormal,
         {
           top,
-          height:
-            visualHeight,
-
-          backgroundColor:
-            cardBackground,
-
+          height: visualHeight,
+          backgroundColor: cardBackground,
           transform: [
-            {
-              translateY:
-                dragY,
-            },
-            {
-              scale:
-                scaleAnim,
-            },
+            { translateY: dragY },
+            { scale: scaleAnim },
           ],
         },
         horizontalStyle,
@@ -905,21 +532,14 @@ const endTimeStr =
       <View
         style={[
           styles.taskAccentBar,
-          {
-            backgroundColor:
-              accentColor,
-          },
+          { backgroundColor: accentColor },
         ]}
       />
 
       <TouchableOpacity
-        style={
-          styles.taskBody
-        }
+        style={styles.taskBody}
         onPress={() => {
-          if (
-            !isDragActive.current
-          ) {
+          if (!isDragActive.current) {
             onPress(task);
           }
         }}
@@ -927,23 +547,11 @@ const endTimeStr =
         <Text
           style={[
             styles.taskTitle,
-
-            {
-              color:
-                titleColor,
-            },
-
-            isNarrow &&
-              styles.taskTitleNarrow,
-
-            isVeryNarrow &&
-              styles.taskTitleVeryNarrow,
-
-            isCompleted &&
-              styles.taskTitleCompleted,
-
-            isAbandoned &&
-              styles.taskTitleAbandoned,
+            { color: titleColor },
+            isNarrow && styles.taskTitleNarrow,
+            isVeryNarrow && styles.taskTitleVeryNarrow,
+            isCompleted && styles.taskTitleCompleted,
+            isAbandoned && styles.taskTitleAbandoned,
           ]}
           numberOfLines={1}
         >
@@ -954,14 +562,8 @@ const endTimeStr =
           <Text
             style={[
               styles.taskMeta,
-
-              {
-                color:
-                  metaColor,
-              },
-
-              isNarrow &&
-                styles.taskMetaNarrow,
+              { color: metaColor },
+              isNarrow && styles.taskMetaNarrow,
             ]}
             numberOfLines={1}
           >
@@ -976,29 +578,15 @@ const endTimeStr =
 
       {showCheckbox && (
         <TouchableOpacity
-          hitSlop={{
-            top: 10,
-            bottom: 10,
-            left: 10,
-            right: 10,
-          }}
-          onPress={() =>
-            onToggle(task.id)
-          }
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => onToggle(task.id)}
           style={[
             styles.universalCheckbox,
-
-            isAbandoned &&
-              styles.abandonedCheckbox,
-
-            {
-              marginTop: 8,
-            },
+            isAbandoned && styles.abandonedCheckbox,
+            { marginTop: 8 },
           ]}
         >
-          {renderStatusIcon(
-            10
-          )}
+          {renderStatusIcon(10)}
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -1009,290 +597,173 @@ const endTimeStr =
    STYLES
 ------------------------------------------------------- */
 
-const styles =
-  StyleSheet.create({
-    /* ---------------------------------------------------
-       NORMAL
-    --------------------------------------------------- */
-
-    taskNormal: {
-      position: 'absolute',
-
-      borderRadius: 3,
-
-      borderWidth: 0,
-
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
-
-      borderBottomColor:
-        '#E7E3DF',
-
-      flexDirection: 'row',
-
-      alignItems:
-        'flex-start',
-
-      overflow: 'hidden',
-    },
-
-    taskAccentBar: {
-      width: 3,
-
-      alignSelf:
-        'stretch',
-    },
-
-    taskBody: {
-      flex: 1,
-alignSelf: 'stretch',
-      paddingHorizontal: 8,
-
-      paddingTop: 8,
-
-      paddingBottom: 8,
-
-      justifyContent:
-        'flex-start',
-    },
-
-    taskTitle: {
-      fontSize: 13,
-
-      fontWeight: '600',
-
-      color: '#403B37',
-
-      includeFontPadding:
-        false,
-
-      lineHeight: 15,
-    },
-
-    taskTitleNarrow: {
-      fontSize: 12,
-    },
-
-    taskTitleVeryNarrow: {
-      fontSize: 10,
-    },
-
-    taskTitleCompleted: {
-      textDecorationLine:
-        'line-through',
-
-      color: '#8F8983',
-    },
-
-    taskTitleAbandoned: {
-      textDecorationLine:
-        'none',
-
-      color: '#AAA39D',
-    },
-
-    taskMeta: {
-      marginTop: 2,
-
-      fontSize: 10,
-
-      fontWeight: '500',
-
-      color: '#8A827C',
-
-      includeFontPadding:
-        false,
-
-      lineHeight: 12,
-    },
-
-    taskMetaNarrow: {
-      fontSize: 9,
-    },
-
-    universalCheckbox: {
-      width: 14,
-
-      height: 14,
-
-      marginRight: 8,
-
-      borderRadius: 3,
-
-      borderWidth: 1.2,
-
-      borderColor:
-        '#C7BFB9',
-
-      backgroundColor:
-        '#FFFFFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-    },
-
-    abandonedCheckbox: {
-      borderColor:
-        '#AAA39D',
-
-      backgroundColor:
-        '#F7F5F3',
-    },
-
-    /* ---------------------------------------------------
-       COMPACT
-    --------------------------------------------------- */
-
-    taskCompact: {
-      position: 'absolute',
-
-      borderRadius: 3,
-
-      borderWidth: 0,
-
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
-
-      borderBottomColor:
-        '#E4E0DC',
-
-      flexDirection: 'row',
-
-      alignItems: 'center',
-
-      overflow: 'hidden',
-    },
-
-    taskCompactBar: {
-      width: 3,
-
-      alignSelf:
-        'stretch',
-    },
-
-    compactClickArea: {
-      flex: 1,
-
-      height: '100%',
-
-      paddingHorizontal: 7,
-
-      justifyContent:
-        'center',
-    },
-
-    compactTitle: {
-      fontSize: 10,
-
-      fontWeight: '600',
-
-      color: '#403B37',
-
-      includeFontPadding:
-        false,
-    },
-
-    compactTitleVeryNarrow: {
-      fontSize: 9,
-    },
-
-    compactMetaLine: {
-      marginTop: 1,
-
-      fontSize: 8,
-
-      lineHeight: 9,
-
-      fontWeight: '400',
-
-      color: '#8A827C',
-
-      includeFontPadding:
-        false,
-    },
-
-    compactCheckbox: {
-      width: 11,
-
-      height: 11,
-
-      marginRight: 6,
-
-      borderRadius: 2.5,
-
-      borderWidth: 1,
-
-      borderColor:
-        '#C7BFB9',
-
-      backgroundColor:
-        '#FFFFFF',
-
-      alignItems:
-        'center',
-
-      justifyContent:
-        'center',
-    },
-
-    /* ---------------------------------------------------
-       TINY
-    --------------------------------------------------- */
-
-    taskTiny: {
-      position: 'absolute',
-
-      borderRadius: 2,
-
-      borderWidth: 0,
-
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
-
-      borderBottomColor:
-        '#E4E0DC',
-
-      flexDirection: 'row',
-
-      alignItems: 'center',
-
-      overflow: 'hidden',
-    },
-
-    taskTinyBar: {
-      width: 3,
-
-      height: '100%',
-    },
-
-    tinyClickArea: {
-      flex: 1,
-
-      height: '100%',
-
-      paddingHorizontal: 6,
-
-      justifyContent:
-        'center',
-    },
-
-    tinyTitle: {
-      fontSize: 8,
-
-      lineHeight: 9,
-
-      fontWeight: '600',
-
-      color: '#403B37',
-
-      includeFontPadding:
-        false,
-    },
-
-    tinyTitleVeryNarrow: {
-      fontSize: 7,
-    },
-  });
+const styles = StyleSheet.create({
+  /* NORMAL */
+  taskNormal: {
+    position: 'absolute',
+    borderRadius: 3,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E7E3DF',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    overflow: 'hidden',
+  },
+
+  taskAccentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+  },
+
+  taskBody: {
+    flex: 1,
+    alignSelf: 'stretch',
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
+    justifyContent: 'flex-start',
+  },
+
+  taskTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    includeFontPadding: false,
+    lineHeight: 15,
+  },
+
+  taskTitleNarrow: {
+    fontSize: 12,
+  },
+
+  taskTitleVeryNarrow: {
+    fontSize: 10,
+  },
+
+  taskTitleCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#8F8983',
+  },
+
+  taskTitleAbandoned: {
+    textDecorationLine: 'none',
+    color: '#AAA39D',
+  },
+
+  taskMeta: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '500',
+    includeFontPadding: false,
+    lineHeight: 12,
+  },
+
+  taskMetaNarrow: {
+    fontSize: 9,
+  },
+
+  universalCheckbox: {
+    width: 14,
+    height: 14,
+    marginRight: 8,
+    borderRadius: 3,
+    borderWidth: 1.2,
+    borderColor: '#C7BFB9',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  abandonedCheckbox: {
+    borderColor: '#AAA39D',
+    backgroundColor: '#F7F5F3',
+  },
+
+  /* COMPACT */
+  taskCompact: {
+    position: 'absolute',
+    borderRadius: 3,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E4E0DC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  taskCompactBar: {
+    width: 3,
+    alignSelf: 'stretch',
+  },
+
+  compactClickArea: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 7,
+    justifyContent: 'center',
+  },
+
+  compactTitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+
+  compactTitleVeryNarrow: {
+    fontSize: 9,
+  },
+
+  compactMetaLine: {
+    marginTop: 1,
+    fontSize: 8,
+    lineHeight: 9,
+    fontWeight: '400',
+    includeFontPadding: false,
+  },
+
+  compactCheckbox: {
+    width: 11,
+    height: 11,
+    marginRight: 6,
+    borderRadius: 2.5,
+    borderWidth: 1,
+    borderColor: '#C7BFB9',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* TINY */
+  taskTiny: {
+    position: 'absolute',
+    borderRadius: 2,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E4E0DC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  taskTinyBar: {
+    width: 3,
+    height: '100%',
+  },
+
+  tinyClickArea: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
+
+  tinyTitle: {
+    fontSize: 8,
+    lineHeight: 9,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+
+  tinyTitleVeryNarrow: {
+    fontSize: 7,
+  },
+});

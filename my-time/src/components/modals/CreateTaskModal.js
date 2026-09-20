@@ -23,6 +23,8 @@ import {
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
 
+import colors from '../../theme/colors';
+
 /* -------------------------------------------------------
    OPÇÕES
 ------------------------------------------------------- */
@@ -44,31 +46,31 @@ const CATEGORY_OPTIONS = [
     id: 'inbox',
     label: 'Caixa de Entrada',
     icon: 'archive-outline',
-    color: '#4F75E2',
+    color: colors.categoryInbox,      // #6B8296
   },
   {
     id: 'work',
     label: 'Trabalho',
     icon: 'briefcase-outline',
-    color: '#E0783E',
+    color: colors.categoryWork,       // #C86D51 (Tijolo / Terracota)
   },
   {
     id: 'personal',
     label: 'Pessoal',
     icon: 'home-outline',
-    color: '#FC8181',
+    color: colors.categoryPersonal,   // #D4975A (Mostarda / Ocre)
   },
   {
     id: 'exercise',
     label: 'Exercício',
     icon: 'barbell-outline',
-    color: '#38A169',
+    color: colors.categoryExercise,   // #769379 (Verde Sálvia)
   },
   {
     id: 'shopping',
     label: 'Compras',
     icon: 'cube-outline',
-    color: '#B794F4',
+    color: colors.categoryShopping,   // #9580A1 (Violeta Seco)
   },
 ];
 
