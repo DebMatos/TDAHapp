@@ -56,6 +56,28 @@ const formatTimeFromMinutes = (
     '0'
   )}`;
 };
+const timeToMinutes = (
+  value
+) => {
+  if (
+    !value ||
+    !value.includes(':')
+  ) {
+    return 7 * 60;
+  }
+
+  const [hours, minutes] =
+    value.split(':').map(Number);
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes)
+  ) {
+    return 7 * 60;
+  }
+
+  return hours * 60 + minutes;
+};
 
 const formatDuration = (
   minutes
@@ -135,27 +157,29 @@ export default function TaskCardClean({
      ESTADO
   ------------------------------------------------------- */
 
-  const taskStatus =
-    task.status ||
-    (task.completed
-      ? 'completed'
-      : 'pending');
+const taskStatus =
+  task.status ?? 'pending';
 
-  const isCompleted =
-    taskStatus === 'completed';
+const isCompleted =
+  taskStatus === 'completed';
 
-  const isAbandoned =
-    taskStatus === 'abandoned';
+const isAbandoned =
+  taskStatus === 'abandoned';
 
-  const isNeutralized =
-    isCompleted || isAbandoned;
+const isNeutralized =
+  isCompleted || isAbandoned;
+
+const startMinutes =
+  timeToMinutes(
+    task.startTime
+  );
 
   /* -------------------------------------------------------
      ALTURA
   ------------------------------------------------------- */
 
-  const duration =
-    task.timeMinutes || 30;
+const duration =
+  task.durationMinutes ?? 30;
 
   const rawHeight =
     duration * ppm;
@@ -188,10 +212,10 @@ export default function TaskCardClean({
      POSIÇÃO
   ------------------------------------------------------- */
 
-  const top =
-    getVisualY(
-      task.startMinsPlanned || 0
-    );
+const top =
+  getVisualY(
+    startMinutes
+  );
 
   const horizontalStyle =
     layoutStyle || {
@@ -492,16 +516,16 @@ export default function TaskCardClean({
      TEXTO
   ------------------------------------------------------- */
 
-  const startTimeStr =
-    formatTimeFromMinutes(
-      task.startMinsPlanned
-    );
+const startTimeStr =
+  formatTimeFromMinutes(
+    startMinutes
+  );
 
-  const endTimeStr =
-    formatTimeFromMinutes(
-      task.startMinsPlanned +
-        duration
-    );
+const endTimeStr =
+  formatTimeFromMinutes(
+    startMinutes +
+      duration
+  );
 
   const durationStr =
     formatDuration(

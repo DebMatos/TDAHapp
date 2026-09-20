@@ -193,17 +193,12 @@ export default function CreateTaskModal({
       return;
     }
 
-    onSave({
-      title:
-        title.trim(),
-
-      description:
-        description.trim(),
-
-      duration,
-
-      categoryId,
-    });
+  onSave({
+  title: title.trim(),
+  notes: description.trim(),
+  durationMinutes: duration,
+  categoryId,
+});
   };
 
   /* -------------------------------------------------------
@@ -213,27 +208,17 @@ export default function CreateTaskModal({
 const handleMoreOptions = () => {
   onMoreOptions?.({
     title: title.trim(),
-    description: description.trim(),
-
-    startMinsPlanned:
-      initialMinutes,
-
-    timeOfDay:
+    notes: description.trim(),
+    startTime:
       initialMinutes != null
         ? formatTimeFromMinutes(
             initialMinutes
           )
-        : null,
-
-    timeMinutes:
-      duration,
-
-    duration,
-
+        : '07:00',
+    durationMinutes: duration,
     categoryId,
   });
 };
-
   /* -------------------------------------------------------
      LABEL DA HORA
   ------------------------------------------------------- */
