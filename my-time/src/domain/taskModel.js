@@ -178,10 +178,7 @@ export const normalizeTask = (
     categoryId: task.categoryId ?? 'inbox',
     priority: normalizePriority(task.priority),
 
-    date:
-      normalizeDate(task.date) ??
-      options.fallbackDate ??
-      null,
+    date: normalizeDate(task.date),
     startTime: normalizeTime(task.startTime),
     durationMinutes: normalizeDuration(
       task.durationMinutes
