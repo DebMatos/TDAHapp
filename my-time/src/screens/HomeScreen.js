@@ -59,13 +59,13 @@ const VERTICAL_PADDING =
   20;
 
 const AXIS_WIDTH =
-  48;
+  45;
 
 const TASK_CARD_LEFT =
   56;
 
 const TASK_CARD_RIGHT =
-  16;
+  22;
 
 const OVERLAP_GAP =
   4;
@@ -2074,16 +2074,14 @@ const styles =
         3,
     },
 
-    hourLine: {
-      flex: 1,
-
-      height:
-        1,
-
-      backgroundColor:
-        '#F5F2EF',
-    },
-
+  /* Estilo da linha horizontal de cada hora na grelha */
+hourLine: {
+  position: 'absolute',
+  left: 50,                  
+  right: 20,                
+  height: 1,
+  backgroundColor: 'colors.borderSoft',
+   },
     hourLineOverview: {
       backgroundColor:
         '#FBF9F7',
@@ -2111,7 +2109,7 @@ const styles =
         AXIS_WIDTH,
 
       right:
-        10,
+        20,
 
       height:
         1.5,
