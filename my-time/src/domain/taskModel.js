@@ -26,43 +26,22 @@ const VALID_SOURCES = new Set([
   'import',
 ]);
 
-const REPEAT_ALIASES = {
-  Nunca: 'never',
-  'Todos os dias': 'daily',
-  'Dias úteis': 'weekdays',
-  'Todas as semanas': 'weekly',
-};
-
-const pad2 = (value) =>
-  String(value).padStart(2, '0');
+const pad2 = (value) => String(value).padStart(2, '0');
 
 /* -------------------------------------------------------
-   DATA
+   DATA E TEMPO
 ------------------------------------------------------- */
 
 export const normalizeDate = (value) => {
-  if (!value || typeof value !== 'string') {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
     return null;
   }
 
-  // Formato canónico
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  // Compatibilidade com DD/MM/YYYY
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-    const [day, month, year] = value.split('/');
-
-    return `${year}-${month}-${day}`;
-  }
-
-  return null;
+  return value;
 };
-
-/* -------------------------------------------------------
-   TEMPO
-------------------------------------------------------- */
 
 export const minutesToTime = (value) => {
   const minutes = Number(value);
@@ -72,26 +51,21 @@ export const minutesToTime = (value) => {
   }
 
   const dayMinutes = 24 * 60;
-
   const normalized =
-    ((Math.round(minutes) % dayMinutes) +
-      dayMinutes) %
+    ((Math.round(minutes) % dayMinutes) + dayMinutes) %
     dayMinutes;
 
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
-
-  return `${pad2(hours)}:${pad2(mins)}`;
+  return `${pad2(Math.floor(normalized / 60))}:${pad2(
+    normalized % 60
+  )}`;
 };
 
 export const normalizeTime = (value) => {
-  if (!value || typeof value !== 'string') {
+  if (typeof value !== 'string') {
     return null;
   }
 
-  const match = value.match(
-    /^(\d{1,2}):(\d{2})$/
-  );
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
 
   if (!match) {
     return null;
@@ -118,75 +92,37 @@ export const normalizeTime = (value) => {
    CAMPOS
 ------------------------------------------------------- */
 
-const normalizeDuration = (task) => {
-  const raw =
-    task.durationMinutes ??
-    task.timeMinutes ??
-    task.duration;
-
-  if (
-    raw === null ||
-    raw === undefined ||
-    raw === ''
-  ) {
+const normalizeDuration = (value) => {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
 
-  const duration = Number(raw);
+  const duration = Number(value);
 
-  if (
-    !Number.isFinite(duration) ||
-    duration <= 0
-  ) {
+  if (!Number.isFinite(duration) || duration <= 0) {
     return null;
   }
 
   return Math.round(duration);
 };
 
-const normalizeStatus = (task) => {
-  if (VALID_STATUSES.has(task.status)) {
-    return task.status;
-  }
-
-  return task.completed
-    ? 'completed'
-    : 'pending';
-};
+const normalizeStatus = (value) =>
+  VALID_STATUSES.has(value) ? value : 'pending';
 
 const normalizePriority = (value) =>
-  VALID_PRIORITIES.has(value)
-    ? value
-    : 'normal';
+  VALID_PRIORITIES.has(value) ? value : 'normal';
 
-const normalizeRepeat = (value) => {
-  const normalized =
-    REPEAT_ALIASES[value] || value;
-
-  return VALID_REPEATS.has(normalized)
-    ? normalized
-    : 'never';
-};
+const normalizeRepeat = (value) =>
+  VALID_REPEATS.has(value) ? value : 'never';
 
 const normalizeSource = (value) =>
-  VALID_SOURCES.has(value)
-    ? value
-    : 'app';
+  VALID_SOURCES.has(value) ? value : 'app';
 
-const normalizePosition = (
-  value,
-  fallback = 0
-) => {
+const normalizePosition = (value, fallback = 0) => {
   const position = Number(value);
 
-  return Number.isFinite(position)
-    ? position
-    : fallback;
+  return Number.isFinite(position) ? position : fallback;
 };
-
-/* -------------------------------------------------------
-   SUBTASKS
-------------------------------------------------------- */
 
 const normalizeSubtasks = (subtasks) => {
   if (!Array.isArray(subtasks)) {
@@ -200,55 +136,17 @@ const normalizeSubtasks = (subtasks) => {
         typeof subtask === 'object'
     )
     .map((subtask, index) => ({
-      id:
-        subtask.id ??
-        `legacy-subtask-${index}`,
-
-      title: String(
-        subtask.title ?? ''
-      ).trim(),
-
+      id: subtask.id ?? `subtask-${index}`,
+      title: String(subtask.title ?? '').trim(),
       status:
         subtask.status === 'completed'
           ? 'completed'
           : 'pending',
-
       position: normalizePosition(
         subtask.position,
         index
       ),
     }));
-};
-
-/* -------------------------------------------------------
-   COMPATIBILIDADE COM MODELO ANTIGO
-------------------------------------------------------- */
-
-const getLegacyStartTime = (task) => {
-  const canonical =
-    normalizeTime(task.startTime);
-
-  if (canonical) {
-    return canonical;
-  }
-
-  const legacyTime =
-    normalizeTime(task.timeOfDay);
-
-  if (legacyTime) {
-    return legacyTime;
-  }
-
-  if (
-    task.startMinsPlanned !== null &&
-    task.startMinsPlanned !== undefined
-  ) {
-    return minutesToTime(
-      task.startMinsPlanned
-    );
-  }
-
-  return null;
 };
 
 /* -------------------------------------------------------
@@ -259,98 +157,52 @@ export const normalizeTask = (
   task,
   options = {}
 ) => {
-  if (
-    !task ||
-    typeof task !== 'object'
-  ) {
+  if (!task || typeof task !== 'object') {
     return null;
   }
 
   const now =
-    options.now ||
+    options.now ??
     new Date().toISOString();
 
-  const status =
-    normalizeStatus(task);
-
-  const createdAt =
-    task.createdAt || now;
-
-  const updatedAt =
-    task.updatedAt || createdAt;
+  const status = normalizeStatus(task.status);
+  const createdAt = task.createdAt ?? now;
 
   return {
     id: task.id,
 
-    // Conteúdo
-    title: String(
-      task.title ?? ''
-    ).trim(),
+    title: String(task.title ?? '').trim(),
+    notes: String(task.notes ?? '').trim(),
 
-    notes: String(
-      task.notes ??
-        task.description ??
-        ''
-    ).trim(),
+    projectId: task.projectId ?? null,
+    categoryId: task.categoryId ?? 'inbox',
+    priority: normalizePriority(task.priority),
 
-    // Organização
-    projectId:
-      task.projectId ?? null,
-
-    categoryId:
-      task.categoryId ?? 'inbox',
-
-    priority:
-      normalizePriority(
-        task.priority
-      ),
-
-    // Planeamento
     date:
       normalizeDate(task.date) ??
       options.fallbackDate ??
       null,
+    startTime: normalizeTime(task.startTime),
+    durationMinutes: normalizeDuration(
+      task.durationMinutes
+    ),
 
-    startTime:
-      getLegacyStartTime(task),
+    dueDate: normalizeDate(task.dueDate),
+    dueTime: normalizeTime(task.dueTime),
 
-    durationMinutes:
-      normalizeDuration(task),
-
-    // Deadline
-    dueDate:
-      normalizeDate(task.dueDate),
-
-    dueTime:
-      normalizeTime(task.dueTime),
-
-    // Estado
     status,
+    repeat: normalizeRepeat(task.repeat),
+    subtasks: normalizeSubtasks(task.subtasks),
 
-    // Recorrência
-    repeat:
-      normalizeRepeat(task.repeat),
+    position: normalizePosition(
+      task.position,
+      options.position ?? 0
+    ),
 
-    // Subtarefas
-    subtasks:
-      normalizeSubtasks(
-        task.subtasks
-      ),
+    source: normalizeSource(task.source),
 
-    // Ordenação
-    position:
-      normalizePosition(
-        task.position,
-        options.position ?? 0
-      ),
-
-    // Origem
-    source:
-      normalizeSource(task.source),
-
-    // Metadados
     createdAt,
-    updatedAt,
+    updatedAt: task.updatedAt ?? createdAt,
 
     completedAt:
       status === 'completed'
@@ -364,10 +216,6 @@ export const normalizeTask = (
   };
 };
 
-/* -------------------------------------------------------
-   LISTA DE TASKS
-------------------------------------------------------- */
-
 export const normalizeTasks = (
   tasks,
   options = {}
@@ -376,10 +224,8 @@ export const normalizeTasks = (
     return [];
   }
 
-  // Todas recebem o mesmo instante durante
-  // uma operação de migração.
   const now =
-    options.now ||
+    options.now ??
     new Date().toISOString();
 
   return tasks
@@ -394,7 +240,7 @@ export const normalizeTasks = (
 };
 
 /* -------------------------------------------------------
-   CRIAÇÃO
+   OPERAÇÕES
 ------------------------------------------------------- */
 
 export const createTask = (
@@ -404,33 +250,14 @@ export const createTask = (
   normalizeTask(
     {
       ...values,
-
-      status:
-        values.status ??
-        'pending',
-
-      priority:
-        values.priority ??
-        'normal',
-
-      repeat:
-        values.repeat ??
-        'never',
-
-      source:
-        values.source ??
-        'app',
-
-      subtasks:
-        values.subtasks ??
-        [],
+      status: values.status ?? 'pending',
+      priority: values.priority ?? 'normal',
+      repeat: values.repeat ?? 'never',
+      source: values.source ?? 'app',
+      subtasks: values.subtasks ?? [],
     },
     options
   );
-
-  /* -------------------------------------------------------
-   UPDATE
-------------------------------------------------------- */
 
 export const updateTask = (
   task,
@@ -438,18 +265,15 @@ export const updateTask = (
   options = {}
 ) => {
   const now =
-    options.now ||
+    options.now ??
     new Date().toISOString();
 
-  const previous =
-    normalizeTask(task, {
-      ...options,
-      now,
-    });
+  const previous = normalizeTask(task, {
+    ...options,
+    now,
+  });
 
-  const nextStatus =
-    changes.status ??
-    previous.status;
+  const status = changes.status ?? previous.status;
 
   return normalizeTask(
     {
@@ -457,28 +281,23 @@ export const updateTask = (
       ...changes,
 
       id: previous.id,
+      createdAt: previous.createdAt,
+      updatedAt: now,
 
-      createdAt:
-        previous.createdAt,
-
-      status: nextStatus,
+      status,
 
       completedAt:
-        nextStatus === 'completed'
-          ? (
-              changes.completedAt ??
-              previous.completedAt ??
-              now
-            )
+        status === 'completed'
+          ? changes.completedAt ??
+            previous.completedAt ??
+            now
           : null,
 
       abandonedAt:
-        nextStatus === 'abandoned'
-          ? (
-              changes.abandonedAt ??
-              previous.abandonedAt ??
-              now
-            )
+        status === 'abandoned'
+          ? changes.abandonedAt ??
+            previous.abandonedAt ??
+            now
           : null,
     },
     {
@@ -488,30 +307,25 @@ export const updateTask = (
   );
 };
 
-  export const toggleTaskCompletion = (
+export const toggleTaskCompletion = (
   task,
   options = {}
 ) => {
   const now =
-    options.now ||
+    options.now ??
     new Date().toISOString();
 
-  const canonical =
-    normalizeTask(task, {
-      ...options,
-      now,
-    });
+  const canonical = normalizeTask(task, {
+    ...options,
+    now,
+  });
 
-  if (
-    canonical.status ===
-    'abandoned'
-  ) {
+  if (canonical.status === 'abandoned') {
     return canonical;
   }
 
   const isCompleted =
-    canonical.status ===
-    'completed';
+    canonical.status === 'completed';
 
   return updateTask(
     canonical,
@@ -519,10 +333,6 @@ export const updateTask = (
       status: isCompleted
         ? 'pending'
         : 'completed',
-
-      completedAt: isCompleted
-        ? null
-        : now,
     },
     {
       ...options,
