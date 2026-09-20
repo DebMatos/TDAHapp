@@ -4,27 +4,62 @@ import {
   normalizeTasks,
 } from '../domain/taskModel';
 
+import { supabase } from '../lib/supabase';
+
+import {
+  loadTasks as loadRemoteTasks,
+  saveTasks as saveRemoteTasks,
+} from '../repositories/supabaseTaskRepository';
+
 const TASKS_STORAGE_KEY =
   '@my_time_tasks_data_v2';
 
 const TASKS_SCHEMA_VERSION = 2;
+
+const getCurrentUserId = async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user?.id) {
+    throw new Error(
+      'Não existe um utilizador autenticado.'
+    );
+  }
+
+  return session.user.id;
+};
+
+const loadLocalTasks = async () => {
+  const stored = await AsyncStorage.getItem(
+    TASKS_STORAGE_KEY
+  );
+
+  if (!stored) {
+    return [];
+  }
+
+  const parsed = JSON.parse(stored);
+
+  if (
+    !parsed ||
+    parsed.schemaVersion !== TASKS_SCHEMA_VERSION ||
+    !Array.isArray(parsed.tasks)
+  ) {
+    return [];
+  }
+
+  return normalizeTasks(parsed.tasks);
+};
 
 /* -------------------------------------------------------
    WRITE
 ------------------------------------------------------- */
 
 export const saveTasks = async (tasks) => {
-  const canonicalTasks = normalizeTasks(tasks);
+  const userId = await getCurrentUserId();
 
-  await AsyncStorage.setItem(
-    TASKS_STORAGE_KEY,
-    JSON.stringify({
-      schemaVersion: TASKS_SCHEMA_VERSION,
-      tasks: canonicalTasks,
-    })
-  );
-
-  return canonicalTasks;
+  return saveRemoteTasks(userId, tasks);
 };
 
 /* -------------------------------------------------------
@@ -32,37 +67,41 @@ export const saveTasks = async (tasks) => {
 ------------------------------------------------------- */
 
 export const loadTasks = async () => {
-  try {
-    const stored = await AsyncStorage.getItem(
-      TASKS_STORAGE_KEY
-    );
+  const userId = await getCurrentUserId();
 
-    if (!stored) {
-      return [];
-    }
+  const remoteTasks = await loadRemoteTasks(userId);
 
-    const parsed = JSON.parse(stored);
+  if (remoteTasks.length > 0) {
+    return remoteTasks;
+  }
 
-    if (
-      !parsed ||
-      parsed.schemaVersion !== TASKS_SCHEMA_VERSION ||
-      !Array.isArray(parsed.tasks)
-    ) {
-      return [];
-    }
+  /*
+   * Migração única das tarefas que já existiam
+   * no telemóvel antes de ligar ao Supabase.
+   */
+  const localTasks = await loadLocalTasks();
 
-    return normalizeTasks(parsed.tasks);
-  } catch (error) {
-    console.error(
-      'Erro ao carregar tarefas:',
-      error
-    );
-
+  if (localTasks.length === 0) {
     return [];
   }
+
+  const migratedTasks = await saveRemoteTasks(
+    userId,
+    localTasks
+  );
+
+  await AsyncStorage.removeItem(
+    TASKS_STORAGE_KEY
+  );
+
+  return migratedTasks;
 };
 
 export const clearTasks = async () => {
+  const userId = await getCurrentUserId();
+
+  await saveRemoteTasks(userId, []);
+
   await AsyncStorage.removeItem(
     TASKS_STORAGE_KEY
   );

@@ -1,5 +1,8 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
 import { View, ActivityIndicator, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +10,8 @@ import { useFonts } from 'expo-font';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-
+import AuthScreen from './src/screens/AuthScreen';
+import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/HomeScreen';
 import TimelineSpike from './src/screens/TimelineSpike';
 
@@ -54,29 +58,65 @@ function MainTabs() {
   );
 }
 
-// 2. O App Provider
 export default function App() {
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
     ...MaterialCommunityIcons.font,
   });
 
-  if (!fontsLoaded) {
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        setSession(nextSession);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!fontsLoaded || session === undefined) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFDF9' }}>
-        <ActivityIndicator size="large" color="#4A90B2" />
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#FFFDF9',
+        }}
+      >
+        <ActivityIndicator
+          size="large"
+          color="#4A90B2"
+        />
       </View>
     );
   }
 
-  const RootContainer = Platform.OS === 'web' ? View : GestureHandlerRootView;
+  const RootContainer =
+    Platform.OS === 'web'
+      ? View
+      : GestureHandlerRootView;
 
   return (
     <RootContainer style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <MainTabs />
-        </NavigationContainer>
+        {session ? (
+          <NavigationContainer>
+            <MainTabs />
+          </NavigationContainer>
+        ) : (
+          <AuthScreen />
+        )}
       </SafeAreaProvider>
     </RootContainer>
   );
