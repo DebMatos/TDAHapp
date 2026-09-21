@@ -1,5 +1,5 @@
 const colors = {
-   /* BASE & FONDOS */
+   /* BASE & FUNDOS */
    background: '#FAF9F6',       // Branco papel quente para o fundo principal da timeline
    surface: '#FFFDFC',          // Mês e elementos de destaque suave
    surfaceSoft: '#F6F3EE',      // Fundo dos pills/pílulas e cards suaves
@@ -14,8 +14,10 @@ const colors = {
    /* BORDAS & SELEÇÃO */
    border: '#E3DDD7',
    borderSoft: '#EFECE6',
-   selection: '#8A9273',        // Verde-oliva (dia selecionado)
+   selection: '#8A9273',   
+   selectionSoft: '#F2F4EE',     // Verde-oliva (dia selecionado)
    selectionText: '#6F765D',
+   checkboxBorder: '#AAA19B',
 
    /* COR DE DESTAQUE / ACENTO (A tua nova cor tijolo!) */
    accentTerracotta: '#C86D51',  // Tijolo / Terracota (ideal para o ícone de guardar/disquete ou destaques)

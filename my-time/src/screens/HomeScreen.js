@@ -2080,7 +2080,7 @@ hourLine: {
   left: 50,                  
   right: 20,                
   height: 1,
-  backgroundColor: 'colors.borderSoft',
+  backgroundColor: colors.borderSoft,
    },
     hourLineOverview: {
       backgroundColor:
