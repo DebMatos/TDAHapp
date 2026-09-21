@@ -60,6 +60,8 @@ const TIMELINE_START_MINUTES = 7 * 60;
 
 const SNAP_MINUTES = 5;
 
+const CREATE_LONG_PRESS_MS = 500;
+
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
 ------------------------------------------------------- */
@@ -638,7 +640,7 @@ export default function TimelineScreen() {
 
     const elapsed = Date.now() - start.time;
 
-    if (elapsed > 300) {
+    if (elapsed < CREATE_LONG_PRESS_MS) {
       return;
     }
 
@@ -1095,7 +1097,7 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     textAlign: 'right',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#9C948D',
   },
 
