@@ -1,118 +1,42 @@
 const colors = {
-  /* -------------------------------------------------------
-     BASE
-  ------------------------------------------------------- */
+   /* BASE & FUNDOS */
+   background: '#FAF9F6',       // Branco papel quente para o fundo principal da timeline
+   surface: '#FFFDFC',          // Mês e elementos de destaque suave
+   surfaceSoft: '#F6F3EE',      // Fundo dos pills/pílulas e cards suaves
+   surfaceMuted: '#EFECE6',     // Pílulas com um pouco mais de presença no topo
 
-  background: '#FFFFFF',
+   /* TEXTO */
+   text: '#2F2A27',             // Castanho escuro / quase-preto quente
+   textSecondary: '#625A55',
+   textMuted: '#817770',
+   textFaint: '#AAA19B',
 
-  surface: '#FFFDFC',
+   /* BORDAS & SELEÇÃO */
+   border: '#E3DDD7',
+   borderSoft: '#EFECE6',
+   selection: '#8A9273',   
+   selectionSoft: '#F2F4EE',     // Verde-oliva (dia selecionado)
+   selectionText: '#6F765D',
+   checkboxBorder: '#AAA19B',
 
-  surfaceSoft: '#FAF8F6',
+   /* COR DE DESTAQUE / ACENTO (A tua nova cor tijolo!) */
+   accentTerracotta: '#C86D51',  // Tijolo / Terracota (ideal para o ícone de guardar/disquete ou destaques)
+   accentTerracottaSoft: '#FBF0EC',
 
-  surfaceMuted: '#F5F4F2',
+   /* CATEGORIAS (Paleta Terrosa Harmonizada) */
+   categoryInbox: '#6B8296',     // Azul ardósia / acinzentado suave
+   categoryWork: '#C86D51',      // Tijolo / Terracota
+   categoryPersonal: '#D4975A',  // Mostarda /  
+   categoryExercise: '#769379',  // Verde sabedoria / sálvia
+   categoryShopping: '#9580A1',  // Violeta seco
 
-  /* -------------------------------------------------------
-     TEXTO
-  ------------------------------------------------------- */
+   /* ESTADOS */
+   success: '#6F8F78',
+   completed: '#8F8983',
+   danger: '#BD5B5B',
 
-  text: '#2F2A27',
-
-  textSecondary: '#625A55',
-
-  textMuted: '#817770',
-
-  textFaint: '#AAA19B',
-
-  textDisabled: '#B8B1AB',
-
-  /* -------------------------------------------------------
-     BORDAS / DIVISORES
-  ------------------------------------------------------- */
-
-  border: '#E8E2DE',
-
-  borderSoft: '#EEE9E5',
-
-  checkboxBorder: '#AAA19B',
-
-  /* -------------------------------------------------------
-     SELEÇÃO
-  ------------------------------------------------------- */
-
-  selection: '#8A9273',
-
-  selectionText: '#6F765D',
-
-  selectionSoft: '#F5F5EF',
-
-  /* -------------------------------------------------------
-     ESTADOS
-  ------------------------------------------------------- */
-
-  success: '#6F8F78',
-
-  completed: '#8F8983',
-
-  abandoned: '#9B958F',
-
-  danger: '#B65E5E',
-
-  dangerSoft: '#FAF1F1',
-
-  /* -------------------------------------------------------
-     TIMELINE / AGORA
-  ------------------------------------------------------- */
-
-  now: '#ECC94B',
-
-  /* -------------------------------------------------------
-     PERÍODOS DO DIA
-  ------------------------------------------------------- */
-
-  periodEarlyMorning: '#68D391',
-
-  periodMorning: '#F6E05E',
-
-  periodLunch: '#F6AD55',
-
-  periodAfternoon: '#FC8181',
-
-  periodEvening: '#B794F4',
-
-  periodNight: '#7F9CF5',
-
-  /* -------------------------------------------------------
-     CATEGORIAS
-     TEMPORÁRIO — depois afinamos estas cores
-  ------------------------------------------------------- */
-
-  categoryInbox: '#6F86A8',
-
-  categoryWork: '#C47A4A',
-
-  categoryPersonal: '#C98278',
-
-  categoryExercise: '#6F9879',
-
-  categoryShopping: '#9783A8',
-
-  /* -------------------------------------------------------
-     CARDS
-  ------------------------------------------------------- */
-
-  cardBlueSoft: '#F4F7FD',
-
-  cardPurpleSoft: '#F7F4FC',
-
-  cardOrangeSoft: '#FDF6F0',
-
-  cardGreenSoft: '#F1F8F4',
-
-  /* -------------------------------------------------------
-     SOMBRAS
-  ------------------------------------------------------- */
-
-  shadow: '#000000',
+   /* TIMELINE / AGORA */
+   now: '#ECC94B',
 };
 
 export default colors;
