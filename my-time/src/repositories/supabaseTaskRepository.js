@@ -1,6 +1,17 @@
 import { supabase } from '../lib/supabase';
 import { normalizeTasks } from '../domain/taskModel';
 
+const REQUEST_TIMEOUT_MS = 10000;
+
+const createRequestTimeout = () => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId),
+  };
+};
+
 const fromDatabase = (row) => ({
   id: row.id,
   title: row.title,
@@ -49,65 +60,80 @@ const toDatabase = (task, userId) => ({
 });
 
 export const loadTasks = async (userId) => {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('user_id', userId)
-    .order('position', { ascending: true });
+  const timeout = createRequestTimeout();
 
-  if (error) {
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .order('position', {
+        ascending: true,
+      })
+      .abortSignal(timeout.signal);
+
+    if (error) {
+      throw error;
+    }
+
+    return normalizeTasks(data.map(fromDatabase));
+  } finally {
+    timeout.clear();
   }
-
-  return normalizeTasks(data.map(fromDatabase));
 };
 
 export const saveTasks = async (userId, tasks) => {
-  const canonicalTasks = normalizeTasks(tasks);
+  const timeout = createRequestTimeout();
 
-  const { data: existingTasks, error: loadError } =
-    await supabase
+  try {
+    const canonicalTasks = normalizeTasks(tasks);
+
+    const { data: existingTasks, error: loadError } = await supabase
       .from('tasks')
       .select('id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .abortSignal(timeout.signal);
 
-  if (loadError) {
-    throw loadError;
-  }
-
-  if (canonicalTasks.length > 0) {
-    const { error: upsertError } = await supabase
-      .from('tasks')
-      .upsert(
-        canonicalTasks.map((task) =>
-          toDatabase(task, userId)
-        ),
-        { onConflict: 'id' }
-      );
-
-    if (upsertError) {
-      throw upsertError;
+    if (loadError) {
+      throw loadError;
     }
-  }
 
-  const currentIds = new Set(
-    canonicalTasks.map((task) => task.id)
-  );
+    if (canonicalTasks.length > 0) {
+      const { error: upsertError } = await supabase
+        .from('tasks')
+        .upsert(
+          canonicalTasks.map((task) => toDatabase(task, userId)),
+          {
+            onConflict: 'id',
+          },
+        )
+        .abortSignal(timeout.signal);
 
-  const idsToDelete = existingTasks
-    .map((task) => task.id)
-    .filter((id) => !currentIds.has(id));
-
-  if (idsToDelete.length > 0) {
-    const { error: deleteError } = await supabase
-      .from('tasks')
-      .delete()
-      .in('id', idsToDelete);
-
-    if (deleteError) {
-      throw deleteError;
+      if (upsertError) {
+        throw upsertError;
+      }
     }
-  }
 
-  return canonicalTasks;
+    const currentIds = new Set(canonicalTasks.map((task) => task.id));
+
+    const idsToDelete = existingTasks
+      .map((task) => task.id)
+      .filter((id) => !currentIds.has(id));
+
+    if (idsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', idsToDelete)
+        .abortSignal(timeout.signal);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+    }
+
+    return canonicalTasks;
+  } finally {
+    timeout.clear();
+  }
 };

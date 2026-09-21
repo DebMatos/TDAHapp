@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {
-  normalizeTasks,
-} from '../domain/taskModel';
+import { normalizeTasks } from '../domain/taskModel';
 
 import { supabase } from '../lib/supabase';
 
@@ -11,8 +9,7 @@ import {
   saveTasks as saveRemoteTasks,
 } from '../repositories/supabaseTaskRepository';
 
-const TASKS_STORAGE_KEY =
-  '@my_time_tasks_data_v2';
+const TASKS_STORAGE_KEY = '@my_time_tasks_data_v2';
 
 const TASKS_SCHEMA_VERSION = 2;
 
@@ -22,18 +19,14 @@ const getCurrentUserId = async () => {
   } = await supabase.auth.getSession();
 
   if (!session?.user?.id) {
-    throw new Error(
-      'Não existe um utilizador autenticado.'
-    );
+    throw new Error('Não existe um utilizador autenticado.');
   }
 
   return session.user.id;
 };
 
 const loadLocalTasks = async () => {
-  const stored = await AsyncStorage.getItem(
-    TASKS_STORAGE_KEY
-  );
+  const stored = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
 
   if (!stored) {
     return [];
@@ -59,9 +52,9 @@ const loadLocalTasks = async () => {
 export const saveTasks = async (tasks) => {
   const userId = await getCurrentUserId();
 
-  return saveRemoteTasks(userId, tasks);
+  const result = await saveRemoteTasks(userId, tasks);
+  return result;
 };
-
 /* -------------------------------------------------------
    READ
 ------------------------------------------------------- */
@@ -85,14 +78,9 @@ export const loadTasks = async () => {
     return [];
   }
 
-  const migratedTasks = await saveRemoteTasks(
-    userId,
-    localTasks
-  );
+  const migratedTasks = await saveRemoteTasks(userId, localTasks);
 
-  await AsyncStorage.removeItem(
-    TASKS_STORAGE_KEY
-  );
+  await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
 
   return migratedTasks;
 };
@@ -102,9 +90,7 @@ export const clearTasks = async () => {
 
   await saveRemoteTasks(userId, []);
 
-  await AsyncStorage.removeItem(
-    TASKS_STORAGE_KEY
-  );
+  await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
 };
 
 export const TASK_STORAGE_INFO = {

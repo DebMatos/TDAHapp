@@ -1,8 +1,4 @@
-import React, {
-  useCallback,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 
 import {
   Animated,
@@ -26,16 +22,12 @@ const LONG_PRESS_DELAY_MS = 350;
    HELPERS
 ------------------------------------------------------- */
 
-const clamp = (value, min, max) =>
-  Math.max(min, Math.min(max, value));
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-const snap = (minutes) =>
-  Math.round(minutes / SNAP_MINUTES) *
-  SNAP_MINUTES;
+const snap = (minutes) => Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
 
 const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized =
-    ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
 
   const hours = Math.floor(normalized / 60);
   const mins = normalized % 60;
@@ -144,10 +136,12 @@ export default function TaskCardClean({
   ------------------------------------------------------- */
 
   const isMicroTask = visualHeight < 8;
-  const isTinyTask = visualHeight >= 8 && visualHeight < 12;
-  const isCompactTask = visualHeight >= 12 && visualHeight < 30;
-  const isNormalTask = visualHeight >= 30;
 
+  const isTinyTask = visualHeight >= 8 && visualHeight < 14;
+
+  const isCompactTask = visualHeight >= 14 && visualHeight < 32;
+
+  const isNormalTask = visualHeight >= 32;
   /* -------------------------------------------------------
      POSIÇÃO
   ------------------------------------------------------- */
@@ -167,8 +161,7 @@ export default function TaskCardClean({
   const isNarrow = cardWidth != null && cardWidth < 180;
   const isVeryNarrow = cardWidth != null && cardWidth < 105;
 
-  const hasRoomForMeta = visualHeight >= 30;
-  const hasRoomForCompactMeta = visualHeight >= 18;
+  const hasRoomForMeta = visualHeight >= 32;
   const showCheckbox = !isVeryNarrow;
 
   /* -------------------------------------------------------
@@ -236,7 +229,7 @@ export default function TaskCardClean({
             const finalMins = clamp(
               snap(getMinuteFromY(finalY)),
               0,
-              DAY_MINUTES - duration
+              DAY_MINUTES - duration,
             );
 
             dragY.setValue(0);
@@ -250,7 +243,7 @@ export default function TaskCardClean({
           resetAll();
         },
       }),
-    [dragY, top, getMinuteFromY, duration, onChangeStart, task.id, resetAll]
+    [dragY, top, getMinuteFromY, duration, onChangeStart, task.id, resetAll],
   );
 
   /* -------------------------------------------------------
@@ -334,19 +327,13 @@ export default function TaskCardClean({
             top,
             height: visualHeight,
             backgroundColor: cardBackground,
-            transform: [
-              { translateY: dragY },
-              { scale: scaleAnim },
-            ],
+            transform: [{ translateY: dragY }, { scale: scaleAnim }],
           },
           horizontalStyle,
         ]}
       >
         <View
-          style={[
-            styles.taskCompactBar,
-            { backgroundColor: accentColor },
-          ]}
+          style={[styles.taskCompactBar, { backgroundColor: accentColor }]}
         />
 
         <TouchableOpacity
@@ -379,20 +366,12 @@ export default function TaskCardClean({
             top,
             height: visualHeight,
             backgroundColor: cardBackground,
-            transform: [
-              { translateY: dragY },
-              { scale: scaleAnim },
-            ],
+            transform: [{ translateY: dragY }, { scale: scaleAnim }],
           },
           horizontalStyle,
         ]}
       >
-        <View
-          style={[
-            styles.taskTinyBar,
-            { backgroundColor: accentColor },
-          ]}
-        />
+        <View style={[styles.taskTinyBar, { backgroundColor: accentColor }]} />
 
         <TouchableOpacity
           style={styles.tinyClickArea}
@@ -437,19 +416,13 @@ export default function TaskCardClean({
             top,
             height: visualHeight,
             backgroundColor: cardBackground,
-            transform: [
-              { translateY: dragY },
-              { scale: scaleAnim },
-            ],
+            transform: [{ translateY: dragY }, { scale: scaleAnim }],
           },
           horizontalStyle,
         ]}
       >
         <View
-          style={[
-            styles.taskCompactBar,
-            { backgroundColor: accentColor },
-          ]}
+          style={[styles.taskCompactBar, { backgroundColor: accentColor }]}
         />
 
         <TouchableOpacity
@@ -470,22 +443,8 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {task.title}
+            {isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
           </Text>
-
-          {hasRoomForCompactMeta && !isVeryNarrow && (
-            <Text
-              style={[
-                styles.compactMetaLine,
-                { color: metaColor },
-              ]}
-              numberOfLines={1}
-            >
-              {isNarrow
-                ? durationStr
-                : `${startTimeStr} · ${durationStr}`}
-            </Text>
-          )}
         </TouchableOpacity>
 
         {showCheckbox && (
@@ -521,20 +480,12 @@ export default function TaskCardClean({
           top,
           height: visualHeight,
           backgroundColor: cardBackground,
-          transform: [
-            { translateY: dragY },
-            { scale: scaleAnim },
-          ],
+          transform: [{ translateY: dragY }, { scale: scaleAnim }],
         },
         horizontalStyle,
       ]}
     >
-      <View
-        style={[
-          styles.taskAccentBar,
-          { backgroundColor: accentColor },
-        ]}
-      />
+      <View style={[styles.taskAccentBar, { backgroundColor: accentColor }]} />
 
       <TouchableOpacity
         style={styles.taskBody}
@@ -583,7 +534,6 @@ export default function TaskCardClean({
           style={[
             styles.universalCheckbox,
             isAbandoned && styles.abandonedCheckbox,
-            { marginTop: 8 },
           ]}
         >
           {renderStatusIcon(10)}
@@ -606,7 +556,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E7E3DF',
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     overflow: 'hidden',
   },
 
@@ -618,10 +568,14 @@ const styles = StyleSheet.create({
   taskBody: {
     flex: 1,
     alignSelf: 'stretch',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: 8,
-    justifyContent: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    transform: [
+      {
+        translateY: -2,
+      },
+    ],
   },
 
   taskTitle: {
@@ -650,7 +604,7 @@ const styles = StyleSheet.create({
   },
 
   taskMeta: {
-    marginTop: 2,
+    marginTop: 1,
     fontSize: 10,
     fontWeight: '500',
     includeFontPadding: false,
@@ -662,15 +616,21 @@ const styles = StyleSheet.create({
   },
 
   universalCheckbox: {
-    width: 14,
-    height: 14,
-    marginRight: 8,
-    borderRadius: 3,
+    width: 18,
+    height: 18,
+    marginRight: 10,
+    marginLeft: 4,
+    borderRadius: 4,
     borderWidth: 1.2,
     borderColor: '#C7BFB9',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [
+      {
+        translateY: -2,
+      },
+    ],
   },
 
   abandonedCheckbox: {
@@ -698,8 +658,14 @@ const styles = StyleSheet.create({
   compactClickArea: {
     flex: 1,
     height: '100%',
-    paddingHorizontal: 7,
+    paddingLeft: 9,
+    paddingRight: 6,
     justifyContent: 'center',
+    transform: [
+      {
+        translateY: -1,
+      },
+    ],
   },
 
   compactTitle: {
@@ -712,22 +678,19 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
 
-  compactMetaLine: {
-    marginTop: 1,
-    fontSize: 8,
-    lineHeight: 9,
-    fontWeight: '400',
-    includeFontPadding: false,
-  },
-
   compactCheckbox: {
-    width: 11,
-    height: 11,
-    marginRight: 6,
-    borderRadius: 2.5,
+    width: 14,
+    height: 14,
+
+    marginRight: 8,
+    marginLeft: 3,
+
+    borderRadius: 3,
     borderWidth: 1,
+
     borderColor: '#C7BFB9',
     backgroundColor: '#FFFFFF',
+
     alignItems: 'center',
     justifyContent: 'center',
   },
