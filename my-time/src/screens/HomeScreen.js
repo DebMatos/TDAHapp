@@ -60,7 +60,7 @@ const TIMELINE_START_MINUTES = 7 * 60;
 
 const SNAP_MINUTES = 5;
 
-const CREATE_LONG_PRESS_MS = 500;
+const CREATE_LONG_PRESS_MS = 400;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
