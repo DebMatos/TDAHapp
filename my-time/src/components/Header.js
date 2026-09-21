@@ -1,29 +1,47 @@
-import React, { useRef, useState } from 'react';import { StyleSheet, View, Text, TouchableOpacity, FlatList, Dimensions } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  VirtualizedList,
+  Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 
-// 1. CÁLCULO DE LARGURA PERFEITA (7 dias exatos por ecrã)
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const STRIP_PADDING = 12; // Padding horizontal das bordas
-const DAY_WIDTH = (SCREEN_WIDTH - (STRIP_PADDING * 2)) / 7;
+const STRIP_PADDING = 12;
+const DAY_WIDTH = (SCREEN_WIDTH - STRIP_PADDING * 2) / 7;
+const TOTAL_DAYS = 100001;
 
-// 2. GERADOR DE DATAS (Cria uma janela de 6 meses para poderes deslizar livremente)
-const PAST_DAYS = 90;
-const FUTURE_DAYS = 90;
+const CENTER_INDEX = Math.floor(TOTAL_DAYS / 2);
 
-const generateDateRange = () => {
-  const start = new Date();
-  start.setDate(start.getDate() - PAST_DAYS);
-  const days = [];
-  for (let i = 0; i < (PAST_DAYS + FUTURE_DAYS); i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    days.push(d);
-  }
-  return days;
+const REFERENCE_DATE = new Date();
+
+REFERENCE_DATE.setHours(0, 0, 0, 0);
+
+const getDateForIndex = (index) => {
+  const date = new Date(REFERENCE_DATE);
+
+  const offset = index - CENTER_INDEX;
+
+  date.setDate(date.getDate() + offset);
+
+  return date;
 };
 
-const ALL_DAYS = generateDateRange();
+const getIndexForDate = (date) => {
+  const normalized = new Date(date);
+
+  normalized.setHours(0, 0, 0, 0);
+
+  const diffMs = normalized - REFERENCE_DATE;
+
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+  return CENTER_INDEX + diffDays;
+};
 
 const isSameDay = (a, b) =>
   a.getFullYear() === b.getFullYear() &&
@@ -32,17 +50,32 @@ const isSameDay = (a, b) =>
 
 const WEEK_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTHS = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
 ];
 
 const getCurrentPeriodIcon = () => {
   const hour = new Date().getHours();
-  if (hour >= 7 && hour < 9) return { name: 'partly-sunny-outline', color: '#68D391' };
-  if (hour >= 9 && hour < 12) return { name: 'sunny-outline', color: '#F6E05E' };
-  if (hour >= 12 && hour < 14) return { name: 'restaurant-outline', color: '#F6AD55' };
-  if (hour >= 14 && hour < 18) return { name: 'briefcase-outline', color: '#FC8181' };
-  if (hour >= 18 && hour < 23) return { name: 'moon-outline', color: '#B794F4' };
+  if (hour >= 7 && hour < 9)
+    return { name: 'partly-sunny-outline', color: '#68D391' };
+  if (hour >= 9 && hour < 12)
+    return { name: 'sunny-outline', color: '#F6E05E' };
+  if (hour >= 12 && hour < 14)
+    return { name: 'restaurant-outline', color: '#F6AD55' };
+  if (hour >= 14 && hour < 18)
+    return { name: 'briefcase-outline', color: '#FC8181' };
+  if (hour >= 18 && hour < 23)
+    return { name: 'moon-outline', color: '#B794F4' };
   return { name: 'bed-outline', color: '#7F9CF5' };
 };
 
@@ -56,7 +89,8 @@ export default function Header({
 }) {
   const flatListRef = useRef(null);
   const now = new Date();
-  const safeSelectedDate = selectedDate instanceof Date ? selectedDate : new Date();
+  const safeSelectedDate =
+    selectedDate instanceof Date ? selectedDate : new Date();
 
   // Estado para o título do mês
   const [visibleDate, setVisibleDate] = useState(safeSelectedDate);
@@ -65,26 +99,8 @@ export default function Header({
   const year = visibleDate.getFullYear();
   const periodIcon = getCurrentPeriodIcon();
 
-  // Índice inicial (para quando a app abre)
-  const initialSelectedIndex = ALL_DAYS.findIndex((d) => isSameDay(d, safeSelectedDate));
+  const initialSelectedIndex = getIndexForDate(safeSelectedDate);
   const initialCenteredIndex = Math.max(0, initialSelectedIndex - 3);
-
-  // NOVO: Função que só faz scroll quando carregas no botão "Agora"
-  const handleGoToNowPress = () => {
-    // 1. Chama a função que vem do ecrã pai (para mudar a data)
-    if (onGoToNow) onGoToNow();
-
-    // 2. Faz scroll suave de volta para o dia de hoje
-    const todayIndex = ALL_DAYS.findIndex((d) => isSameDay(d, now));
-    const centerTodayIndex = Math.max(0, todayIndex - 3);
-    
-    if (flatListRef.current && todayIndex !== -1) {
-      flatListRef.current.scrollToIndex({
-        index: centerTodayIndex,
-        animated: true,
-      });
-    }
-  };
 
   // Deteta os itens visíveis para atualizar o título do mês ao deslizar (swipe)
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
@@ -108,19 +124,24 @@ export default function Header({
         <View style={styles.centerTasksContainer} pointerEvents="none">
           <View style={styles.tasksInline}>
             <Ionicons name="checkmark-done" size={16} color={colors.success} />
-            <Text style={styles.tasksText}>{`${completedTasks}/${totalTasks}`}</Text>
+            <Text
+              style={styles.tasksText}
+            >{`${completedTasks}/${totalTasks}`}</Text>
           </View>
         </View>
 
         <View style={styles.rightGroup}>
-          {/* BOTÃO AGORA CHAMA A NOVA FUNÇÃO handleGoToNowPress */}
           <TouchableOpacity
-            onPress={handleGoToNowPress}
+            onPress={onGoToNow}
             activeOpacity={0.7}
             style={styles.nowButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name={periodIcon.name} size={15} color={periodIcon.color} />
+            <Ionicons
+              name={periodIcon.name}
+              size={15}
+              color={periodIcon.color}
+            />
             <Text style={styles.nowText}>Agora</Text>
           </TouchableOpacity>
 
@@ -137,35 +158,46 @@ export default function Header({
 
       {/* 2. FAIXA DESLIZÁVEL */}
       <View style={{ height: 60 }}>
-        <FlatList
+        <VirtualizedList
           ref={flatListRef}
-          data={ALL_DAYS}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.toISOString()}
-          initialScrollIndex={initialCenteredIndex} // Só centra no arranque
-          getItemLayout={(data, index) => ({
+          initialScrollIndex={initialCenteredIndex}
+          initialNumToRender={14}
+          windowSize={7}
+          getItemCount={() => TOTAL_DAYS}
+          getItem={(_data, index) => getDateForIndex(index)}
+          getItemLayout={(_data, index) => ({
             length: DAY_WIDTH,
+
             offset: DAY_WIDTH * index,
+
             index,
           })}
+          keyExtractor={(item) => item.toISOString()}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           contentContainerStyle={styles.flatListContainer}
           renderItem={({ item: dateItem }) => {
             const isSelected = isSameDay(dateItem, safeSelectedDate);
+
             const isToday = isSameDay(dateItem, now);
 
             return (
               <TouchableOpacity
                 style={styles.dayColumn}
-                // Agora ao clicar, apenas seleciona, NÃO FAZ SCROLL
-                onPress={() => onSelectDate && onSelectDate(dateItem)} 
+                onPress={() => onSelectDate?.(dateItem)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.weekLabelText, isSelected && styles.selectedWeekLabel]}>
+                <Text
+                  style={[
+                    styles.weekLabelText,
+                    isSelected && styles.selectedWeekLabel,
+                  ]}
+                >
                   {WEEK_LABELS[dateItem.getDay()]}
                 </Text>
+
                 <View
                   style={[
                     styles.dayNumberCircle,
@@ -287,14 +319,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayNumberText: {
-    fontSize: 14, 
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
   selectedDayCircle: {
     backgroundColor: colors.selection,
     borderRadius: 17,
-
   },
   selectedDayText: {
     color: '#FFFFFF',
