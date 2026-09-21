@@ -760,20 +760,24 @@ export default function TimelineScreen() {
   const handleGoToNow = () => {
     const today = new Date();
 
-    if (!isSameDay(selectedDate, today)) {
-      // 1. Se não for hoje, muda a data selecionada para hoje
-      setSelectedDate(today);
-    } else {
-      // 2. Se já for hoje, calcula a posição Y da hora atual e faz scroll
-      const targetY = nowTop - viewportHeight * 0.35;
-      const maxScroll = Math.max(0, canvasHeight - viewportHeight);
-      const y = clamp(targetY, 0, maxScroll);
+    const targetY = nowTop - viewportHeight * 0.35;
 
+    const maxScroll = Math.max(0, canvasHeight - viewportHeight);
+
+    const y = clamp(targetY, 0, maxScroll);
+
+    if (!isSameDay(selectedDate, today)) {
+      setSelectedDate(today);
+    }
+
+    scrollYRef.current = y;
+
+    requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({
         y,
-        animated: true, // Scroll suave até à linha da abelha
+        animated: true,
       });
-    }
+    });
   };
   /* -------------------------------------------------------
      RENDER

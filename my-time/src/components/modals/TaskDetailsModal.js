@@ -992,32 +992,34 @@ export default function TaskDetailsModal({
      SAVE
   ------------------------------------------------------- */
 
-  const handleSave = async () => {
-    if (!canSave || isSaving) {
-      return;
-    }
+const handleSave = async () => {
+  if (!canSave || isSaving) {
+    return;
+  }
 
-    const startMinutes = parseTime(startTime);
+  const startMinutes = parseTime(startTime);
 
-    try {
-      setIsSaving(true);
+  try {
+    setIsSaving(true);
 
-      await onSave({
-        title: title.trim(),
-        date: dateInputToStorageDate(dateValue),
-        startTime: formatTime(startMinutes),
-        durationMinutes: duration,
-        categoryId,
-        notes: notes.trim(),
-        repeat,
-        status,
-      });
+    await onSave({
+      title: title.trim(),
+      date: dateInputToStorageDate(dateValue),
+      startTime: formatTime(startMinutes),
+      durationMinutes: duration,
+      categoryId,
+      notes: notes.trim(),
+      repeat,
+      status,
+    });
 
-      setSavedSnapshot(currentSnapshot);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    setSavedSnapshot(currentSnapshot);
+  } catch (error) {
+    // O HomeScreen já mostra o erro ao utilizador.
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const closeInlineEditor = () => {
     if (activeScheduleField) {
