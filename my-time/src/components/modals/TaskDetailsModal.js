@@ -1,9 +1,4 @@
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Animated,
@@ -27,26 +22,15 @@ import colors from '../../theme/colors';
 
 const DAY_MINUTES = 24 * 60;
 
-const SCREEN_HEIGHT =
-  Dimensions.get('window').height;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const NORMAL_SHEET_HEIGHT =
-  Math.round(
-    SCREEN_HEIGHT * 0.78
-  );
+const NORMAL_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.78);
 
-const EXPANDED_SHEET_HEIGHT =
-  Math.round(
-    SCREEN_HEIGHT * 0.94
-  );
+const EXPANDED_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.94);
 
 const MIN_SHEET_HEIGHT = 260;
 
-const DURATION_PRESETS = [
-  15,
-  30,
-  60,
-];
+const DURATION_PRESETS = [15, 30, 60];
 
 const POSTPONE_OPTIONS = [
   {
@@ -66,12 +50,7 @@ const POSTPONE_OPTIONS = [
   },
 ];
 
-const REPEAT_OPTIONS = [
-  'never',
-  'daily',
-  'weekdays',
-  'weekly',
-];
+const REPEAT_OPTIONS = ['never', 'daily', 'weekdays', 'weekly'];
 
 const REPEAT_LABELS = {
   never: 'Nunca',
@@ -132,111 +111,45 @@ const CATEGORY_OPTIONS = [
    HELPERS
 ------------------------------------------------------- */
 
-const clamp = (
-  value,
-  min,
-  max
-) =>
-  Math.max(
-    min,
-    Math.min(
-      max,
-      value
-    )
-  );
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-const normalizeMinutes = (
-  minutes
-) =>
-  ((minutes % DAY_MINUTES) +
-    DAY_MINUTES) %
-  DAY_MINUTES;
+const normalizeMinutes = (minutes) =>
+  ((minutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
 
-const formatTime = (
-  minutes
-) => {
-  const normalized =
-    normalizeMinutes(
-      minutes
-    );
+const formatTime = (minutes) => {
+  const normalized = normalizeMinutes(minutes);
 
-  const hours =
-    Math.floor(
-      normalized / 60
-    );
+  const hours = Math.floor(normalized / 60);
 
-  const mins =
-    normalized % 60;
+  const mins = normalized % 60;
 
-  return `${String(
-    hours
-  ).padStart(
-    2,
-    '0'
-  )}:${String(
-    mins
-  ).padStart(
-    2,
-    '0'
-  )}`;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
-const parseTime = (
-  value,
-  fallback = 7 * 60
-) => {
-  if (
-    !value ||
-    !value.includes(':')
-  ) {
+const parseTime = (value, fallback = 7 * 60) => {
+  if (!value || !value.includes(':')) {
     return fallback;
   }
 
-  const [
-    hours,
-    minutes,
-  ] =
-    value
-      .split(':')
-      .map(Number);
+  const [hours, minutes] = value.split(':').map(Number);
 
-  if (
-    Number.isNaN(
-      hours
-    ) ||
-    Number.isNaN(
-      minutes
-    )
-  ) {
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
     return fallback;
   }
 
-  return normalizeMinutes(
-    hours * 60 +
-    minutes
-  );
+  return normalizeMinutes(hours * 60 + minutes);
 };
 
-const formatDuration = (
-  minutes
-) => {
-  if (
-    minutes < 60
-  ) {
+const formatDuration = (minutes) => {
+  if (minutes < 60) {
     return `${minutes} min`;
   }
 
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
+  const hours = Math.floor(minutes / 60);
 
-  const mins =
-    minutes % 60;
+  const mins = minutes % 60;
 
-  if (
-    mins === 0
-  ) {
+  if (mins === 0) {
     return `${hours} h`;
   }
 
@@ -247,207 +160,86 @@ const formatDuration = (
    TIME
 ------------------------------------------------------- */
 
-const formatTimeInput = (
-  value
-) => {
-  const digits =
-    value
-      .replace(
-        /\D/g,
-        ''
-      )
-      .slice(
-        0,
-        4
-      );
+const formatTimeInput = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
 
-  if (
-    digits.length <= 2
-  ) {
+  if (digits.length <= 2) {
     return digits;
   }
 
-  return `${digits.slice(
-    0,
-    2
-  )}:${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 };
 
-const isValidTime = (
-  value
-) => {
-  if (
-    !/^\d{2}:\d{2}$/.test(
-      value
-    )
-  ) {
+const isValidTime = (value) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) {
     return false;
   }
 
-  const [
-    hours,
-    minutes,
-  ] =
-    value
-      .split(':')
-      .map(Number);
+  const [hours, minutes] = value.split(':').map(Number);
 
-  return (
-    hours >= 0 &&
-    hours <= 23 &&
-    minutes >= 0 &&
-    minutes <= 59
-  );
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 };
 
 /* -------------------------------------------------------
    DATE
 ------------------------------------------------------- */
 
-const formatDateForInput = (
-  date
-) => {
-  const d =
-    date instanceof Date
-      ? date
-      : new Date(date);
+const formatDateForInput = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
 
-  if (
-    Number.isNaN(
-      d.getTime()
-    )
-  ) {
+  if (Number.isNaN(d.getTime())) {
     return '';
   }
 
-  const day =
-    String(
-      d.getDate()
-    ).padStart(
-      2,
-      '0'
-    );
+  const day = String(d.getDate()).padStart(2, '0');
 
-  const month =
-    String(
-      d.getMonth() + 1
-    ).padStart(
-      2,
-      '0'
-    );
+  const month = String(d.getMonth() + 1).padStart(2, '0');
 
-  const year =
-    d.getFullYear();
+  const year = d.getFullYear();
 
   return `${day}/${month}/${year}`;
 };
 
-const getTodayDateInput =
-  () =>
-    formatDateForInput(
-      new Date()
-    );
+const getTodayDateInput = () => formatDateForInput(new Date());
 
-const formatDateInput = (
-  value
-) => {
-  const digits =
-    value
-      .replace(
-        /\D/g,
-        ''
-      )
-      .slice(
-        0,
-        8
-      );
+const formatDateInput = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
 
-  if (
-    digits.length <= 2
-  ) {
+  if (digits.length <= 2) {
     return digits;
   }
 
-  if (
-    digits.length <= 4
-  ) {
-    return `${digits.slice(
-      0,
-      2
-    )}/${digits.slice(2)}`;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   }
 
-  return `${digits.slice(
-    0,
-    2
-  )}/${digits.slice(
-    2,
-    4
-  )}/${digits.slice(4)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 };
 
-const isValidDateInput = (
-  value
-) => {
-  if (
-    !/^\d{2}\/\d{2}\/\d{4}$/.test(
-      value
-    )
-  ) {
+const isValidDateInput = (value) => {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
     return false;
   }
 
-  const [
-    day,
-    month,
-    year,
-  ] =
-    value
-      .split('/')
-      .map(Number);
+  const [day, month, year] = value.split('/').map(Number);
 
-  const date =
-    new Date(
-      year,
-      month - 1,
-      day
-    );
+  const date = new Date(year, month - 1, day);
 
   return (
-    date.getFullYear() ===
-    year &&
-    date.getMonth() ===
-    month - 1 &&
-    date.getDate() ===
-    day
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
   );
 };
 
-const parseDateInput = (
-  value
-) => {
-  if (
-    !isValidDateInput(
-      value
-    )
-  ) {
+const parseDateInput = (value) => {
+  if (!isValidDateInput(value)) {
     return null;
   }
 
-  const [
-    day,
-    month,
-    year,
-  ] =
-    value
-      .split('/')
-      .map(Number);
+  const [day, month, year] = value.split('/').map(Number);
 
-  return new Date(
-    year,
-    month - 1,
-    day
-  );
+  return new Date(year, month - 1, day);
 };
 
 const dateInputToStorageDate = (value) => {
@@ -459,48 +251,26 @@ const dateInputToStorageDate = (value) => {
 
   return `${year}-${month}-${day}`;
 };
-const addDaysToDateInput = (
-  value,
-  days
-) => {
-  const date =
-    parseDateInput(
-      value
-    );
+const addDaysToDateInput = (value, days) => {
+  const date = parseDateInput(value);
 
   if (!date) {
     return value;
   }
 
-  date.setDate(
-    date.getDate() +
-    days
-  );
+  date.setDate(date.getDate() + days);
 
-  return formatDateForInput(
-    date
-  );
+  return formatDateForInput(date);
 };
 
-const getDateDisplayLabel = (
-  value
-) => {
-  if (
-    value ===
-    getTodayDateInput()
-  ) {
+const getDateDisplayLabel = (value) => {
+  if (value === getTodayDateInput()) {
     return 'Hoje';
   }
 
-  const tomorrow =
-    addDaysToDateInput(
-      getTodayDateInput(),
-      1
-    );
+  const tomorrow = addDaysToDateInput(getTodayDateInput(), 1);
 
-  if (
-    value === tomorrow
-  ) {
+  if (value === tomorrow) {
     return 'Amanhã';
   }
 
@@ -511,45 +281,24 @@ const getDateDisplayLabel = (
    STATUS ICON
 ------------------------------------------------------- */
 
-function StatusIcon({
-  type,
-  selected,
-}) {
-  const iconColor =
-    selected
-      ? colors.selectionText
-      : colors.textMuted;
+function StatusIcon({ type, selected }) {
+  const iconColor = selected ? colors.selectionText : colors.textMuted;
 
   return (
     <View
       style={[
         styles.statusIconSquare,
 
-        selected &&
-        styles.statusIconSquareSelected,
+        selected && styles.statusIconSquareSelected,
       ]}
     >
-      {type ===
-        'completed' && (
-          <Ionicons
-            name="checkmark"
-            size={15}
-            color={
-              iconColor
-            }
-          />
-        )}
+      {type === 'completed' && (
+        <Ionicons name="checkmark" size={15} color={iconColor} />
+      )}
 
-      {type ===
-        'abandoned' && (
-          <Ionicons
-            name="close"
-            size={15}
-            color={
-              iconColor
-            }
-          />
-        )}
+      {type === 'abandoned' && (
+        <Ionicons name="close" size={15} color={iconColor} />
+      )}
     </View>
   );
 }
@@ -566,1364 +315,694 @@ export default function TaskDetailsModal({
   onSave,
   onDelete,
 }) {
-  const isEdit =
-    mode === 'edit';
+  const isEdit = mode === 'edit';
 
-  const [
-    title,
-    setTitle,
-  ] =
-    useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [
-    isEditingTitle,
-    setIsEditingTitle,
-  ] =
-    useState(false);
+  const [title, setTitle] = useState('');
 
-  const [
-    dateValue,
-    setDateValue,
-  ] =
-    useState(
-      getTodayDateInput()
-    );
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
 
-  const [
-    startTime,
-    setStartTime,
-  ] =
-    useState(
-      '07:00'
-    );
+  const [dateValue, setDateValue] = useState(getTodayDateInput());
 
-  const [
-    endTime,
-    setEndTime,
-  ] =
-    useState(
-      '07:30'
-    );
+  const [startTime, setStartTime] = useState('07:00');
 
-  const [
-    duration,
-    setDuration,
-  ] =
-    useState(30);
+  const [endTime, setEndTime] = useState('07:30');
 
-  const [
-    customDuration,
-    setCustomDuration,
-  ] =
-    useState('');
+  const [duration, setDuration] = useState(30);
 
-  const [
-    activeScheduleField,
-    setActiveScheduleField,
-  ] =
-    useState(null);
+  const [customDuration, setCustomDuration] = useState('');
 
-  const [
-    postponeSelection,
-    setPostponeSelection,
-  ] =
-    useState(null);
+  const [activeScheduleField, setActiveScheduleField] = useState(null);
 
-  const [
-    categoryId,
-    setCategoryId,
-  ] =
-    useState(
-      'inbox'
-    );
+  const [postponeSelection, setPostponeSelection] = useState(null);
 
-  const [
-    status,
-    setStatus,
-  ] =
-    useState(
-      'pending'
-    );
+  const [categoryId, setCategoryId] = useState('inbox');
 
-  const [
-    repeat,
-    setRepeat,
-  ] =
-    useState(
-      'never'
-    );
+  const [status, setStatus] = useState('pending');
 
-  const [
-    isEditingRepeat,
-    setIsEditingRepeat,
-  ] =
-    useState(false);
+  const [repeat, setRepeat] = useState('never');
 
-  const [
-    notes,
-    setNotes,
-  ] =
-    useState('');
+  const [isEditingRepeat, setIsEditingRepeat] = useState(false);
 
-  const [
-    savedSnapshot,
-    setSavedSnapshot,
-  ] =
-    useState(null);
+  const [notes, setNotes] = useState('');
 
-  const [
-    isExpanded,
-    setIsExpanded,
-  ] =
-    useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
 
-  const [
-    keyboardHeight,
-    setKeyboardHeight,
-  ] =
-    useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const titleInputRef =
-    useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  const dateInputRef =
-    useRef(null);
+  const titleInputRef = useRef(null);
 
-  const startInputRef =
-    useRef(null);
+  const dateInputRef = useRef(null);
 
-  const scrollRef =
-    useRef(null);
+  const startInputRef = useRef(null);
 
-  const scheduleBaseRef =
-    useRef({
-      date:
-        getTodayDateInput(),
+  const scrollRef = useRef(null);
 
-      startTime:
-        '07:00',
-    });
+  const scheduleBaseRef = useRef({
+    date: getTodayDateInput(),
 
-  const sheetHeight =
-    useRef(
-      new Animated.Value(
-        NORMAL_SHEET_HEIGHT
-      )
-    ).current;
+    startTime: '07:00',
+  });
 
-  const sheetBottom =
-    useRef(
-      new Animated.Value(
-        0
-      )
-    ).current;
+  const sheetHeight = useRef(new Animated.Value(NORMAL_SHEET_HEIGHT)).current;
 
-  const dragStartHeightRef =
-    useRef(
-      NORMAL_SHEET_HEIGHT
-    );
+  const sheetBottom = useRef(new Animated.Value(0)).current;
 
-  const selectedCategory =
-    useMemo(
-      () =>
-        CATEGORY_OPTIONS.find(
-          (item) =>
-            item.id ===
-            categoryId
-        ) ||
-        CATEGORY_OPTIONS[0],
-      [categoryId]
-    );
+  const dragStartHeightRef = useRef(NORMAL_SHEET_HEIGHT);
 
-  const currentSnapshot =
-    useMemo(
-      () =>
-        JSON.stringify({
-          title:
-            title.trim(),
+  const selectedCategory = useMemo(
+    () =>
+      CATEGORY_OPTIONS.find((item) => item.id === categoryId) ||
+      CATEGORY_OPTIONS[0],
+    [categoryId],
+  );
 
-          date:
-            dateValue,
-
-          startTime,
-
-          endTime,
-
-          duration,
-
-          categoryId,
-
-          status,
-
-          repeat,
-
-          notes:
-            notes.trim(),
-        }),
-      [
-        title,
-        dateValue,
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        title: title.trim(),
+        date: dateValue,
         startTime,
         endTime,
         duration,
         categoryId,
         status,
         repeat,
-        notes,
-      ]
-    );
+        notes: notes.trim(),
+      }),
+    [
+      title,
+      dateValue,
+      startTime,
+      endTime,
+      duration,
+      categoryId,
+      status,
+      repeat,
+      notes,
+    ],
+  );
 
   const canSave =
-    title.trim().length >
-    0 &&
-    isValidDateInput(
-      dateValue
-    ) &&
-    isValidTime(
-      startTime
-    ) &&
-    isValidTime(
-      endTime
-    );
+    title.trim().length > 0 &&
+    isValidDateInput(dateValue) &&
+    isValidTime(startTime) &&
+    isValidTime(endTime);
 
-  const isDirty =
-    savedSnapshot !== null &&
-    currentSnapshot !==
-    savedSnapshot;
+  const isDirty = savedSnapshot !== null && currentSnapshot !== savedSnapshot;
 
-  const saveIconColor =
-    !canSave
-      ? colors.textFaint
-      : isDirty
-        ? colors.categoryWork
-        : colors.textMuted;
+  const saveIconColor = !canSave
+    ? colors.textFaint
+    : isDirty
+      ? colors.categoryWork
+      : colors.textMuted;
 
   /* -------------------------------------------------------
      SHEET
   ------------------------------------------------------- */
 
-  const animateGeometry = (
-    baseHeight,
-    bottomValue
-  ) => {
-    const height =
-      Math.max(
-        MIN_SHEET_HEIGHT,
+  const animateGeometry = (baseHeight, bottomValue) => {
+    const height = Math.max(
+      MIN_SHEET_HEIGHT,
 
-        baseHeight -
-        bottomValue
-      );
+      baseHeight - bottomValue,
+    );
 
     Animated.parallel([
-      Animated.spring(
-        sheetHeight,
-        {
-          toValue:
-            height,
+      Animated.spring(sheetHeight, {
+        toValue: height,
 
-          useNativeDriver:
-            false,
+        useNativeDriver: false,
 
-          tension:
-            70,
+        tension: 70,
 
-          friction:
-            11,
-        }
-      ),
+        friction: 11,
+      }),
 
-      Animated.spring(
-        sheetBottom,
-        {
-          toValue:
-            bottomValue,
+      Animated.spring(sheetBottom, {
+        toValue: bottomValue,
 
-          useNativeDriver:
-            false,
+        useNativeDriver: false,
 
-          tension:
-            70,
+        tension: 70,
 
-          friction:
-            11,
-        }
-      ),
+        friction: 11,
+      }),
     ]).start();
   };
 
-  const animateSheetTo = (
-    expanded
-  ) => {
-    const baseHeight =
-      expanded
-        ? EXPANDED_SHEET_HEIGHT
-        : NORMAL_SHEET_HEIGHT;
+  const animateSheetTo = (expanded) => {
+    const baseHeight = expanded ? EXPANDED_SHEET_HEIGHT : NORMAL_SHEET_HEIGHT;
 
-    setIsExpanded(
-      expanded
-    );
+    setIsExpanded(expanded);
 
-    animateGeometry(
-      baseHeight,
-      keyboardHeight
-    );
+    animateGeometry(baseHeight, keyboardHeight);
   };
 
-  const closeFromDrag =
-    () => {
-      Animated.parallel([
-        Animated.timing(
-          sheetHeight,
-          {
-            toValue:
-              0,
+  const closeFromDrag = () => {
+    Animated.parallel([
+      Animated.timing(sheetHeight, {
+        toValue: 0,
 
-            duration:
-              180,
+        duration: 180,
 
-            useNativeDriver:
-              false,
+        useNativeDriver: false,
+      }),
+
+      Animated.timing(sheetBottom, {
+        toValue: 0,
+
+        duration: 180,
+
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      sheetHeight.setValue(NORMAL_SHEET_HEIGHT);
+
+      sheetBottom.setValue(0);
+
+      setIsExpanded(false);
+
+      setKeyboardHeight(0);
+
+      onClose?.();
+    });
+  };
+
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => keyboardHeight === 0,
+
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          keyboardHeight === 0 && Math.abs(gesture.dy) > 3,
+
+        onPanResponderGrant: () => {
+          dragStartHeightRef.current = isExpanded
+            ? EXPANDED_SHEET_HEIGHT
+            : NORMAL_SHEET_HEIGHT;
+        },
+
+        onPanResponderMove: (_, gesture) => {
+          const nextHeight = clamp(
+            dragStartHeightRef.current - gesture.dy,
+
+            MIN_SHEET_HEIGHT,
+
+            EXPANDED_SHEET_HEIGHT,
+          );
+
+          sheetHeight.setValue(nextHeight);
+        },
+
+        onPanResponderRelease: (_, gesture) => {
+          const draggedUp = gesture.dy < -45 || gesture.vy < -0.55;
+
+          const draggedDown = gesture.dy > 55 || gesture.vy > 0.65;
+
+          if (!isExpanded) {
+            if (draggedUp) {
+              animateSheetTo(true);
+
+              return;
+            }
+
+            if (draggedDown) {
+              closeFromDrag();
+
+              return;
+            }
+
+            animateSheetTo(false);
+
+            return;
           }
-        ),
 
-        Animated.timing(
-          sheetBottom,
-          {
-            toValue:
-              0,
+          if (draggedDown) {
+            animateSheetTo(false);
 
-            duration:
-              180,
-
-            useNativeDriver:
-              false,
+            return;
           }
-        ),
-      ]).start(
-        () => {
-          sheetHeight.setValue(
-            NORMAL_SHEET_HEIGHT
-          );
 
-          sheetBottom.setValue(
-            0
-          );
+          animateSheetTo(true);
+        },
 
-          setIsExpanded(
-            false
-          );
-
-          setKeyboardHeight(
-            0
-          );
-
-          onClose?.();
-        }
-      );
-    };
-
-  const sheetPanResponder =
-    useMemo(
-      () =>
-        PanResponder.create({
-          onStartShouldSetPanResponder:
-            () =>
-              keyboardHeight ===
-              0,
-
-          onMoveShouldSetPanResponder:
-            (
-              _,
-              gesture
-            ) =>
-              keyboardHeight ===
-              0 &&
-              Math.abs(
-                gesture.dy
-              ) >
-              3,
-
-          onPanResponderGrant:
-            () => {
-              dragStartHeightRef.current =
-                isExpanded
-                  ? EXPANDED_SHEET_HEIGHT
-                  : NORMAL_SHEET_HEIGHT;
-            },
-
-          onPanResponderMove:
-            (
-              _,
-              gesture
-            ) => {
-              const nextHeight =
-                clamp(
-                  dragStartHeightRef.current -
-                  gesture.dy,
-
-                  MIN_SHEET_HEIGHT,
-
-                  EXPANDED_SHEET_HEIGHT
-                );
-
-              sheetHeight.setValue(
-                nextHeight
-              );
-            },
-
-          onPanResponderRelease:
-            (
-              _,
-              gesture
-            ) => {
-              const draggedUp =
-                gesture.dy <
-                -45 ||
-                gesture.vy <
-                -0.55;
-
-              const draggedDown =
-                gesture.dy >
-                55 ||
-                gesture.vy >
-                0.65;
-
-              if (
-                !isExpanded
-              ) {
-                if (
-                  draggedUp
-                ) {
-                  animateSheetTo(
-                    true
-                  );
-
-                  return;
-                }
-
-                if (
-                  draggedDown
-                ) {
-                  closeFromDrag();
-
-                  return;
-                }
-
-                animateSheetTo(
-                  false
-                );
-
-                return;
-              }
-
-              if (
-                draggedDown
-              ) {
-                animateSheetTo(
-                  false
-                );
-
-                return;
-              }
-
-              animateSheetTo(
-                true
-              );
-            },
-
-          onPanResponderTerminate:
-            () => {
-              animateSheetTo(
-                isExpanded
-              );
-            },
-        }),
-      [
-        isExpanded,
-        keyboardHeight,
-        sheetHeight,
-      ]
-    );
+        onPanResponderTerminate: () => {
+          animateSheetTo(isExpanded);
+        },
+      }),
+    [isExpanded, keyboardHeight, sheetHeight],
+  );
 
   /* -------------------------------------------------------
      KEYBOARD
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (
-      !visible
-    ) {
+    if (!visible) {
       return;
     }
 
     const showEvent =
-      Platform.OS ===
-        'ios'
-        ? 'keyboardWillShow'
-        : 'keyboardDidShow';
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
 
     const hideEvent =
-      Platform.OS ===
-        'ios'
-        ? 'keyboardWillHide'
-        : 'keyboardDidHide';
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub =
-      Keyboard.addListener(
-        showEvent,
-        (
-          event
-        ) => {
-          const height =
-            event
-              .endCoordinates
-              ?.height ||
-            0;
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      const height = event.endCoordinates?.height || 0;
 
-          setKeyboardHeight(
-            height
-          );
+      setKeyboardHeight(height);
 
-          const baseHeight =
-            isExpanded
-              ? EXPANDED_SHEET_HEIGHT
-              : NORMAL_SHEET_HEIGHT;
+      const baseHeight = isExpanded
+        ? EXPANDED_SHEET_HEIGHT
+        : NORMAL_SHEET_HEIGHT;
 
-          animateGeometry(
-            baseHeight,
-            height
-          );
+      animateGeometry(baseHeight, height);
 
-          if (
-            isEditingTitle
-          ) {
-            requestAnimationFrame(
-              () => {
-                scrollRef.current?.scrollTo(
-                  {
-                    y:
-                      0,
+      if (isEditingTitle) {
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollTo({
+            y: 0,
 
-                    animated:
-                      false,
-                  }
-                );
-              }
-            );
-          }
-        }
-      );
+            animated: false,
+          });
+        });
+      }
+    });
 
-    const hideSub =
-      Keyboard.addListener(
-        hideEvent,
-        () => {
-          setKeyboardHeight(
-            0
-          );
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
 
-          const baseHeight =
-            isExpanded
-              ? EXPANDED_SHEET_HEIGHT
-              : NORMAL_SHEET_HEIGHT;
+      const baseHeight = isExpanded
+        ? EXPANDED_SHEET_HEIGHT
+        : NORMAL_SHEET_HEIGHT;
 
-          animateGeometry(
-            baseHeight,
-            0
-          );
-        }
-      );
+      animateGeometry(baseHeight, 0);
+    });
 
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [
-    visible,
-    isExpanded,
-    isEditingTitle,
-  ]);
+  }, [visible, isExpanded, isEditingTitle]);
 
   /* -------------------------------------------------------
      FOCUS
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (
-      !isEdit ||
-      !isEditingTitle
-    ) {
+    if (!isEdit || !isEditingTitle) {
       return;
     }
 
     scrollRef.current?.scrollTo({
-      y:
-        0,
+      y: 0,
 
-      animated:
-        false,
+      animated: false,
     });
 
-    const timer =
-      setTimeout(
-        () => {
-          titleInputRef.current?.focus();
-        },
-        80
-      );
+    const timer = setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 80);
 
-    return () =>
-      clearTimeout(
-        timer
-      );
-  }, [
-    isEdit,
-    isEditingTitle,
-  ]);
+    return () => clearTimeout(timer);
+  }, [isEdit, isEditingTitle]);
 
   useEffect(() => {
-    if (
-      activeScheduleField ===
-      'date'
-    ) {
-      const timer =
-        setTimeout(
-          () => {
-            dateInputRef.current?.focus();
-          },
-          60
-        );
+    if (activeScheduleField === 'date') {
+      const timer = setTimeout(() => {
+        dateInputRef.current?.focus();
+      }, 60);
 
-      return () =>
-        clearTimeout(
-          timer
-        );
+      return () => clearTimeout(timer);
     }
 
-    if (
-      activeScheduleField ===
-      'time'
-    ) {
-      const timer =
-        setTimeout(
-          () => {
-            startInputRef.current?.focus();
-          },
-          60
-        );
+    if (activeScheduleField === 'time') {
+      const timer = setTimeout(() => {
+        startInputRef.current?.focus();
+      }, 60);
 
-      return () =>
-        clearTimeout(
-          timer
-        );
+      return () => clearTimeout(timer);
     }
 
     return undefined;
-  }, [
-    activeScheduleField,
-  ]);
+  }, [activeScheduleField]);
 
   /* -------------------------------------------------------
      RESET
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (
-      !visible
-    ) {
+    if (!visible) {
       return;
     }
 
-    setIsEditingTitle(
-      false
-    );
+    setIsEditingTitle(false);
 
-    setActiveScheduleField(
-      null
-    );
+    setActiveScheduleField(null);
 
-    setPostponeSelection(
-      null
-    );
+    setPostponeSelection(null);
 
-    setIsEditingRepeat(
-      false
-    );
+    setIsEditingRepeat(false);
 
-    setIsExpanded(
-      false
-    );
+    setIsExpanded(false);
 
-    setKeyboardHeight(
-      0
-    );
+    setKeyboardHeight(0);
 
-    setSavedSnapshot(
-      null
-    );
+    setSavedSnapshot(null);
 
-    sheetHeight.setValue(
-      NORMAL_SHEET_HEIGHT
-    );
+    sheetHeight.setValue(NORMAL_SHEET_HEIGHT);
 
-    sheetBottom.setValue(
-      0
-    );
-  }, [
-    visible,
-    sheetHeight,
-    sheetBottom,
-  ]);
+    sheetBottom.setValue(0);
+  }, [visible, sheetHeight, sheetBottom]);
 
   /* -------------------------------------------------------
      LOAD
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (
-      !visible
-    ) {
+    if (!visible) {
       return;
     }
 
-    const initialStart =
-      initialValues?.startTime ??
-      '07:00';
+    const initialStart = initialValues?.startTime ?? '07:00';
 
-    const initialDuration =
-      Math.max(
-        1,
+    const initialDuration = Math.max(
+      1,
 
-        Number(
-          initialValues?.durationMinutes
-        ) || 30
-      );
+      Number(initialValues?.durationMinutes) || 30,
+    );
 
-    const startMinutes =
-      parseTime(
-        initialStart
-      );
+    const startMinutes = parseTime(initialStart);
 
-    const initialEnd =
-      formatTime(
-        startMinutes +
-        initialDuration
-      );
+    const initialEnd = formatTime(startMinutes + initialDuration);
 
-    const initialStatus =
-      initialValues?.status ??
-      'pending';
+    const initialStatus = initialValues?.status ?? 'pending';
 
-    let initialDate =
-      getTodayDateInput();
+    let initialDate = getTodayDateInput();
 
-    if (
-      initialValues?.date
-    ) {
-      if (
-        /^\d{2}\/\d{2}\/\d{4}$/.test(
-          initialValues.date
-        )
-      ) {
-        initialDate =
-          initialValues.date;
+    if (initialValues?.date) {
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(initialValues.date)) {
+        initialDate = initialValues.date;
       } else {
-        const formatted =
-          formatDateForInput(
-            initialValues.date
-          );
+        const formatted = formatDateForInput(initialValues.date);
 
-        if (
-          formatted
-        ) {
-          initialDate =
-            formatted;
+        if (formatted) {
+          initialDate = formatted;
         }
       }
     }
 
-    const initialTitle =
-      initialValues?.title ||
-      '';
+    const initialTitle = initialValues?.title || '';
 
-    const initialCategory =
-      initialValues?.categoryId ||
-      'inbox';
+    const initialCategory = initialValues?.categoryId || 'inbox';
 
- const initialRepeat =
-  initialValues?.repeat ??
-  'never';
+    const initialRepeat = initialValues?.repeat ?? 'never';
 
-    const initialNotes =
-      initialValues?.notes ??
-      '';
+    const initialNotes = initialValues?.notes ?? '';
 
     scheduleBaseRef.current = {
-      date:
-        initialDate,
+      date: initialDate,
 
-      startTime:
-        initialStart,
+      startTime: initialStart,
     };
 
-    setTitle(
-      initialTitle
-    );
+    setTitle(initialTitle);
 
-    setDateValue(
-      initialDate
-    );
+    setDateValue(initialDate);
 
-    setStartTime(
-      initialStart
-    );
+    setStartTime(initialStart);
 
-    setDuration(
-      initialDuration
-    );
+    setDuration(initialDuration);
 
-    setEndTime(
-      initialEnd
-    );
+    setEndTime(initialEnd);
 
-    setCategoryId(
-      initialCategory
-    );
+    setCategoryId(initialCategory);
 
-    setStatus(
-      initialStatus
-    );
+    setStatus(initialStatus);
 
-    setRepeat(
-      initialRepeat
-    );
+    setRepeat(initialRepeat);
 
-    setIsEditingRepeat(
-      false
-    );
+    setIsEditingRepeat(false);
 
-    setNotes(
-      initialNotes
-    );
+    setNotes(initialNotes);
 
-    setPostponeSelection(
-      null
-    );
+    setPostponeSelection(null);
 
-    setActiveScheduleField(
-      null
-    );
+    setActiveScheduleField(null);
 
-    if (
-      DURATION_PRESETS.includes(
-        initialDuration
-      )
-    ) {
-      setCustomDuration(
-        ''
-      );
+    if (DURATION_PRESETS.includes(initialDuration)) {
+      setCustomDuration('');
     } else {
-      setCustomDuration(
-        String(
-          initialDuration
-        )
-      );
+      setCustomDuration(String(initialDuration));
     }
 
     setSavedSnapshot(
       JSON.stringify({
-        title:
-          initialTitle.trim(),
+        title: initialTitle.trim(),
 
-        date:
-          initialDate,
+        date: initialDate,
 
-        startTime:
-          initialStart,
+        startTime: initialStart,
 
-        endTime:
-          initialEnd,
+        endTime: initialEnd,
 
-        duration:
-          initialDuration,
+        duration: initialDuration,
 
-        categoryId:
-          initialCategory,
+        categoryId: initialCategory,
 
-        status:
-          initialStatus,
+        status: initialStatus,
 
-        repeat:
-          initialRepeat,
+        repeat: initialRepeat,
 
-        notes:
-          initialNotes.trim(),
-      })
+        notes: initialNotes.trim(),
+      }),
     );
-  }, [
-    visible,
-    initialValues,
-  ]);
+  }, [visible, initialValues]);
 
   /* -------------------------------------------------------
      SCHEDULE EDIT
   ------------------------------------------------------- */
 
-  const commitManualScheduleBase =
-    (
-      nextDate =
-        dateValue,
+  const commitManualScheduleBase = (
+    nextDate = dateValue,
 
-      nextStart =
-        startTime
-    ) => {
-      if (
-        isValidDateInput(
-          nextDate
-        ) &&
-        isValidTime(
-          nextStart
-        )
-      ) {
-        scheduleBaseRef.current = {
-          date:
-            nextDate,
-
-          startTime:
-            nextStart,
-        };
-
-        setPostponeSelection(
-          null
-        );
-      }
-    };
-
-  const updateDate = (
-    value
+    nextStart = startTime,
   ) => {
-    const formatted =
-      formatDateInput(
-        value
-      );
+    if (isValidDateInput(nextDate) && isValidTime(nextStart)) {
+      scheduleBaseRef.current = {
+        date: nextDate,
 
-    setDateValue(
-      formatted
-    );
+        startTime: nextStart,
+      };
 
-    if (
-      isValidDateInput(
-        formatted
-      )
-    ) {
-      commitManualScheduleBase(
-        formatted,
-        startTime
-      );
+      setPostponeSelection(null);
     }
   };
 
-  const updateStartTime = (
-    value
-  ) => {
-    const formatted =
-      formatTimeInput(
-        value
-      );
+  const updateDate = (value) => {
+    const formatted = formatDateInput(value);
 
-    setStartTime(
-      formatted
-    );
+    setDateValue(formatted);
 
-    if (
-      !isValidTime(
-        formatted
-      )
-    ) {
-      return;
+    if (isValidDateInput(formatted)) {
+      commitManualScheduleBase(formatted, startTime);
     }
-
-    const startMinutes =
-      parseTime(
-        formatted
-      );
-
-    setEndTime(
-      formatTime(
-        startMinutes +
-        duration
-      )
-    );
-
-    commitManualScheduleBase(
-      dateValue,
-      formatted
-    );
   };
 
-  const updateEndTime = (
-    value
-  ) => {
-    const formatted =
-      formatTimeInput(
-        value
-      );
+  const updateStartTime = (value) => {
+    const formatted = formatTimeInput(value);
 
-    setEndTime(
-      formatted
-    );
+    setStartTime(formatted);
 
-    if (
-      !isValidTime(
-        formatted
-      ) ||
-      !isValidTime(
-        startTime
-      )
-    ) {
+    if (!isValidTime(formatted)) {
       return;
     }
 
-    const startMinutes =
-      parseTime(
-        startTime
-      );
+    const startMinutes = parseTime(formatted);
 
-    let endMinutes =
-      parseTime(
-        formatted
-      );
+    setEndTime(formatTime(startMinutes + duration));
 
-    if (
-      endMinutes <=
-      startMinutes
-    ) {
-      endMinutes +=
-        DAY_MINUTES;
+    commitManualScheduleBase(dateValue, formatted);
+  };
+
+  const updateEndTime = (value) => {
+    const formatted = formatTimeInput(value);
+
+    setEndTime(formatted);
+
+    if (!isValidTime(formatted) || !isValidTime(startTime)) {
+      return;
     }
 
-    const nextDuration =
-      Math.max(
-        1,
+    const startMinutes = parseTime(startTime);
 
-        endMinutes -
-        startMinutes
-      );
+    let endMinutes = parseTime(formatted);
 
-    setDuration(
-      nextDuration
+    if (endMinutes <= startMinutes) {
+      endMinutes += DAY_MINUTES;
+    }
+
+    const nextDuration = Math.max(
+      1,
+
+      endMinutes - startMinutes,
     );
 
-    if (
-      DURATION_PRESETS.includes(
-        nextDuration
-      )
-    ) {
-      setCustomDuration(
-        ''
-      );
+    setDuration(nextDuration);
+
+    if (DURATION_PRESETS.includes(nextDuration)) {
+      setCustomDuration('');
     } else {
-      setCustomDuration(
-        String(
-          nextDuration
-        )
-      );
+      setCustomDuration(String(nextDuration));
     }
   };
 
-  const updateDuration = (
-    value
-  ) => {
-    const safeValue =
-      Math.max(
-        1,
+  const updateDuration = (value) => {
+    const safeValue = Math.max(
+      1,
 
-        Number(
-          value
-        ) ||
-        1
-      );
-
-    setDuration(
-      safeValue
+      Number(value) || 1,
     );
 
-    if (
-      !isValidTime(
-        startTime
-      )
-    ) {
+    setDuration(safeValue);
+
+    if (!isValidTime(startTime)) {
       return;
     }
 
-    const startMinutes =
-      parseTime(
-        startTime
-      );
+    const startMinutes = parseTime(startTime);
 
-    setEndTime(
-      formatTime(
-        startMinutes +
-        safeValue
-      )
-    );
+    setEndTime(formatTime(startMinutes + safeValue));
   };
 
-  const handlePresetDuration =
-    (
-      preset
-    ) => {
-      setCustomDuration(
-        ''
-      );
+  const handlePresetDuration = (preset) => {
+    setCustomDuration('');
 
-      updateDuration(
-        preset
-      );
+    updateDuration(preset);
 
-      setActiveScheduleField(
-        null
-      );
+    setActiveScheduleField(null);
 
-      Keyboard.dismiss();
-    };
+    Keyboard.dismiss();
+  };
 
-  const handleCustomDuration =
-    (
-      value
-    ) => {
-      const digits =
-        value
-          .replace(
-            /\D/g,
-            ''
-          )
-          .slice(
-            0,
-            4
-          );
+  const handleCustomDuration = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
 
-      setCustomDuration(
-        digits
-      );
+    setCustomDuration(digits);
 
-      if (
-        !digits
-      ) {
-        return;
-      }
+    if (!digits) {
+      return;
+    }
 
-      updateDuration(
-        Number(
-          digits
-        )
-      );
-    };
+    updateDuration(Number(digits));
+  };
 
   /* -------------------------------------------------------
      POSTPONE
   ------------------------------------------------------- */
 
-  const restoreScheduleBase =
-    () => {
-      const base =
-        scheduleBaseRef.current;
+  const restoreScheduleBase = () => {
+    const base = scheduleBaseRef.current;
 
-      const baseStart =
-        parseTime(
-          base.startTime
-        );
+    const baseStart = parseTime(base.startTime);
 
-      setDateValue(
-        base.date
-      );
+    setDateValue(base.date);
 
-      setStartTime(
-        base.startTime
-      );
+    setStartTime(base.startTime);
 
-      setEndTime(
-        formatTime(
-          baseStart +
-          duration
-        )
-      );
+    setEndTime(formatTime(baseStart + duration));
 
-      setPostponeSelection(
-        null
-      );
-    };
+    setPostponeSelection(null);
+  };
 
-  const selectPostponeMinutes =
-    (
-      option
-    ) => {
-      setActiveScheduleField(
-        null
-      );
+  const selectPostponeMinutes = (option) => {
+    setActiveScheduleField(null);
 
-      setIsEditingRepeat(
-        false
-      );
+    setIsEditingRepeat(false);
 
-      Keyboard.dismiss();
+    Keyboard.dismiss();
 
-      if (
-        postponeSelection ===
-        option.id
-      ) {
-        restoreScheduleBase();
+    if (postponeSelection === option.id) {
+      restoreScheduleBase();
 
-        return;
-      }
+      return;
+    }
 
-      const base =
-        scheduleBaseRef.current;
+    const base = scheduleBaseRef.current;
 
-      if (
-        !isValidDateInput(
-          base.date
-        ) ||
-        !isValidTime(
-          base.startTime
-        )
-      ) {
-        return;
-      }
+    if (!isValidDateInput(base.date) || !isValidTime(base.startTime)) {
+      return;
+    }
 
-      const baseStart =
-        parseTime(
-          base.startTime
-        );
+    const baseStart = parseTime(base.startTime);
 
-      const rawStart =
-        baseStart +
-        option.minutes;
+    const rawStart = baseStart + option.minutes;
 
-      const dayOffset =
-        Math.floor(
-          rawStart /
-          DAY_MINUTES
-        );
+    const dayOffset = Math.floor(rawStart / DAY_MINUTES);
 
-      const nextStart =
-        normalizeMinutes(
-          rawStart
-        );
+    const nextStart = normalizeMinutes(rawStart);
 
-      setDateValue(
-        addDaysToDateInput(
-          base.date,
-          dayOffset
-        )
-      );
+    setDateValue(addDaysToDateInput(base.date, dayOffset));
 
-      setStartTime(
-        formatTime(
-          nextStart
-        )
-      );
+    setStartTime(formatTime(nextStart));
 
-      setEndTime(
-        formatTime(
-          nextStart +
-          duration
-        )
-      );
+    setEndTime(formatTime(nextStart + duration));
 
-      setPostponeSelection(
-        option.id
-      );
-    };
+    setPostponeSelection(option.id);
+  };
 
-  const selectPostponeTomorrow =
-    () => {
-      setActiveScheduleField(
-        null
-      );
+  const selectPostponeTomorrow = () => {
+    setActiveScheduleField(null);
 
-      setIsEditingRepeat(
-        false
-      );
+    setIsEditingRepeat(false);
 
-      Keyboard.dismiss();
+    Keyboard.dismiss();
 
-      const id =
-        'tomorrow';
+    const id = 'tomorrow';
 
-      if (
-        postponeSelection ===
-        id
-      ) {
-        restoreScheduleBase();
+    if (postponeSelection === id) {
+      restoreScheduleBase();
 
-        return;
-      }
+      return;
+    }
 
-      const base =
-        scheduleBaseRef.current;
+    const base = scheduleBaseRef.current;
 
-      if (
-        !isValidDateInput(
-          base.date
-        ) ||
-        !isValidTime(
-          base.startTime
-        )
-      ) {
-        return;
-      }
+    if (!isValidDateInput(base.date) || !isValidTime(base.startTime)) {
+      return;
+    }
 
-      const baseStart =
-        parseTime(
-          base.startTime
-        );
+    const baseStart = parseTime(base.startTime);
 
-      setDateValue(
-        addDaysToDateInput(
-          base.date,
-          1
-        )
-      );
+    setDateValue(addDaysToDateInput(base.date, 1));
 
-      setStartTime(
-        base.startTime
-      );
+    setStartTime(base.startTime);
 
-      setEndTime(
-        formatTime(
-          baseStart +
-          duration
-        )
-      );
+    setEndTime(formatTime(baseStart + duration));
 
-      setPostponeSelection(
-        id
-      );
-    };
+    setPostponeSelection(id);
+  };
 
   /* -------------------------------------------------------
      SAVE
   ------------------------------------------------------- */
 
-  const handleSave =
-    () => {
-      if (
-        !canSave
-      ) {
-        return;
-      }
+  const handleSave = async () => {
+    if (!canSave || isSaving) {
+      return;
+    }
 
-      const startMinutes =
-        parseTime(
-          startTime
-        );
+    const startMinutes = parseTime(startTime);
 
-      setSavedSnapshot(
-        currentSnapshot
-      );
+    try {
+      setIsSaving(true);
 
-      onSave({
+      await onSave({
         title: title.trim(),
         date: dateInputToStorageDate(dateValue),
         startTime: formatTime(startMinutes),
@@ -1933,662 +1012,361 @@ export default function TaskDetailsModal({
         repeat,
         status,
       });
-    };
 
-  const closeInlineEditor =
-    () => {
-      if (
-        activeScheduleField
-      ) {
-        setActiveScheduleField(
-          null
-        );
+      setSavedSnapshot(currentSnapshot);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-        Keyboard.dismiss();
-      }
+  const closeInlineEditor = () => {
+    if (activeScheduleField) {
+      setActiveScheduleField(null);
 
-      if (
-        isEditingRepeat
-      ) {
-        setIsEditingRepeat(
-          false
-        );
-      }
-    };
+      Keyboard.dismiss();
+    }
+
+    if (isEditingRepeat) {
+      setIsEditingRepeat(false);
+    }
+  };
 
   /* -------------------------------------------------------
      SCHEDULE RENDER
   ------------------------------------------------------- */
 
-  const renderScheduleLine =
-    () => {
-      const dateContent =
-        activeScheduleField ===
-          'date' ? (
-          <TextInput
-            ref={
-              dateInputRef
-            }
-            style={
-              styles.inlineDateInput
-            }
-            value={
-              dateValue
-            }
-            onChangeText={
-              updateDate
-            }
-            keyboardType="number-pad"
-            maxLength={
-              10
-            }
-            onBlur={() =>
-              setActiveScheduleField(
-                null
-              )
-            }
-          />
-        ) : (
-          <TouchableOpacity
-            activeOpacity={
-              0.65
-            }
-            onPress={() => {
-              setIsEditingRepeat(
-                false
-              );
+  const renderScheduleLine = () => {
+    const dateContent =
+      activeScheduleField === 'date' ? (
+        <TextInput
+          ref={dateInputRef}
+          style={styles.inlineDateInput}
+          value={dateValue}
+          onChangeText={updateDate}
+          keyboardType="number-pad"
+          maxLength={10}
+          onBlur={() => setActiveScheduleField(null)}
+        />
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.65}
+          onPress={() => {
+            setIsEditingRepeat(false);
 
-              Keyboard.dismiss();
+            Keyboard.dismiss();
 
-              setActiveScheduleField(
-                'date'
-              );
-            }}
-          >
-            <Text
-              style={
-                styles.inlineDateText
-              }
-            >
-              {getDateDisplayLabel(
-                dateValue
-              )}
-            </Text>
-          </TouchableOpacity>
-        );
-
-      const timeContent =
-        activeScheduleField ===
-          'time' ? (
-          <View
-            style={
-              styles.inlineTimeEditor
-            }
-          >
-            <TextInput
-              ref={
-                startInputRef
-              }
-              style={
-                styles.inlineTimeInput
-              }
-              value={
-                startTime
-              }
-              onChangeText={
-                updateStartTime
-              }
-              keyboardType="number-pad"
-              maxLength={
-                5
-              }
-            />
-
-            <Text
-              style={
-                styles.inlineArrow
-              }
-            >
-              →
-            </Text>
-
-            <TextInput
-              style={
-                styles.inlineTimeInput
-              }
-              value={
-                endTime
-              }
-              onChangeText={
-                updateEndTime
-              }
-              keyboardType="number-pad"
-              maxLength={
-                5
-              }
-              onSubmitEditing={() =>
-                setActiveScheduleField(
-                  null
-                )
-              }
-            />
-          </View>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={
-              0.65
-            }
-            onPress={() => {
-              setIsEditingRepeat(
-                false
-              );
-
-              Keyboard.dismiss();
-
-              setActiveScheduleField(
-                'time'
-              );
-            }}
-          >
-            <Text
-              style={
-                styles.inlineTimeText
-              }
-            >
-              {startTime}
-              {'  →  '}
-              {endTime}
-            </Text>
-          </TouchableOpacity>
-        );
-
-      const durationContent =
-        activeScheduleField ===
-          'duration' ? (
-          <View
-            style={
-              styles.inlineDurationEditor
-            }
-          >
-            {DURATION_PRESETS.map(
-              (
-                preset
-              ) => {
-                const selected =
-                  duration ===
-                  preset &&
-                  customDuration ===
-                  '';
-
-                return (
-                  <TouchableOpacity
-                    key={
-                      preset
-                    }
-                    style={[
-                      styles.inlineDurationPreset,
-
-                      selected &&
-                      styles.inlineDurationPresetSelected,
-                    ]}
-                    activeOpacity={
-                      0.7
-                    }
-                    onPress={() =>
-                      handlePresetDuration(
-                        preset
-                      )
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.inlineDurationPresetText,
-
-                        selected &&
-                        styles.inlineDurationPresetTextSelected,
-                      ]}
-                    >
-                      {preset ===
-                        60
-                        ? '1 h'
-                        : `${preset} min`}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-            )}
-
-            <View
-              style={
-                styles.inlineCustomDuration
-              }
-            >
-              <TextInput
-                style={
-                  styles.inlineCustomDurationInput
-                }
-                value={
-                  customDuration
-                }
-                onChangeText={
-                  handleCustomDuration
-                }
-                keyboardType="number-pad"
-                maxLength={
-                  4
-                }
-                placeholder="45"
-                placeholderTextColor={
-                  colors.textFaint
-                }
-                onBlur={() => {
-                  setActiveScheduleField(
-                    null
-                  );
-
-                  Keyboard.dismiss();
-                }}
-                onSubmitEditing={() => {
-                  setActiveScheduleField(
-                    null
-                  );
-
-                  Keyboard.dismiss();
-                }}
-              />
-
-              <Text
-                style={
-                  styles.inlineCustomDurationUnit
-                }
-              >
-                min
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={
-              0.65
-            }
-            onPress={() => {
-              setIsEditingRepeat(
-                false
-              );
-
-              Keyboard.dismiss();
-
-              setActiveScheduleField(
-                'duration'
-              );
-            }}
-          >
-            <Text
-              style={
-                styles.inlineDurationText
-              }
-            >
-              {formatDuration(
-                duration
-              )}
-            </Text>
-          </TouchableOpacity>
-        );
-
-      if (
-        activeScheduleField ===
-        'duration'
-      ) {
-        return (
-          <View
-            style={
-              styles.scheduleBlock
-            }
-          >
-            <View
-              style={
-                styles.scheduleLine
-              }
-            >
-              {dateContent}
-
-              <Text
-                style={
-                  styles.scheduleDot
-                }
-              >
-                ·
-              </Text>
-
-              {timeContent}
-            </View>
-
-            {durationContent}
-          </View>
-        );
-      }
-
-      return (
-        <View
-          style={
-            styles.scheduleLine
-          }
+            setActiveScheduleField('date');
+          }}
         >
-          {dateContent}
-
-          <Text
-            style={
-              styles.scheduleDot
-            }
-          >
-            ·
+          <Text style={styles.inlineDateText}>
+            {getDateDisplayLabel(dateValue)}
           </Text>
+        </TouchableOpacity>
+      );
 
-          {timeContent}
+    const timeContent =
+      activeScheduleField === 'time' ? (
+        <View style={styles.inlineTimeEditor}>
+          <TextInput
+            ref={startInputRef}
+            style={styles.inlineTimeInput}
+            value={startTime}
+            onChangeText={updateStartTime}
+            keyboardType="number-pad"
+            maxLength={5}
+          />
 
-          <Text
-            style={
-              styles.scheduleDot
-            }
-          >
-            ·
+          <Text style={styles.inlineArrow}>→</Text>
+
+          <TextInput
+            style={styles.inlineTimeInput}
+            value={endTime}
+            onChangeText={updateEndTime}
+            keyboardType="number-pad"
+            maxLength={5}
+            onSubmitEditing={() => setActiveScheduleField(null)}
+          />
+        </View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.65}
+          onPress={() => {
+            setIsEditingRepeat(false);
+
+            Keyboard.dismiss();
+
+            setActiveScheduleField('time');
+          }}
+        >
+          <Text style={styles.inlineTimeText}>
+            {startTime}
+            {'  →  '}
+            {endTime}
           </Text>
+        </TouchableOpacity>
+      );
+
+    const durationContent =
+      activeScheduleField === 'duration' ? (
+        <View style={styles.inlineDurationEditor}>
+          {DURATION_PRESETS.map((preset) => {
+            const selected = duration === preset && customDuration === '';
+
+            return (
+              <TouchableOpacity
+                key={preset}
+                style={[
+                  styles.inlineDurationPreset,
+
+                  selected && styles.inlineDurationPresetSelected,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handlePresetDuration(preset)}
+              >
+                <Text
+                  style={[
+                    styles.inlineDurationPresetText,
+
+                    selected && styles.inlineDurationPresetTextSelected,
+                  ]}
+                >
+                  {preset === 60 ? '1 h' : `${preset} min`}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          <View style={styles.inlineCustomDuration}>
+            <TextInput
+              style={styles.inlineCustomDurationInput}
+              value={customDuration}
+              onChangeText={handleCustomDuration}
+              keyboardType="number-pad"
+              maxLength={4}
+              placeholder="45"
+              placeholderTextColor={colors.textFaint}
+              onBlur={() => {
+                setActiveScheduleField(null);
+
+                Keyboard.dismiss();
+              }}
+              onSubmitEditing={() => {
+                setActiveScheduleField(null);
+
+                Keyboard.dismiss();
+              }}
+            />
+
+            <Text style={styles.inlineCustomDurationUnit}>min</Text>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.65}
+          onPress={() => {
+            setIsEditingRepeat(false);
+
+            Keyboard.dismiss();
+
+            setActiveScheduleField('duration');
+          }}
+        >
+          <Text style={styles.inlineDurationText}>
+            {formatDuration(duration)}
+          </Text>
+        </TouchableOpacity>
+      );
+
+    if (activeScheduleField === 'duration') {
+      return (
+        <View style={styles.scheduleBlock}>
+          <View style={styles.scheduleLine}>
+            {dateContent}
+
+            <Text style={styles.scheduleDot}>·</Text>
+
+            {timeContent}
+          </View>
 
           {durationContent}
         </View>
       );
-    };
+    }
+
+    return (
+      <View style={styles.scheduleLine}>
+        {dateContent}
+
+        <Text style={styles.scheduleDot}>·</Text>
+
+        {timeContent}
+
+        <Text style={styles.scheduleDot}>·</Text>
+
+        {durationContent}
+      </View>
+    );
+  };
 
   return (
     <Modal
-      visible={
-        visible
-      }
+      visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={
-        onClose
-      }
+      onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View
-        style={
-          styles.overlay
-        }
-      >
-        <Pressable
-          style={
-            styles.backdrop
-          }
-          onPress={
-            onClose
-          }
-        />
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
 
         <Animated.View
           style={[
             styles.sheet,
 
             {
-              height:
-                sheetHeight,
+              height: sheetHeight,
 
-              bottom:
-                sheetBottom,
+              bottom: sheetBottom,
             },
           ]}
         >
           {/* TOP */}
 
-          <View
-            style={
-              styles.topBar
-            }
-          >
-            <View
-              {...sheetPanResponder.panHandlers}
-              style={
-                styles.dragZone
-              }
-            >
-              <View
-                style={
-                  styles.handle
-                }
-              />
+          <View style={styles.topBar}>
+            <View {...sheetPanResponder.panHandlers} style={styles.dragZone}>
+              <View style={styles.handle} />
             </View>
 
             <TouchableOpacity
               style={[
                 styles.saveIconButton,
 
-                !canSave &&
-                styles.saveIconButtonDisabled,
+                (!canSave || isSaving) && styles.saveIconButtonDisabled,
               ]}
-              disabled={
-                !canSave
-              }
-              activeOpacity={
-                0.65
-              }
-              onPress={
-                handleSave
-              }
+              disabled={!canSave || isSaving}
+              activeOpacity={0.65}
+              onPress={handleSave}
             >
               <Ionicons
-                name="save-outline"
+                name={isSaving ? 'hourglass-outline' : 'save-outline'}
                 size={22}
-                color={
-                  saveIconColor
-                }
+                color={isSaving ? colors.textFaint : saveIconColor}
               />
             </TouchableOpacity>
           </View>
 
           <ScrollView
-            ref={
-              scrollRef
-            }
-            style={
-              styles.scroll
-            }
-            contentContainerStyle={
-              styles.scrollContent
-            }
-            showsVerticalScrollIndicator={
-              false
-            }
+            ref={scrollRef}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            onScrollBeginDrag={
-              closeInlineEditor
-            }
+            onScrollBeginDrag={closeInlineEditor}
           >
             {/* TITLE */}
 
             {isEdit ? (
-              <View
-                style={
-                  styles.titleRow
-                }
-              >
+              <View style={styles.titleRow}>
                 <Ionicons
-                  name={
-                    selectedCategory.icon
-                  }
+                  name={selectedCategory.icon}
                   size={24}
-                  color={
-                    selectedCategory.color
-                  }
-                  style={
-                    styles.titleCategoryIcon
-                  }
+                  color={selectedCategory.color}
+                  style={styles.titleCategoryIcon}
                 />
 
                 {isEditingTitle ? (
                   <TextInput
-                    ref={
-                      titleInputRef
-                    }
-                    style={[
-                      styles.titleInput,
-                      styles.editTitleInput,
-                    ]}
-                    value={
-                      title
-                    }
-                    onChangeText={
-                      setTitle
-                    }
+                    ref={titleInputRef}
+                    style={[styles.titleInput, styles.editTitleInput]}
+                    value={title}
+                    onChangeText={setTitle}
                     returnKeyType="done"
-                    onBlur={() =>
-                      setIsEditingTitle(
-                        false
-                      )
-                    }
-                    onSubmitEditing={() =>
-                      setIsEditingTitle(
-                        false
-                      )
-                    }
+                    onBlur={() => setIsEditingTitle(false)}
+                    onSubmitEditing={() => setIsEditingTitle(false)}
                     placeholder="O que vais fazer?"
-                    placeholderTextColor={
-                      colors.textFaint
-                    }
+                    placeholderTextColor={colors.textFaint}
                   />
                 ) : (
                   <TouchableOpacity
-                    style={
-                      styles.editTitleTouch
-                    }
-                    activeOpacity={
-                      0.7
-                    }
+                    style={styles.editTitleTouch}
+                    activeOpacity={0.7}
                     onPress={() => {
                       closeInlineEditor();
 
                       scrollRef.current?.scrollTo({
-                        y:
-                          0,
+                        y: 0,
 
-                        animated:
-                          false,
+                        animated: false,
                       });
 
-                      setIsEditingTitle(
-                        true
-                      );
+                      setIsEditingTitle(true);
                     }}
                   >
-                    <Text
-                      style={
-                        styles.editTitle
-                      }
-                      numberOfLines={
-                        3
-                      }
-                    >
-                      {title ||
-                        'O que vais fazer?'}
+                    <Text style={styles.editTitle} numberOfLines={3}>
+                      {title || 'O que vais fazer?'}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
               <TextInput
-                style={
-                  styles.titleInput
-                }
-                value={
-                  title
-                }
-                onChangeText={
-                  setTitle
-                }
+                style={styles.titleInput}
+                value={title}
+                onChangeText={setTitle}
                 placeholder="O que vais fazer?"
-                placeholderTextColor={
-                  colors.textFaint
-                }
+                placeholderTextColor={colors.textFaint}
                 autoFocus
               />
             )}
 
             {/* SCHEDULE */}
 
-            <View
-              style={
-                styles.scheduleArea
-              }
-            >
-              {renderScheduleLine()}
-            </View>
+            <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
 
             {/* POSTPONE */}
 
             {isEdit && (
-              <View
-                style={
-                  styles.postponeRow
-                }
-              >
-                {POSTPONE_OPTIONS.map(
-                  (
-                    option
-                  ) => {
-                    const selected =
-                      postponeSelection ===
-                      option.id;
+              <View style={styles.postponeRow}>
+                {POSTPONE_OPTIONS.map((option) => {
+                  const selected = postponeSelection === option.id;
 
-                    return (
-                      <TouchableOpacity
-                        key={
-                          option.id
-                        }
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.postponeButton,
+
+                        selected && styles.postponeButtonSelected,
+                      ]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        closeInlineEditor();
+
+                        selectPostponeMinutes(option);
+                      }}
+                    >
+                      <Text
                         style={[
-                          styles.postponeButton,
+                          styles.postponeButtonText,
 
-                          selected &&
-                          styles.postponeButtonSelected,
+                          selected && styles.postponeButtonTextSelected,
                         ]}
-                        activeOpacity={
-                          0.7
-                        }
-                        onPress={() => {
-                          closeInlineEditor();
-
-                          selectPostponeMinutes(
-                            option
-                          );
-                        }}
                       >
-                        <Text
-                          style={[
-                            styles.postponeButtonText,
-
-                            selected &&
-                            styles.postponeButtonTextSelected,
-                          ]}
-                        >
-                          {
-                            option.label
-                          }
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }
-                )}
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
 
                 <TouchableOpacity
                   style={[
                     styles.postponeButton,
 
-                    postponeSelection ===
-                    'tomorrow' &&
-                    styles.postponeButtonSelected,
+                    postponeSelection === 'tomorrow' &&
+                      styles.postponeButtonSelected,
                   ]}
-                  activeOpacity={
-                    0.7
-                  }
+                  activeOpacity={0.7}
                   onPress={() => {
                     closeInlineEditor();
 
@@ -2599,8 +1377,7 @@ export default function TaskDetailsModal({
                     name="sunny-outline"
                     size={14}
                     color={
-                      postponeSelection ===
-                        'tomorrow'
+                      postponeSelection === 'tomorrow'
                         ? colors.selection
                         : colors.text
                     }
@@ -2610,9 +1387,8 @@ export default function TaskDetailsModal({
                     style={[
                       styles.postponeButtonText,
 
-                      postponeSelection ===
-                      'tomorrow' &&
-                      styles.postponeButtonTextSelected,
+                      postponeSelection === 'tomorrow' &&
+                        styles.postponeButtonTextSelected,
                     ]}
                   >
                     Amanhã
@@ -2623,350 +1399,196 @@ export default function TaskDetailsModal({
 
             {/* CATEGORY */}
 
-            <Text
-              style={
-                styles.sectionLabel
-              }
-            >
-              Categoria
-            </Text>
+            <Text style={styles.sectionLabel}>Categoria</Text>
 
-            <View
-              style={
-                styles.selectorRow
-              }
-            >
-              {CATEGORY_OPTIONS.map(
-                (
-                  item
-                ) => {
-                  const selected =
-                    item.id ===
-                    categoryId;
+            <View style={styles.selectorRow}>
+              {CATEGORY_OPTIONS.map((item) => {
+                const selected = item.id === categoryId;
 
-                  return (
-                    <TouchableOpacity
-                      key={
-                        item.id
-                      }
-                      activeOpacity={
-                        0.7
-                      }
-                      style={[
-                        styles.selectorItem,
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.selectorItem,
 
-                        selected &&
-                        styles.selectorItemSelected,
-                      ]}
-                      onPress={() => {
-                        closeInlineEditor();
+                      selected && styles.selectorItemSelected,
+                    ]}
+                    onPress={() => {
+                      closeInlineEditor();
 
-                        setCategoryId(
-                          item.id
-                        );
-                      }}
-                    >
-                      <Ionicons
-                        name={
-                          item.icon
-                        }
-                        size={
-                          selected
-                            ? 24
-                            : 21
-                        }
-                        color={
-                          selected
-                            ? item.color
-                            : colors.textMuted
-                        }
-                      />
+                      setCategoryId(item.id);
+                    }}
+                  >
+                    <Ionicons
+                      name={item.icon}
+                      size={selected ? 24 : 21}
+                      color={selected ? item.color : colors.textMuted}
+                    />
 
-                      {selected && (
-                        <Text
-                          style={[
-                            styles.selectorLabel,
+                    {selected && (
+                      <Text
+                        style={[
+                          styles.selectorLabel,
 
-                            {
-                              color:
-                                item.color,
-                            },
-                          ]}
-                          numberOfLines={
-                            1
-                          }
-                        >
                           {
-                            item.label
-                          }
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                }
-              )}
+                            color: item.color,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* STATUS */}
 
-            <Text
-              style={
-                styles.sectionLabel
-              }
-            >
-              Estado
-            </Text>
+            <Text style={styles.sectionLabel}>Estado</Text>
 
-            <View
-              style={[
-                styles.selectorRow,
-                styles.statusSelectorRow,
-              ]}
-            >
-              {STATUS_OPTIONS.map(
-                (
-                  item
-                ) => {
-                  const selected =
-                    item.id ===
-                    status;
+            <View style={[styles.selectorRow, styles.statusSelectorRow]}>
+              {STATUS_OPTIONS.map((item) => {
+                const selected = item.id === status;
 
-                  return (
-                    <TouchableOpacity
-                      key={
-                        item.id
-                      }
-                      activeOpacity={
-                        0.7
-                      }
-                      style={[
-                        styles.selectorItem,
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.selectorItem,
 
-                        selected &&
-                        styles.selectorItemSelected,
-                      ]}
-                      onPress={() => {
-                        closeInlineEditor();
+                      selected && styles.selectorItemSelected,
+                    ]}
+                    onPress={() => {
+                      closeInlineEditor();
 
-                        setStatus(
-                          item.id
-                        );
-                      }}
-                    >
-                      <StatusIcon
-                        type={
-                          item.id
-                        }
-                        selected={
-                          selected
-                        }
-                      />
+                      setStatus(item.id);
+                    }}
+                  >
+                    <StatusIcon type={item.id} selected={selected} />
 
-                      {selected && (
-                        <Text
-                          style={[
-                            styles.selectorLabel,
-                            styles.statusSelectorLabel,
-                          ]}
-                          numberOfLines={
-                            1
-                          }
-                        >
-                          {
-                            item.label
-                          }
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                }
-              )}
+                    {selected && (
+                      <Text
+                        style={[
+                          styles.selectorLabel,
+                          styles.statusSelectorLabel,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* REPEAT */}
 
-            <Text
-              style={
-                styles.sectionLabel
-              }
-            >
-              Repetir
-            </Text>
+            <Text style={styles.sectionLabel}>Repetir</Text>
 
             {!isEditingRepeat ? (
               <TouchableOpacity
-                style={
-                  styles.repeatRestRow
-                }
-                activeOpacity={
-                  0.65
-                }
+                style={styles.repeatRestRow}
+                activeOpacity={0.65}
                 onPress={() => {
-                  setActiveScheduleField(
-                    null
-                  );
+                  setActiveScheduleField(null);
 
                   Keyboard.dismiss();
 
-                  setIsEditingRepeat(
-                    true
-                  );
+                  setIsEditingRepeat(true);
                 }}
               >
                 <Ionicons
                   name="repeat-outline"
                   size={20}
-                  color={
-                    colors.textMuted
-                  }
+                  color={colors.textMuted}
                 />
 
-                <Text
-                  style={
-                    styles.repeatRestText
-                  }
-                >
-{REPEAT_LABELS[repeat]} 
-               </Text>
+                <Text style={styles.repeatRestText}>
+                  {REPEAT_LABELS[repeat]}
+                </Text>
               </TouchableOpacity>
             ) : (
-              <View
-                style={
-                  styles.repeatEditor
-                }
-              >
-                <View
-                  style={
-                    styles.repeatEditorHeader
-                  }
-                >
+              <View style={styles.repeatEditor}>
+                <View style={styles.repeatEditorHeader}>
                   <Ionicons
                     name="repeat-outline"
                     size={20}
-                    color={
-                      colors.textMuted
-                    }
+                    color={colors.textMuted}
                   />
                 </View>
 
-                <View
-                  style={
-                    styles.repeatOptionsRow
-                  }
-                >
-                  {REPEAT_OPTIONS.map(
-                    (
-                      item
-                    ) => {
-                      const selected =
-                        item ===
-                        repeat;
+                <View style={styles.repeatOptionsRow}>
+                  {REPEAT_OPTIONS.map((item) => {
+                    const selected = item === repeat;
 
-                      return (
-                        <TouchableOpacity
-                          key={
-                            item
-                          }
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.repeatOption,
+
+                          selected && styles.repeatOptionSelected,
+                        ]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setRepeat(item);
+
+                          setIsEditingRepeat(false);
+                        }}
+                      >
+                        <Text
                           style={[
-                            styles.repeatOption,
+                            styles.repeatOptionText,
 
-                            selected &&
-                            styles.repeatOptionSelected,
+                            selected && styles.repeatOptionTextSelected,
                           ]}
-                          activeOpacity={
-                            0.7
-                          }
-                          onPress={() => {
-                            setRepeat(
-                              item
-                            );
-
-                            setIsEditingRepeat(
-                              false
-                            );
-                          }}
                         >
-                          <Text
-                            style={[
-                              styles.repeatOptionText,
-
-                              selected &&
-                              styles.repeatOptionTextSelected,
-                            ]}
-                          >
-                         {REPEAT_LABELS[item]}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }
-                  )}
+                          {REPEAT_LABELS[item]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
 
             {/* NOTES */}
 
-            <Text
-              style={
-                styles.notesLabel
-              }
-            >
-              Notas
-            </Text>
+            <Text style={styles.notesLabel}>Notas</Text>
 
             <TextInput
-              style={
-                styles.notesInput
-              }
-              value={
-                notes
-              }
-              onChangeText={
-                setNotes
-              }
+              style={styles.notesInput}
+              value={notes}
+              onChangeText={setNotes}
               multiline
               placeholder="Adicionar notas..."
-              placeholderTextColor={
-                colors.textFaint
-              }
+              placeholderTextColor={colors.textFaint}
               textAlignVertical="top"
-              onFocus={
-                closeInlineEditor
-              }
+              onFocus={closeInlineEditor}
             />
 
             {/* DELETE */}
 
-            {isEdit &&
-              onDelete && (
-                <TouchableOpacity
-                  style={
-                    styles.deleteTaskButton
-                  }
-                  activeOpacity={
-                    0.7
-                  }
-                  onPress={
-                    onDelete
-                  }
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={18}
-                    color={
-                      colors.danger
-                    }
-                  />
+            {isEdit && onDelete && (
+              <TouchableOpacity
+                style={styles.deleteTaskButton}
+                activeOpacity={0.7}
+                onPress={onDelete}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color={colors.danger}
+                />
 
-                  <Text
-                    style={
-                      styles.deleteTaskText
-                    }
-                  >
-                    Apagar tarefa
-                  </Text>
-                </TouchableOpacity>
-              )}
+                <Text style={styles.deleteTaskText}>Apagar tarefa</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </Animated.View>
       </View>
@@ -2978,806 +1600,631 @@ export default function TaskDetailsModal({
    STYLES
 ------------------------------------------------------- */
 
-const styles =
-  StyleSheet.create({
-    overlay: {
-      flex: 1,
-    },
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+  },
 
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
 
-      backgroundColor:
-        'rgba(32, 28, 25, 0.30)',
-    },
+    backgroundColor: 'rgba(32, 28, 25, 0.30)',
+  },
 
-    sheet: {
-      position:
-        'absolute',
+  sheet: {
+    position: 'absolute',
 
-      left: 0,
-      right: 0,
+    left: 0,
+    right: 0,
 
-      backgroundColor:
-        colors.surface,
+    backgroundColor: colors.surface,
 
-      borderTopLeftRadius:
-        22,
+    borderTopLeftRadius: 22,
 
-      borderTopRightRadius:
-        22,
+    borderTopRightRadius: 22,
 
-      overflow:
-        'hidden',
-    },
+    overflow: 'hidden',
+  },
 
-    topBar: {
-      height: 38,
+  topBar: {
+    height: 38,
 
-      position:
-        'relative',
+    position: 'relative',
 
-      justifyContent:
-        'center',
-    },
+    justifyContent: 'center',
+  },
 
-    dragZone: {
-      height: 38,
+  dragZone: {
+    height: 38,
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'center',
-    },
+    justifyContent: 'center',
+  },
 
-    handle: {
-      width: 42,
+  handle: {
+    width: 42,
 
-      height: 4,
+    height: 4,
 
-      borderRadius: 2,
+    borderRadius: 2,
 
-      backgroundColor:
-        '#C8C2BE',
-    },
+    backgroundColor: '#C8C2BE',
+  },
 
-    saveIconButton: {
-      position:
-        'absolute',
+  saveIconButton: {
+    position: 'absolute',
 
-      right: 14,
+    right: 14,
 
-      top: 3,
+    top: 3,
 
-      width: 34,
+    width: 34,
 
-      height: 34,
+    height: 34,
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'center',
+    justifyContent: 'center',
 
-      borderRadius:
-        17,
-    },
+    borderRadius: 17,
+  },
 
-    saveIconButtonDisabled: {
-      opacity: 0.35,
-    },
+  saveIconButtonDisabled: {
+    opacity: 0.35,
+  },
 
-    scroll: {
-      flex: 1,
-    },
+  scroll: {
+    flex: 1,
+  },
 
-    scrollContent: {
-      paddingHorizontal:
-        18,
+  scrollContent: {
+    paddingHorizontal: 18,
 
-      paddingTop:
-        2,
+    paddingTop: 2,
 
-      paddingBottom:
-        Platform.OS ===
-          'ios'
-          ? 40
-          : 56,
-    },
+    paddingBottom: Platform.OS === 'ios' ? 40 : 56,
+  },
 
-    /* TITLE */
+  /* TITLE */
 
-    titleRow: {
-      flexDirection:
-        'row',
+  titleRow: {
+    flexDirection: 'row',
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      gap: 10,
-    },
+    gap: 10,
+  },
 
-    titleCategoryIcon: {
-      flexShrink: 0,
-    },
+  titleCategoryIcon: {
+    flexShrink: 0,
+  },
 
-    titleInput: {
-      height: 42,
+  titleInput: {
+    height: 42,
 
-      borderRadius: 8,
+    borderRadius: 8,
 
-      backgroundColor:
-        colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
 
-      paddingHorizontal:
-        11,
+    paddingHorizontal: 11,
 
-      fontSize: 15,
+    fontSize: 15,
 
-      fontWeight:
-        '500',
+    fontWeight: '500',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    editTitleTouch: {
-      flex: 1,
+  editTitleTouch: {
+    flex: 1,
 
-      minHeight: 48,
+    minHeight: 48,
 
-      justifyContent:
-        'center',
+    justifyContent: 'center',
 
-      paddingVertical:
-        3,
-    },
+    paddingVertical: 3,
+  },
 
-    editTitle: {
-      fontSize: 24,
+  editTitle: {
+    fontSize: 24,
 
-      lineHeight: 30,
+    lineHeight: 30,
 
-      fontWeight:
-        '700',
+    fontWeight: '700',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    editTitleInput: {
-      flex: 1,
+  editTitleInput: {
+    flex: 1,
 
-      minWidth: 0,
+    minWidth: 0,
 
-      fontSize: 20,
+    fontSize: 20,
 
-      fontWeight:
-        '700',
+    fontWeight: '700',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    /* SCHEDULE */
+  /* SCHEDULE */
 
-    scheduleArea: {
-      marginTop: 11,
+  scheduleArea: {
+    marginTop: 11,
 
-      minHeight: 36,
+    minHeight: 36,
 
-      justifyContent:
-        'center',
-    },
+    justifyContent: 'center',
+  },
 
-    scheduleBlock: {
-      gap: 9,
-    },
+  scheduleBlock: {
+    gap: 9,
+  },
 
-    scheduleLine: {
-      minHeight: 34,
+  scheduleLine: {
+    minHeight: 34,
 
-      flexDirection:
-        'row',
+    flexDirection: 'row',
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      flexWrap:
-        'wrap',
+    flexWrap: 'wrap',
 
-      gap: 7,
-    },
+    gap: 7,
+  },
 
-    scheduleDot: {
-      fontSize: 14,
+  scheduleDot: {
+    fontSize: 14,
 
-      color:
-        colors.textFaint,
-    },
+    color: colors.textFaint,
+  },
 
-    inlineDateText: {
-      fontSize: 14,
+  inlineDateText: {
+    fontSize: 14,
 
-      lineHeight: 20,
+    lineHeight: 20,
 
-      fontWeight:
-        '700',
+    fontWeight: '700',
 
-      color:
-        colors.selection,
-    },
+    color: colors.selection,
+  },
 
-    inlineTimeText: {
-      fontSize: 14,
+  inlineTimeText: {
+    fontSize: 14,
 
-      lineHeight: 20,
+    lineHeight: 20,
 
-      fontWeight:
-        '600',
+    fontWeight: '600',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    inlineDurationText: {
-      fontSize: 13,
+  inlineDurationText: {
+    fontSize: 13,
 
-      lineHeight: 20,
+    lineHeight: 20,
 
-      fontWeight:
-        '700',
+    fontWeight: '700',
 
-      color:
-        colors.selectionText,
-    },
+    color: colors.selectionText,
+  },
 
-    inlineDateInput: {
-      width: 104,
+  inlineDateInput: {
+    width: 104,
 
-      minHeight: 34,
+    minHeight: 34,
 
-      paddingHorizontal:
-        7,
+    paddingHorizontal: 7,
 
-      paddingVertical:
-        4,
+    paddingVertical: 4,
 
-      borderBottomWidth:
-        1,
+    borderBottomWidth: 1,
 
-      borderBottomColor:
-        colors.selection,
+    borderBottomColor: colors.selection,
 
-      fontSize: 14,
+    fontSize: 14,
 
-      fontWeight:
-        '600',
+    fontWeight: '600',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    inlineTimeEditor: {
-      flexDirection:
-        'row',
+  inlineTimeEditor: {
+    flexDirection: 'row',
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      gap: 5,
-    },
+    gap: 5,
+  },
 
-    inlineTimeInput: {
-      width: 54,
+  inlineTimeInput: {
+    width: 54,
 
-      minHeight: 34,
+    minHeight: 34,
 
-      paddingHorizontal:
-        4,
+    paddingHorizontal: 4,
 
-      paddingVertical:
-        4,
+    paddingVertical: 4,
 
-      borderBottomWidth:
-        1,
+    borderBottomWidth: 1,
 
-      borderBottomColor:
-        colors.selection,
+    borderBottomColor: colors.selection,
 
-      textAlign:
-        'center',
+    textAlign: 'center',
 
-      fontSize: 14,
+    fontSize: 14,
 
-      fontWeight:
-        '600',
+    fontWeight: '600',
 
-      color:
-        colors.text,
-    },
+    color: colors.text,
+  },
 
-    inlineArrow: {
-      fontSize: 14,
+  inlineArrow: {
+    fontSize: 14,
 
-      color:
-        colors.textMuted,
-    },
+    color: colors.textMuted,
+  },
 
-    inlineDurationEditor: {
-      flexDirection:
-        'row',
+  inlineDurationEditor: {
+    flexDirection: 'row',
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      flexWrap:
-        'wrap',
+    flexWrap: 'wrap',
 
-      gap: 6,
-    },
+    gap: 6,
+  },
 
-    inlineDurationPreset: {
-      minHeight: 34,
+  inlineDurationPreset: {
+    minHeight: 34,
 
-      paddingHorizontal:
-        9,
+    paddingHorizontal: 9,
 
-      borderRadius: 8,
+    borderRadius: 8,
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'center',
+    justifyContent: 'center',
 
-      backgroundColor:
-        colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    borderWidth: StyleSheet.hairlineWidth,
 
-      borderColor:
-        colors.border,
-    },
+    borderColor: colors.border,
+  },
 
-    inlineDurationPresetSelected: {
-      backgroundColor:
-        colors.selectionSoft,
+  inlineDurationPresetSelected: {
+    backgroundColor: colors.selectionSoft,
+    borderColor: colors.selection,
+  },
 
-      borderColor:
-        colors.selection,
-    },
+  inlineDurationPresetText: {
+    fontSize: 11,
 
-    inlineDurationPresetText: {
-      fontSize: 11,
+    fontWeight: '500',
 
-      fontWeight:
-        '500',
+    color: colors.textMuted,
+  },
 
-      color:
-        colors.textMuted,
-    },
+  inlineDurationPresetTextSelected: {
+    fontWeight: '700',
 
-    inlineDurationPresetTextSelected: {
-      fontWeight:
-        '700',
+    color: colors.selectionText,
+  },
 
-      color:
-        colors.selectionText,
-    },
+  inlineCustomDuration: {
+    width: 70,
 
-    inlineCustomDuration: {
-      width: 70,
+    minHeight: 34,
 
-      minHeight: 34,
+    flexDirection: 'row',
 
-      flexDirection:
-        'row',
+    alignItems: 'center',
 
-      alignItems:
-        'center',
+    paddingHorizontal: 7,
 
-      paddingHorizontal:
-        7,
+    borderRadius: 8,
 
-      borderRadius: 8,
+    backgroundColor: colors.surfaceSoft,
 
-      backgroundColor:
-        colors.surfaceSoft,
+    borderWidth: StyleSheet.hairlineWidth,
 
-      borderWidth:
-        StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
 
-      borderColor:
-        colors.border,
-    },
+  inlineCustomDurationInput: {
+    width: 36,
+    padding: 0,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
 
-    inlineCustomDurationInput: {
-      width: 36,
+  inlineCustomDurationUnit: {
+    marginLeft: 2,
+    fontSize: 9,
+    color: colors.textMuted,
+  },
 
-      padding: 0,
+  /* POSTPONE */
 
-      textAlign:
-        'center',
+  postponeRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
 
-      fontSize: 13,
+  postponeButton: {
+    minHeight: 38,
+    paddingHorizontal: 13,
+    borderRadius: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#EAE6E2',
+    borderWidth: 1,
+    borderColor: '#D8D1CC',
+  },
 
-      fontWeight:
-        '600',
+  postponeButtonSelected: {
+    backgroundColor: colors.selectionSoft,
 
-      color:
-        colors.text,
-    },
+    borderColor: colors.selection,
+  },
 
-    inlineCustomDurationUnit: {
-      marginLeft: 2,
+  postponeButtonText: {
+    fontSize: 12,
 
-      fontSize: 9,
+    fontWeight: '700',
 
-      color:
-        colors.textMuted,
-    },
+    color: colors.text,
+  },
 
-    /* POSTPONE */
+  postponeButtonTextSelected: {
+    fontWeight: '700',
 
-    postponeRow: {
-      marginTop: 14,
+    color: colors.selectionText,
+  },
 
-      flexDirection:
-        'row',
+  /* SECTIONS */
 
-      alignItems:
-        'center',
+  sectionLabel: {
+    marginTop: 17,
 
-      justifyContent:
-        'center',
+    marginBottom: 8,
 
-      flexWrap:
-        'wrap',
+    fontSize: 12,
 
-      gap: 8,
-    },
+    fontWeight: '600',
 
-    postponeButton: {
-      minHeight: 38,
+    color: colors.textMuted,
+  },
 
-      paddingHorizontal:
-        13,
+  /* CATEGORY + STATUS */
 
-      borderRadius: 9,
+  selectorRow: {
+    minHeight: 52,
 
-      flexDirection:
-        'row',
+    flexDirection: 'row',
 
-      alignItems:
-        'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'center',
+    gap: 18,
+  },
 
-      gap: 5,
+  selectorItem: {
+    minWidth: 32,
 
-      backgroundColor:
-        '#EAE6E2',
+    height: 42,
 
-      borderWidth: 1,
+    flexDirection: 'row',
 
-      borderColor:
-        '#D8D1CC',
-    },
+    alignItems: 'center',
 
-    postponeButtonSelected: {
-      backgroundColor:
-        colors.selectionSoft,
+    justifyContent: 'center',
 
-      borderColor:
-        colors.selection,
-    },
+    gap: 8,
 
-    postponeButtonText: {
-      fontSize: 12,
+    paddingHorizontal: 4,
 
-      fontWeight:
-        '700',
+    borderRadius: 14,
+  },
 
-      color:
-        colors.text,
-    },
+  selectorItemSelected: {
+    height: 46,
 
-    postponeButtonTextSelected: {
-      fontWeight:
-        '700',
+    paddingHorizontal: 16,
 
-      color:
-        colors.selectionText,
-    },
+    backgroundColor: colors.surfaceSoft,
 
-    /* SECTIONS */
+    borderRadius: 15,
+  },
 
-    sectionLabel: {
-      marginTop: 17,
+  selectorLabel: {
+    maxWidth: 92,
 
-      marginBottom: 8,
+    fontSize: 13,
 
-      fontSize: 12,
+    fontWeight: '700',
+  },
 
-      fontWeight:
-        '600',
+  statusSelectorRow: {
+    gap: 22,
+  },
 
-      color:
-        colors.textMuted,
-    },
+  statusSelectorLabel: {
+    color: colors.selectionText,
+  },
 
-    /* CATEGORY + STATUS */
+  /* STATUS ICONS */
 
-    selectorRow: {
-      minHeight: 52,
+  statusIconSquare: {
+    width: 21,
 
-      flexDirection:
-        'row',
+    height: 21,
 
-      alignItems:
-        'center',
+    borderRadius: 4,
 
-      gap: 18,
-    },
+    borderWidth: 1.5,
 
-    selectorItem: {
-      minWidth: 32,
+    borderColor: colors.textMuted,
 
-      height: 42,
+    alignItems: 'center',
 
-      flexDirection:
-        'row',
+    justifyContent: 'center',
 
-      alignItems:
-        'center',
+    backgroundColor: 'transparent',
+  },
 
-      justifyContent:
-        'center',
+  statusIconSquareSelected: {
+    width: 23,
 
-      gap: 8,
+    height: 23,
 
-      paddingHorizontal:
-        4,
+    borderColor: colors.selectionText,
+  },
 
-      borderRadius:
-        14,
-    },
+  /* REPEAT */
 
-    selectorItemSelected: {
-      height: 46,
+  repeatRestRow: {
+    minHeight: 42,
 
-      paddingHorizontal:
-        16,
+    alignSelf: 'flex-start',
 
-      backgroundColor:
-        colors.surfaceSoft,
+    flexDirection: 'row',
 
-      borderRadius:
-        15,
-    },
+    alignItems: 'center',
 
-    selectorLabel: {
-      maxWidth: 92,
+    gap: 9,
 
-      fontSize: 13,
+    paddingRight: 10,
+  },
 
-      fontWeight:
-        '700',
-    },
+  repeatRestText: {
+    fontSize: 14,
 
-    statusSelectorRow: {
-      gap: 22,
-    },
+    fontWeight: '600',
 
-    statusSelectorLabel: {
-      color:
-        colors.selectionText,
-    },
+    color: colors.text,
+  },
 
-    /* STATUS ICONS */
+  repeatEditor: {
+    gap: 8,
+  },
 
-    statusIconSquare: {
-      width: 21,
+  repeatEditorHeader: {
+    minHeight: 24,
 
-      height: 21,
+    flexDirection: 'row',
 
-      borderRadius: 4,
+    alignItems: 'center',
+  },
 
-      borderWidth: 1.5,
+  repeatOptionsRow: {
+    flexDirection: 'row',
 
-      borderColor:
-        colors.textMuted,
+    alignItems: 'center',
 
-      alignItems:
-        'center',
+    flexWrap: 'wrap',
 
-      justifyContent:
-        'center',
+    gap: 7,
+  },
 
-      backgroundColor:
-        'transparent',
-    },
+  repeatOption: {
+    minHeight: 36,
 
-    statusIconSquareSelected: {
-      width: 23,
+    paddingHorizontal: 11,
 
-      height: 23,
+    borderRadius: 10,
 
-      borderColor:
-        colors.selectionText,
-    },
+    alignItems: 'center',
 
-    /* REPEAT */
+    justifyContent: 'center',
 
-    repeatRestRow: {
-      minHeight: 42,
+    backgroundColor: colors.surfaceSoft,
+  },
 
-      alignSelf:
-        'flex-start',
+  repeatOptionSelected: {
+    backgroundColor: colors.selectionSoft,
+  },
 
-      flexDirection:
-        'row',
+  repeatOptionText: {
+    fontSize: 12,
 
-      alignItems:
-        'center',
+    fontWeight: '600',
 
-      gap: 9,
+    color: colors.textSecondary,
+  },
 
-      paddingRight:
-        10,
-    },
+  repeatOptionTextSelected: {
+    color: colors.selectionText,
 
-    repeatRestText: {
-      fontSize: 14,
+    fontWeight: '700',
+  },
 
-      fontWeight:
-        '600',
+  /* NOTES */
 
-      color:
-        colors.text,
-    },
+  notesLabel: {
+    marginTop: 17,
 
-    repeatEditor: {
-      gap: 8,
-    },
+    marginBottom: 7,
 
-    repeatEditorHeader: {
-      minHeight: 24,
+    fontSize: 12,
 
-      flexDirection:
-        'row',
+    fontWeight: '600',
 
-      alignItems:
-        'center',
-    },
+    color: colors.textMuted,
+  },
 
-    repeatOptionsRow: {
-      flexDirection:
-        'row',
+  notesInput: {
+    minHeight: 68,
 
-      alignItems:
-        'center',
+    maxHeight: 120,
 
-      flexWrap:
-        'wrap',
+    borderRadius: 10,
 
-      gap: 7,
-    },
+    backgroundColor: colors.surfaceSoft,
 
-    repeatOption: {
-      minHeight: 36,
+    paddingHorizontal: 11,
 
-      paddingHorizontal:
-        11,
+    paddingVertical: 9,
 
-      borderRadius: 10,
+    fontSize: 14,
 
-      alignItems:
-        'center',
+    color: colors.text,
+  },
 
-      justifyContent:
-        'center',
+  /* DELETE */
 
-      backgroundColor:
-        colors.surfaceSoft,
-    },
+  deleteTaskButton: {
+    alignSelf: 'flex-start',
 
-    repeatOptionSelected: {
-      backgroundColor:
-        colors.selectionSoft,
-    },
+    marginTop: 20,
 
-    repeatOptionText: {
-      fontSize: 12,
+    minHeight: 40,
 
-      fontWeight:
-        '600',
+    paddingHorizontal: 10,
 
-      color:
-        colors.textSecondary,
-    },
+    flexDirection: 'row',
 
-    repeatOptionTextSelected: {
-      color:
-        colors.selectionText,
+    alignItems: 'center',
 
-      fontWeight:
-        '700',
-    },
+    gap: 7,
 
-    /* NOTES */
+    borderRadius: 8,
+  },
 
-    notesLabel: {
-      marginTop: 17,
+  deleteTaskText: {
+    fontSize: 13,
 
-      marginBottom: 7,
+    fontWeight: '600',
 
-      fontSize: 12,
-
-      fontWeight:
-        '600',
-
-      color:
-        colors.textMuted,
-    },
-
-    notesInput: {
-      minHeight: 68,
-
-      maxHeight: 120,
-
-      borderRadius: 10,
-
-      backgroundColor:
-        colors.surfaceSoft,
-
-      paddingHorizontal:
-        11,
-
-      paddingVertical:
-        9,
-
-      fontSize: 14,
-
-      color:
-        colors.text,
-    },
-
-    /* DELETE */
-
-    deleteTaskButton: {
-      alignSelf:
-        'flex-start',
-
-      marginTop: 20,
-
-      minHeight: 40,
-
-      paddingHorizontal:
-        10,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      gap: 7,
-
-      borderRadius: 8,
-    },
-
-    deleteTaskText: {
-      fontSize: 13,
-
-      fontWeight:
-        '600',
-
-      color:
-        colors.danger,
-    },
-  });
+    color: colors.danger,
+  },
+});

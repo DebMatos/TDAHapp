@@ -160,6 +160,9 @@ export default function CreateTaskModal({
     setCategoryPickerVisible,
   ] = useState(false);
 
+  const [isSaving, setIsSaving] =
+    useState(false);
+
   const selectedCategory =
     useMemo(
       () =>
@@ -190,37 +193,45 @@ export default function CreateTaskModal({
      GUARDAR
   ------------------------------------------------------- */
 
-  const handleSave = () => {
-    if (!title.trim()) {
+
+
+  const handleSave = async () => {
+    if (!title.trim() || isSaving) {
       return;
     }
 
-  onSave({
-  title: title.trim(),
-  notes: description.trim(),
-  durationMinutes: duration,
-  categoryId,
-});
+    try {
+      setIsSaving(true);
+
+      await onSave({
+        title: title.trim(),
+        notes: description.trim(),
+        durationMinutes: duration,
+        categoryId,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   /* -------------------------------------------------------
      MAIS OPÇÕES
   ------------------------------------------------------- */
 
-const handleMoreOptions = () => {
-  onMoreOptions?.({
-    title: title.trim(),
-    notes: description.trim(),
-    startTime:
-      initialMinutes != null
-        ? formatTimeFromMinutes(
+  const handleMoreOptions = () => {
+    onMoreOptions?.({
+      title: title.trim(),
+      notes: description.trim(),
+      startTime:
+        initialMinutes != null
+          ? formatTimeFromMinutes(
             initialMinutes
           )
-        : '07:00',
-    durationMinutes: duration,
-    categoryId,
-  });
-};
+          : '07:00',
+      durationMinutes: duration,
+      categoryId,
+    });
+  };
   /* -------------------------------------------------------
      LABEL DA HORA
   ------------------------------------------------------- */
@@ -229,8 +240,8 @@ const handleMoreOptions = () => {
     initialMinutes == null
       ? '--:--'
       : formatTimeFromMinutes(
-          initialMinutes
-        );
+        initialMinutes
+      );
 
   /* -------------------------------------------------------
      RENDER
@@ -468,19 +479,23 @@ const handleMoreOptions = () => {
                   Só existe depois de escrever.
               ---------------------------------------------- */}
 
-              {title.trim().length >
-                0 && (
+              {title.trim().length > 0 && (
                 <View
                   style={
                     styles.saveRow
                   }
                 >
                   <TouchableOpacity
-                    style={
-                      styles.saveButton
-                    }
+                    style={[
+                      styles.saveButton,
+                      isSaving &&
+                      styles.saveButtonDisabled,
+                    ]}
                     activeOpacity={
                       0.75
+                    }
+                    disabled={
+                      isSaving
                     }
                     onPress={
                       handleSave
@@ -491,18 +506,23 @@ const handleMoreOptions = () => {
                         styles.saveButtonText
                       }
                     >
-                      Criar
+                      {isSaving
+                        ? 'A guardar…'
+                        : 'Criar'}
                     </Text>
 
-                    <Image
-                      source={require('../../../assets/abelha.png')}
-                      style={
-                        styles.saveBee
-                      }
-                    />
+                    {!isSaving && (
+                      <Image
+                        source={require('../../../assets/abelha.png')}
+                        style={
+                          styles.saveBee
+                        }
+                      />
+                    )}
                   </TouchableOpacity>
                 </View>
               )}
+
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -578,8 +598,8 @@ const handleMoreOptions = () => {
                         styles.pickerRowText,
 
                         item ===
-                          duration &&
-                          styles.pickerRowTextActive,
+                        duration &&
+                        styles.pickerRowTextActive,
                       ]}
                     >
                       {formatDuration(
@@ -589,12 +609,12 @@ const handleMoreOptions = () => {
 
                     {item ===
                       duration && (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color="#4F75E2"
-                      />
-                    )}
+                        <Ionicons
+                          name="checkmark"
+                          size={20}
+                          color="#4F75E2"
+                        />
+                      )}
                   </TouchableOpacity>
                 )
               )}
@@ -682,8 +702,8 @@ const handleMoreOptions = () => {
                         styles.categoryText,
 
                         item.id ===
-                          categoryId &&
-                          styles.categoryTextActive,
+                        categoryId &&
+                        styles.categoryTextActive,
                       ]}
                     >
                       {item.label}
@@ -692,12 +712,12 @@ const handleMoreOptions = () => {
 
                   {item.id ===
                     categoryId && (
-                    <Ionicons
-                      name="checkmark"
-                      size={20}
-                      color="#4F75E2"
-                    />
-                  )}
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color="#4F75E2"
+                      />
+                    )}
                 </TouchableOpacity>
               )
             )}
@@ -863,13 +883,10 @@ const styles =
 
     saveRow: {
       flexDirection: 'row',
-
       justifyContent:
         'flex-end',
-
       marginTop: 8,
     },
-
     saveButton: {
       height: 40,
 
@@ -889,11 +906,12 @@ const styles =
         '#F4F1EF',
     },
 
+    saveButtonDisabled: {
+      opacity: 0.55,
+    },
     saveButtonText: {
       fontSize: 14,
-
       fontWeight: '600',
-
       color: '#403B37',
     },
 
