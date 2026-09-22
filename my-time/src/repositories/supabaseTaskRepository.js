@@ -1,11 +1,12 @@
 import { supabase } from '../lib/supabase';
 import { normalizeTasks } from '../domain/taskModel';
 
-const REQUEST_TIMEOUT_MS = 10000;
+const LOAD_TIMEOUT_MS = 30000;
+const WRITE_TIMEOUT_MS = 10000;
 
-const createRequestTimeout = () => {
+const createRequestTimeout = (timeoutMs) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   return {
     signal: controller.signal,
     clear: () => clearTimeout(timeoutId),
@@ -60,7 +61,7 @@ const toDatabase = (task, userId) => ({
 });
 
 export const loadTasks = async (userId) => {
-  const timeout = createRequestTimeout();
+  const timeout = createRequestTimeout(LOAD_TIMEOUT_MS);
 
   try {
     const { data, error } = await supabase
@@ -83,7 +84,7 @@ export const loadTasks = async (userId) => {
 };
 
 export const saveTasks = async (userId, tasks) => {
-  const timeout = createRequestTimeout();
+  const timeout = createRequestTimeout(WRITE_TIMEOUT_MS);
 
   try {
     const canonicalTasks = normalizeTasks(tasks);

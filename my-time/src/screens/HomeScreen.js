@@ -28,13 +28,7 @@ import colors from '../theme/colors';
 
 import { loadTasks as loadStoredTasks } from '../data/taskRepository';
 import { supabase } from '../lib/supabase';
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { getTimelineDate } from '../utils/timelineDate';
 
 /* -------------------------------------------------------
    TIMELINE
@@ -60,7 +54,7 @@ const TIMELINE_START_MINUTES = 7 * 60;
 
 const SNAP_MINUTES = 5;
 
-const CREATE_LONG_PRESS_MS = 500;
+const CREATE_LONG_PRESS_MS = 400;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
@@ -294,11 +288,12 @@ export default function TimelineScreen() {
   };
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
-  const today = new Date();
+  const now = new Date();
+
+  const currentTimelineDate = getTimelineDate(now);
+  const isViewingToday = isSameDay(selectedDate, currentTimelineDate);
 
   const selectedDateKey = getDateKey(selectedDate);
-
-  const isViewingToday = isSameDay(selectedDate, today);
 
   const scrollRef = useRef(null);
 
@@ -330,11 +325,13 @@ export default function TimelineScreen() {
 
   const visibleTasks = useMemo(() => {
     const todayKey = getDateKey(new Date());
-
     return tasks.filter((task) => {
       const taskDate = task.date || todayKey;
-
-      return taskDate === selectedDateKey;
+      const taskStartTime = task.startTime || '07:00';
+      const taskDateTime = new Date(`${taskDate}T${taskStartTime}:00`);
+      const taskTimelineDate = getTimelineDate(taskDateTime);
+      const taskTimelineDateKey = getDateKey(taskTimelineDate);
+      return taskTimelineDateKey === selectedDateKey;
     });
   }, [tasks, selectedDateKey]);
 
@@ -445,8 +442,6 @@ export default function TimelineScreen() {
      AGORA
   ------------------------------------------------------- */
 
-  const now = new Date();
-
   const currentAbsMins = now.getHours() * 60 + now.getMinutes();
 
   const nowTop = getVisualY(currentAbsMins);
@@ -485,9 +480,18 @@ export default function TimelineScreen() {
 
   useEffect(() => {
     const loadStoredData = async () => {
-      const canonicalTasks = await loadStoredTasks();
+      try {
+        const canonicalTasks = await loadStoredTasks();
 
-      setTasks(canonicalTasks);
+        setTasks(canonicalTasks);
+      } catch (error) {
+        console.error('Erro ao carregar tarefas:', error);
+
+        Alert.alert(
+          'Não foi possível carregar as tarefas',
+          'Não foi possível comunicar com o servidor. Tenta novamente.',
+        );
+      }
     };
 
     loadStoredData();
