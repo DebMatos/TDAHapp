@@ -1,4 +1,4 @@
-const TIMELINE_START_HOUR = 7;
+import { TIMELINE_START_HOUR } from '../constants/timeline';
 
 export const getTimelineDate = (dateTime) => {
   const timelineDate = new Date(dateTime);

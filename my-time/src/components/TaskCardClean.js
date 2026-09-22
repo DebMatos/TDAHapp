@@ -1,6 +1,18 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 
 import {
+  DAY_MINUTES,
+  SNAP_MINUTES,
+} from '../constants/timeline';
+
+import {
+  formatTimeFromMinutes,
+  timeToMinutes,
+  formatDuration,
+  snapMinutes,
+} from '../utils/time';
+
+import {
   Animated,
   PanResponder,
   StyleSheet,
@@ -12,8 +24,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 
-const DAY_MINUTES = 24 * 60;
-const SNAP_MINUTES = 5;
+
 const CARD_LEFT = 58; // Ajustado ligeiramente para afastar da espinha
 const CARD_RIGHT = 16;
 const LONG_PRESS_DELAY_MS = 350;
@@ -23,46 +34,6 @@ const LONG_PRESS_DELAY_MS = 350;
 ------------------------------------------------------- */
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const snap = (minutes) => Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
-const timeToMinutes = (value) => {
-  if (!value || !value.includes(':')) {
-    return 7 * 60;
-  }
-
-  const [hours, minutes] = value.split(':').map(Number);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return 7 * 60;
-  }
-
-  return hours * 60 + minutes;
-};
-
-const formatDuration = (minutes) => {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h${String(mins).padStart(2, '0')}`;
-};
 
 /* -------------------------------------------------------
    TEMAS POR CATEGORIA (Corrigido)
@@ -227,7 +198,7 @@ export default function TaskCardClean({
           if (isDragActive.current) {
             const finalY = top + gesture.dy;
             const finalMins = clamp(
-              snap(getMinuteFromY(finalY)),
+              snapMinutes(getMinuteFromY(finalY)),
               0,
               DAY_MINUTES - duration,
             );

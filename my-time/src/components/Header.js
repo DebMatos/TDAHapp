@@ -9,12 +9,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
-
+import { isSameDay } from '../utils/date';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const STRIP_PADDING = 12;
 const DAY_WIDTH = (SCREEN_WIDTH - STRIP_PADDING * 2) / 7;
 const TOTAL_DAYS = 100001;
-
+import { getTimelineDate } from '../utils/timelineDate';
 const CENTER_INDEX = Math.floor(TOTAL_DAYS / 2);
 
 const REFERENCE_DATE = new Date();
@@ -42,11 +42,6 @@ const getIndexForDate = (date) => {
 
   return CENTER_INDEX + diffDays;
 };
-
-const isSameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
 
 const WEEK_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTHS = [
@@ -88,7 +83,7 @@ export default function Header({
   totalTasks = 0,
 }) {
   const flatListRef = useRef(null);
-  const now = new Date();
+  const now = getTimelineDate(new Date());
   const safeSelectedDate =
     selectedDate instanceof Date ? selectedDate : new Date();
 
@@ -115,6 +110,20 @@ export default function Header({
     itemVisiblePercentThreshold: 50,
   }).current;
 
+  const handleGoToNow = () => {
+    const now = new Date();
+    const targetIndex = getIndexForDate(now);
+    const centeredIndex = Math.max(0, targetIndex - 3);
+
+    flatListRef.current?.scrollToIndex({
+      index: centeredIndex,
+      animated: true,
+    });
+
+    setVisibleDate(now);
+
+    onGoToNow?.();
+  };
   return (
     <View style={styles.headerContainer}>
       {/* 1. LINHA SUPERIOR */}
@@ -132,7 +141,7 @@ export default function Header({
 
         <View style={styles.rightGroup}>
           <TouchableOpacity
-            onPress={onGoToNow}
+            onPress={handleGoToNow}
             activeOpacity={0.7}
             style={styles.nowButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

@@ -9,14 +9,26 @@ import React, {
 import {
   Image,
   PanResponder,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   Alert,
 } from 'react-native';
+import {
+  DAY_MINUTES,
+  TIMELINE_START_MINUTES,
+  MAX_PPM,
+  DEFAULT_PPM,
+} from '../constants/timeline';
+
+import {
+  formatTimeFromMinutes,
+  timeToMinutes,
+  snapMinutes,
+} from '../utils/time';
+
+import { getDateKey, isSameDay, addDays } from '../utils/date';
 import * as taskService from '../services/taskService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,12 +46,6 @@ import { getTimelineDate } from '../utils/timelineDate';
    TIMELINE
 ------------------------------------------------------- */
 
-const DAY_MINUTES = 24 * 60;
-
-const MAX_PPM = 1.75;
-
-const DEFAULT_PPM = 1.25;
-
 const VERTICAL_PADDING = 20;
 
 const AXIS_WIDTH = 45;
@@ -49,10 +55,6 @@ const TASK_CARD_LEFT = 56;
 const TASK_CARD_RIGHT = 22;
 
 const OVERLAP_GAP = 4;
-
-const TIMELINE_START_MINUTES = 7 * 60;
-
-const SNAP_MINUTES = 5;
 
 const CREATE_LONG_PRESS_MS = 400;
 
@@ -97,53 +99,7 @@ const VERTICAL_SEGMENTS = [
    HELPERS
 ------------------------------------------------------- */
 
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-
-  const hours = Math.floor(normalized / 60);
-
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
-const parseTimeToMinutes = (timeStr) => {
-  if (!timeStr || !timeStr.includes(':')) {
-    return 7 * 60;
-  }
-
-  const [h, m] = timeStr.split(':').map(Number);
-
-  return (Number.isNaN(h) ? 7 : h) * 60 + (Number.isNaN(m) ? 0 : m);
-};
-
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const snapMinutes = (minutes) =>
-  Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-
-const getDateKey = (date) => {
-  const year = date.getFullYear();
-
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
-
-const isSameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
-
-const addDays = (date, amount) => {
-  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  next.setDate(next.getDate() + amount);
-
-  return next;
-};
 
 const getPinchDistance = (touches) => {
   const [t1, t2] = touches;
@@ -160,7 +116,7 @@ const getPinchDistance = (touches) => {
 ------------------------------------------------------- */
 
 const getTaskTimelineInterval = (task) => {
-  const startMinute = parseTimeToMinutes(task.startTime);
+  const startMinute = timeToMinutes(task.startTime);
 
   let start = startMinute - TIMELINE_START_MINUTES;
 
