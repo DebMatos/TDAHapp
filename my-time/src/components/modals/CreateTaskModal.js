@@ -1,8 +1,4 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   Image,
@@ -18,92 +14,31 @@ import {
   View,
 } from 'react-native';
 
-import {
-  Ionicons,
-  MaterialCommunityIcons,
-} from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { categoryOptions, getCategory } from '../../config/categories';
 import colors from '../../theme/colors';
-
 /* -------------------------------------------------------
    OPÇÕES
 ------------------------------------------------------- */
 
-const DURATION_OPTIONS = [
-  5,
-  10,
-  15,
-  20,
-  30,
-  45,
-  60,
-  90,
-  120,
-];
-
-const CATEGORY_OPTIONS = [
-  {
-    id: 'inbox',
-    label: 'Caixa de Entrada',
-    icon: 'archive-outline',
-    color: colors.categoryInbox,      // #6B8296
-  },
-  {
-    id: 'work',
-    label: 'Trabalho',
-    icon: 'briefcase-outline',
-    color: colors.categoryWork,       // #C86D51 (Tijolo / Terracota)
-  },
-  {
-    id: 'personal',
-    label: 'Pessoal',
-    icon: 'home-outline',
-    color: colors.categoryPersonal,   // #D4975A (Mostarda / Ocre)
-  },
-  {
-    id: 'exercise',
-    label: 'Exercício',
-    icon: 'barbell-outline',
-    color: colors.categoryExercise,   // #769379 (Verde Sálvia)
-  },
-  {
-    id: 'shopping',
-    label: 'Compras',
-    icon: 'cube-outline',
-    color: colors.categoryShopping,   // #9580A1 (Violeta Seco)
-  },
-];
+const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
 
-const formatTimeFromMinutes = (
-  totalMinutes
-) => {
-  const normalized =
-    ((totalMinutes % 1440) +
-      1440) %
-    1440;
+const formatTimeFromMinutes = (totalMinutes) => {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
 
-  const hours =
-    Math.floor(normalized / 60);
+  const hours = Math.floor(normalized / 60);
 
-  const mins =
-    normalized % 60;
+  const mins = normalized % 60;
 
-  return `${String(hours).padStart(
-    2,
-    '0'
-  )}:${String(mins).padStart(
-    2,
-    '0'
-  )}`;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
-const formatDuration = (
-  minutes
-) => {
+const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
   }
@@ -112,11 +47,9 @@ const formatDuration = (
     return `${minutes / 60} h`;
   }
 
-  const hours =
-    Math.floor(minutes / 60);
+  const hours = Math.floor(minutes / 60);
 
-  const mins =
-    minutes % 60;
+  const mins = minutes % 60;
 
   return `${hours} h ${mins} min`;
 };
@@ -132,48 +65,21 @@ export default function CreateTaskModal({
   onMoreOptions,
   initialMinutes = null,
 }) {
-  const [title, setTitle] =
-    useState('');
+  const [title, setTitle] = useState('');
 
-  const [
-    description,
-    setDescription,
-  ] = useState('');
+  const [description, setDescription] = useState('');
 
-  const [
-    duration,
-    setDuration,
-  ] = useState(30);
+  const [duration, setDuration] = useState(30);
 
-  const [
-    categoryId,
-    setCategoryId,
-  ] = useState('inbox');
+  const [categoryId, setCategoryId] = useState('inbox');
 
-  const [
-    durationPickerVisible,
-    setDurationPickerVisible,
-  ] = useState(false);
+  const [durationPickerVisible, setDurationPickerVisible] = useState(false);
 
-  const [
-    categoryPickerVisible,
-    setCategoryPickerVisible,
-  ] = useState(false);
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
-  const [isSaving, setIsSaving] =
-    useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const selectedCategory =
-    useMemo(
-      () =>
-        CATEGORY_OPTIONS.find(
-          (item) =>
-            item.id === categoryId
-        ) ||
-        CATEGORY_OPTIONS[0],
-      [categoryId]
-    );
-
+  const selectedCategory = useMemo(() => getCategory(categoryId), [categoryId]);
   /* -------------------------------------------------------
      RESET AO ABRIR
   ------------------------------------------------------- */
@@ -192,8 +98,6 @@ export default function CreateTaskModal({
   /* -------------------------------------------------------
      GUARDAR
   ------------------------------------------------------- */
-
-
 
   const handleSave = async () => {
     if (!title.trim() || isSaving) {
@@ -224,9 +128,7 @@ export default function CreateTaskModal({
       notes: description.trim(),
       startTime:
         initialMinutes != null
-          ? formatTimeFromMinutes(
-            initialMinutes
-          )
+          ? formatTimeFromMinutes(initialMinutes)
           : '07:00',
       durationMinutes: duration,
       categoryId,
@@ -237,11 +139,7 @@ export default function CreateTaskModal({
   ------------------------------------------------------- */
 
   const timeLabel =
-    initialMinutes == null
-      ? '--:--'
-      : formatTimeFromMinutes(
-        initialMinutes
-      );
+    initialMinutes == null ? '--:--' : formatTimeFromMinutes(initialMinutes);
 
   /* -------------------------------------------------------
      RENDER
@@ -266,55 +164,34 @@ export default function CreateTaskModal({
         >
           {/* FUNDO */}
 
-          <Pressable
-            style={
-              styles.backdrop
-            }
-            onPress={onClose}
-          />
+          <Pressable style={styles.backdrop} onPress={onClose} />
 
           {/* SHEET */}
 
-          <View
-            style={styles.sheet}
-          >
+          <View style={styles.sheet}>
             {/* HANDLE */}
 
-            <View
-              style={styles.handle}
-            />
+            <View style={styles.handle} />
 
             {/* TÍTULO */}
 
             <TextInput
-              style={
-                styles.titleInput
-              }
+              style={styles.titleInput}
               value={title}
-              onChangeText={
-                setTitle
-              }
+              onChangeText={setTitle}
               placeholder="O que vais fazer?"
               placeholderTextColor="#A79F99"
               autoFocus
               returnKeyType="done"
-              onSubmitEditing={
-                handleSave
-              }
+              onSubmitEditing={handleSave}
             />
 
             {/* DESCRIÇÃO */}
 
             <TextInput
-              style={
-                styles.descriptionInput
-              }
-              value={
-                description
-              }
-              onChangeText={
-                setDescription
-              }
+              style={styles.descriptionInput}
+              value={description}
+              onChangeText={setDescription}
               placeholder="Descrição (opcional)"
               placeholderTextColor="#A79F99"
               multiline
@@ -324,147 +201,73 @@ export default function CreateTaskModal({
                 AÇÕES
             ------------------------------------------------ */}
 
-            <View
-              style={
-                styles.actionsSection
-              }
-            >
+            <View style={styles.actionsSection}>
               <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={
-                  false
-                }
+                showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={
-                  styles.actionsRow
-                }
+                contentContainerStyle={styles.actionsRow}
               >
                 {/* HORA */}
 
-                <View
-                  style={
-                    styles.actionPill
-                  }
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={17}
-                    color="#4E4844"
-                  />
+                <View style={styles.actionPill}>
+                  <Ionicons name="calendar-outline" size={17} color="#4E4844" />
 
-                  <Text
-                    style={
-                      styles.actionText
-                    }
-                  >
-                    Hoje, {timeLabel}
-                  </Text>
+                  <Text style={styles.actionText}>Hoje, {timeLabel}</Text>
                 </View>
 
                 {/* DURAÇÃO */}
 
                 <TouchableOpacity
-                  style={
-                    styles.actionPill
-                  }
-                  activeOpacity={
-                    0.75
-                  }
-                  onPress={() =>
-                    setDurationPickerVisible(
-                      true
-                    )
-                  }
+                  style={styles.actionPill}
+                  activeOpacity={0.75}
+                  onPress={() => setDurationPickerVisible(true)}
                 >
-                  <Ionicons
-                    name="timer-outline"
-                    size={17}
-                    color="#4E4844"
-                  />
+                  <Ionicons name="timer-outline" size={17} color="#4E4844" />
 
-                  <Text
-                    style={
-                      styles.actionText
-                    }
-                  >
-                    {formatDuration(
-                      duration
-                    )}
+                  <Text style={styles.actionText}>
+                    {formatDuration(duration)}
                   </Text>
                 </TouchableOpacity>
 
                 {/* CATEGORIA */}
 
                 <TouchableOpacity
-                  style={
-                    styles.iconButton
-                  }
-                  activeOpacity={
-                    0.75
-                  }
-                  onPress={() =>
-                    setCategoryPickerVisible(
-                      true
-                    )
-                  }
+                  style={styles.iconButton}
+                  activeOpacity={0.75}
+                  onPress={() => setCategoryPickerVisible(true)}
                 >
                   <Ionicons
-                    name={
-                      selectedCategory.icon
-                    }
+                    name={selectedCategory.icon}
                     size={19}
-                    color={
-                      selectedCategory.color
-                    }
+                    color={selectedCategory.color}
                   />
                 </TouchableOpacity>
 
                 {/* PRIORIDADE */}
 
                 <TouchableOpacity
-                  style={
-                    styles.iconButton
-                  }
-                  activeOpacity={
-                    0.75
-                  }
+                  style={styles.iconButton}
+                  activeOpacity={0.75}
                 >
-                  <Ionicons
-                    name="flag-outline"
-                    size={19}
-                    color="#57504B"
-                  />
+                  <Ionicons name="flag-outline" size={19} color="#57504B" />
                 </TouchableOpacity>
 
                 {/* ETIQUETA */}
 
                 <TouchableOpacity
-                  style={
-                    styles.iconButton
-                  }
-                  activeOpacity={
-                    0.75
-                  }
+                  style={styles.iconButton}
+                  activeOpacity={0.75}
                 >
-                  <Ionicons
-                    name="pricetag-outline"
-                    size={19}
-                    color="#57504B"
-                  />
+                  <Ionicons name="pricetag-outline" size={19} color="#57504B" />
                 </TouchableOpacity>
 
                 {/* MAIS */}
 
                 <TouchableOpacity
-                  style={
-                    styles.iconButton
-                  }
-                  activeOpacity={
-                    0.75
-                  }
-                  onPress={
-                    handleMoreOptions
-                  }
+                  style={styles.iconButton}
+                  activeOpacity={0.75}
+                  onPress={handleMoreOptions}
                 >
                   <MaterialCommunityIcons
                     name="dots-horizontal"
@@ -480,49 +283,29 @@ export default function CreateTaskModal({
               ---------------------------------------------- */}
 
               {title.trim().length > 0 && (
-                <View
-                  style={
-                    styles.saveRow
-                  }
-                >
+                <View style={styles.saveRow}>
                   <TouchableOpacity
                     style={[
                       styles.saveButton,
-                      isSaving &&
-                      styles.saveButtonDisabled,
+                      isSaving && styles.saveButtonDisabled,
                     ]}
-                    activeOpacity={
-                      0.75
-                    }
-                    disabled={
-                      isSaving
-                    }
-                    onPress={
-                      handleSave
-                    }
+                    activeOpacity={0.75}
+                    disabled={isSaving}
+                    onPress={handleSave}
                   >
-                    <Text
-                      style={
-                        styles.saveButtonText
-                      }
-                    >
-                      {isSaving
-                        ? 'A guardar…'
-                        : 'Criar'}
+                    <Text style={styles.saveButtonText}>
+                      {isSaving ? 'A guardar…' : 'Criar'}
                     </Text>
 
                     {!isSaving && (
                       <Image
                         source={require('../../../assets/abelha.png')}
-                        style={
-                          styles.saveBee
-                        }
+                        style={styles.saveBee}
                       />
                     )}
                   </TouchableOpacity>
                 </View>
               )}
-
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -533,91 +316,48 @@ export default function CreateTaskModal({
       --------------------------------------------------- */}
 
       <Modal
-        visible={
-          durationPickerVisible
-        }
+        visible={durationPickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() =>
-          setDurationPickerVisible(
-            false
-          )
-        }
+        onRequestClose={() => setDurationPickerVisible(false)}
       >
         <Pressable
-          style={
-            styles.pickerOverlay
-          }
-          onPress={() =>
-            setDurationPickerVisible(
-              false
-            )
-          }
+          style={styles.pickerOverlay}
+          onPress={() => setDurationPickerVisible(false)}
         >
-          <View
-            style={
-              styles.pickerCard
-            }
-          >
-            <Text
-              style={
-                styles.pickerTitle
-              }
-            >
-              Duração
-            </Text>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Duração</Text>
 
             <ScrollView
-              style={
-                styles.pickerScroll
-              }
+              style={styles.pickerScroll}
               keyboardShouldPersistTaps="handled"
             >
-              {DURATION_OPTIONS.map(
-                (item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={
-                      styles.pickerRow
-                    }
-                    activeOpacity={
-                      0.7
-                    }
-                    onPress={() => {
-                      setDuration(
-                        item
-                      );
+              {DURATION_OPTIONS.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.pickerRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setDuration(item);
 
-                      setDurationPickerVisible(
-                        false
-                      );
-                    }}
+                    setDurationPickerVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerRowText,
+
+                      item === duration && styles.pickerRowTextActive,
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.pickerRowText,
+                    {formatDuration(item)}
+                  </Text>
 
-                        item ===
-                        duration &&
-                        styles.pickerRowTextActive,
-                      ]}
-                    >
-                      {formatDuration(
-                        item
-                      )}
-                    </Text>
-
-                    {item ===
-                      duration && (
-                        <Ionicons
-                          name="checkmark"
-                          size={20}
-                          color="#4F75E2"
-                        />
-                      )}
-                  </TouchableOpacity>
-                )
-              )}
+                  {item === duration && (
+                    <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                  )}
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </View>
         </Pressable>
@@ -628,99 +368,48 @@ export default function CreateTaskModal({
       --------------------------------------------------- */}
 
       <Modal
-        visible={
-          categoryPickerVisible
-        }
+        visible={categoryPickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() =>
-          setCategoryPickerVisible(
-            false
-          )
-        }
+        onRequestClose={() => setCategoryPickerVisible(false)}
       >
         <Pressable
-          style={
-            styles.pickerOverlay
-          }
-          onPress={() =>
-            setCategoryPickerVisible(
-              false
-            )
-          }
+          style={styles.pickerOverlay}
+          onPress={() => setCategoryPickerVisible(false)}
         >
-          <View
-            style={
-              styles.categoryCard
-            }
-          >
-            <Text
-              style={
-                styles.pickerTitle
-              }
-            >
-              Categoria
-            </Text>
+          <View style={styles.categoryCard}>
+            <Text style={styles.pickerTitle}>Categoria</Text>
 
-            {CATEGORY_OPTIONS.map(
-              (item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={
-                    styles.categoryRow
-                  }
-                  activeOpacity={
-                    0.7
-                  }
-                  onPress={() => {
-                    setCategoryId(
-                      item.id
-                    );
+            {categoryOptions.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.categoryRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setCategoryId(item.id);
 
-                    setCategoryPickerVisible(
-                      false
-                    );
-                  }}
-                >
-                  <View
-                    style={
-                      styles.categoryLeft
-                    }
+                  setCategoryPickerVisible(false);
+                }}
+              >
+                <View style={styles.categoryLeft}>
+                  <Ionicons name={item.icon} size={20} color={item.color} />
+
+                  <Text
+                    style={[
+                      styles.categoryText,
+
+                      item.id === categoryId && styles.categoryTextActive,
+                    ]}
                   >
-                    <Ionicons
-                      name={
-                        item.icon
-                      }
-                      size={20}
-                      color={
-                        item.color
-                      }
-                    />
+                    {item.label}
+                  </Text>
+                </View>
 
-                    <Text
-                      style={[
-                        styles.categoryText,
-
-                        item.id ===
-                        categoryId &&
-                        styles.categoryTextActive,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </View>
-
-                  {item.id ===
-                    categoryId && (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color="#4F75E2"
-                      />
-                    )}
-                </TouchableOpacity>
-              )
-            )}
+                {item.id === categoryId && (
+                  <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </Pressable>
       </Modal>
@@ -732,325 +421,293 @@ export default function CreateTaskModal({
    STYLES
 ------------------------------------------------------- */
 
-const styles =
-  StyleSheet.create({
-    /* ---------------------------------------------------
+const styles = StyleSheet.create({
+  /* ---------------------------------------------------
        MODAL
     --------------------------------------------------- */
 
-    overlay: {
-      flex: 1,
-      justifyContent:
-        'flex-end',
-    },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
 
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
 
-      backgroundColor:
-        'rgba(32, 28, 25, 0.34)',
-    },
+    backgroundColor: 'rgba(32, 28, 25, 0.34)',
+  },
 
-    sheet: {
-      backgroundColor:
-        '#FFFDFC',
+  sheet: {
+    backgroundColor: '#FFFDFC',
 
-      paddingHorizontal: 16,
-      paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
 
-      paddingBottom:
-        Platform.OS === 'ios'
-          ? 18
-          : 12,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 12,
 
-      borderTopLeftRadius:
-        22,
+    borderTopLeftRadius: 22,
 
-      borderTopRightRadius:
-        22,
+    borderTopRightRadius: 22,
 
-      borderWidth: 1,
-      borderBottomWidth: 0,
+    borderWidth: 1,
+    borderBottomWidth: 0,
 
-      borderColor:
-        '#EEE8E4',
-    },
+    borderColor: '#EEE8E4',
+  },
 
-    handle: {
-      alignSelf: 'center',
+  handle: {
+    alignSelf: 'center',
 
-      width: 42,
-      height: 4,
+    width: 42,
+    height: 4,
 
-      borderRadius: 2,
+    borderRadius: 2,
 
-      backgroundColor:
-        '#C8C2BE',
+    backgroundColor: '#C8C2BE',
 
-      marginBottom: 14,
-    },
+    marginBottom: 14,
+  },
 
-    /* ---------------------------------------------------
+  /* ---------------------------------------------------
        INPUTS
     --------------------------------------------------- */
 
-    titleInput: {
-      minHeight: 46,
+  titleInput: {
+    minHeight: 46,
 
-      borderRadius: 12,
+    borderRadius: 12,
 
-      backgroundColor:
-        '#F7F4F2',
+    backgroundColor: '#F7F4F2',
 
-      paddingHorizontal: 12,
+    paddingHorizontal: 12,
 
-      fontSize: 17,
-      fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '500',
 
-      color: '#2F2A27',
+    color: '#2F2A27',
 
-      marginBottom: 4,
-    },
+    marginBottom: 4,
+  },
 
-    descriptionInput: {
-      minHeight: 34,
+  descriptionInput: {
+    minHeight: 34,
 
-      paddingHorizontal: 12,
-      paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
 
-      fontSize: 14,
+    fontSize: 14,
 
-      color: '#5B544F',
-    },
+    color: '#5B544F',
+  },
 
-    /* ---------------------------------------------------
+  /* ---------------------------------------------------
        AÇÕES
     --------------------------------------------------- */
 
-    actionsSection: {
-      marginTop: 8,
-    },
+  actionsSection: {
+    marginTop: 8,
+  },
 
-    actionsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
 
-      gap: 5,
+    gap: 5,
 
-      paddingRight: 4,
-    },
+    paddingRight: 4,
+  },
 
-    actionPill: {
-      height: 34,
+  actionPill: {
+    height: 34,
 
-      paddingHorizontal: 9,
+    paddingHorizontal: 9,
 
-      borderRadius: 10,
+    borderRadius: 10,
 
-      backgroundColor:
-        '#F4F1EF',
+    backgroundColor: '#F4F1EF',
 
-      flexDirection: 'row',
-      alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
 
-      gap: 5,
-    },
+    gap: 5,
+  },
 
-    actionText: {
-      fontSize: 12,
-      fontWeight: '500',
+  actionText: {
+    fontSize: 12,
+    fontWeight: '500',
 
-      color: '#4E4844',
-    },
+    color: '#4E4844',
+  },
 
-    iconButton: {
-      width: 34,
-      height: 34,
+  iconButton: {
+    width: 34,
+    height: 34,
 
-      borderRadius: 10,
+    borderRadius: 10,
 
-      alignItems: 'center',
-      justifyContent:
-        'center',
+    alignItems: 'center',
+    justifyContent: 'center',
 
-      backgroundColor:
-        '#F4F1EF',
-    },
+    backgroundColor: '#F4F1EF',
+  },
 
-    /* ---------------------------------------------------
+  /* ---------------------------------------------------
        CRIAR
     --------------------------------------------------- */
 
-    saveRow: {
-      flexDirection: 'row',
-      justifyContent:
-        'flex-end',
-      marginTop: 8,
-    },
-    saveButton: {
-      height: 40,
+  saveRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  saveButton: {
+    height: 40,
 
-      paddingHorizontal: 14,
+    paddingHorizontal: 14,
 
-      flexDirection: 'row',
+    flexDirection: 'row',
 
-      alignItems: 'center',
-      justifyContent:
-        'center',
+    alignItems: 'center',
+    justifyContent: 'center',
 
-      gap: 7,
+    gap: 7,
 
-      borderRadius: 10,
+    borderRadius: 10,
 
-      backgroundColor:
-        '#F4F1EF',
-    },
+    backgroundColor: '#F4F1EF',
+  },
 
-    saveButtonDisabled: {
-      opacity: 0.55,
-    },
-    saveButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#403B37',
-    },
+  saveButtonDisabled: {
+    opacity: 0.55,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#403B37',
+  },
 
-    saveBee: {
-      width: 21,
-      height: 21,
+  saveBee: {
+    width: 21,
+    height: 21,
 
-      resizeMode: 'contain',
+    resizeMode: 'contain',
 
-      transform: [
-        {
-          rotate: '90deg',
-        },
-      ],
-    },
+    transform: [
+      {
+        rotate: '90deg',
+      },
+    ],
+  },
 
-    /* ---------------------------------------------------
+  /* ---------------------------------------------------
        PICKERS
     --------------------------------------------------- */
 
-    pickerOverlay: {
-      flex: 1,
+  pickerOverlay: {
+    flex: 1,
 
-      justifyContent:
-        'flex-end',
+    justifyContent: 'flex-end',
 
-      backgroundColor:
-        'rgba(32, 28, 25, 0.28)',
-    },
+    backgroundColor: 'rgba(32, 28, 25, 0.28)',
+  },
 
-    pickerCard: {
-      backgroundColor:
-        '#FFFDFC',
+  pickerCard: {
+    backgroundColor: '#FFFDFC',
 
-      borderTopLeftRadius:
-        20,
+    borderTopLeftRadius: 20,
 
-      borderTopRightRadius:
-        20,
+    borderTopRightRadius: 20,
 
-      paddingHorizontal: 18,
+    paddingHorizontal: 18,
 
-      paddingTop: 18,
-      paddingBottom: 24,
-    },
+    paddingTop: 18,
+    paddingBottom: 24,
+  },
 
-    categoryCard: {
-      backgroundColor:
-        '#FFFDFC',
+  categoryCard: {
+    backgroundColor: '#FFFDFC',
 
-      borderTopLeftRadius:
-        20,
+    borderTopLeftRadius: 20,
 
-      borderTopRightRadius:
-        20,
+    borderTopRightRadius: 20,
 
-      paddingHorizontal: 18,
+    paddingHorizontal: 18,
 
-      paddingTop: 18,
-      paddingBottom: 24,
-    },
+    paddingTop: 18,
+    paddingBottom: 24,
+  },
 
-    pickerTitle: {
-      fontSize: 17,
+  pickerTitle: {
+    fontSize: 17,
 
-      fontWeight: '700',
+    fontWeight: '700',
 
-      color: '#2F2A27',
+    color: '#2F2A27',
 
-      marginBottom: 10,
-    },
+    marginBottom: 10,
+  },
 
-    pickerScroll: {
-      maxHeight: 360,
-    },
+  pickerScroll: {
+    maxHeight: 360,
+  },
 
-    pickerRow: {
-      minHeight: 48,
+  pickerRow: {
+    minHeight: 48,
 
-      flexDirection: 'row',
+    flexDirection: 'row',
 
-      alignItems: 'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'space-between',
+    justifyContent: 'space-between',
 
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
 
-      borderBottomColor:
-        '#E8E2DE',
-    },
+    borderBottomColor: '#E8E2DE',
+  },
 
-    pickerRowText: {
-      fontSize: 15,
+  pickerRowText: {
+    fontSize: 15,
 
-      color: '#625A55',
-    },
+    color: '#625A55',
+  },
 
-    pickerRowTextActive: {
-      fontWeight: '700',
+  pickerRowTextActive: {
+    fontWeight: '700',
 
-      color: '#2F2A27',
-    },
+    color: '#2F2A27',
+  },
 
-    categoryRow: {
-      minHeight: 50,
+  categoryRow: {
+    minHeight: 50,
 
-      flexDirection: 'row',
+    flexDirection: 'row',
 
-      alignItems: 'center',
+    alignItems: 'center',
 
-      justifyContent:
-        'space-between',
+    justifyContent: 'space-between',
 
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
 
-      borderBottomColor:
-        '#E8E2DE',
-    },
+    borderBottomColor: '#E8E2DE',
+  },
 
-    categoryLeft: {
-      flexDirection: 'row',
+  categoryLeft: {
+    flexDirection: 'row',
 
-      alignItems: 'center',
+    alignItems: 'center',
 
-      gap: 12,
-    },
+    gap: 12,
+  },
 
-    categoryText: {
-      fontSize: 15,
+  categoryText: {
+    fontSize: 15,
 
-      color: '#625A55',
-    },
+    color: '#625A55',
+  },
 
-    categoryTextActive: {
-      fontWeight: '700',
+  categoryTextActive: {
+    fontWeight: '700',
 
-      color: '#2F2A27',
-    },
-  });
+    color: '#2F2A27',
+  },
+});

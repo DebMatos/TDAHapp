@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-
+import { categoryOptions, getCategory } from '../../config/categories';
 import colors from '../../theme/colors';
 
 const DAY_MINUTES = 24 * 60;
@@ -71,39 +71,6 @@ const STATUS_OPTIONS = [
   {
     id: 'abandoned',
     label: 'Abandonada',
-  },
-];
-
-const CATEGORY_OPTIONS = [
-  {
-    id: 'inbox',
-    label: 'Inbox',
-    icon: 'archive-outline',
-    color: colors.categoryInbox,
-  },
-  {
-    id: 'work',
-    label: 'Trabalho',
-    icon: 'briefcase-outline',
-    color: colors.categoryWork,
-  },
-  {
-    id: 'personal',
-    label: 'Pessoal',
-    icon: 'home-outline',
-    color: colors.categoryPersonal,
-  },
-  {
-    id: 'exercise',
-    label: 'Exercício',
-    icon: 'barbell-outline',
-    color: colors.categoryExercise,
-  },
-  {
-    id: 'shopping',
-    label: 'Compras',
-    icon: 'cube-outline',
-    color: colors.categoryShopping,
   },
 ];
 
@@ -372,13 +339,7 @@ export default function TaskDetailsModal({
   const sheetBottom = useRef(new Animated.Value(0)).current;
 
   const dragStartHeightRef = useRef(NORMAL_SHEET_HEIGHT);
-
-  const selectedCategory = useMemo(
-    () =>
-      CATEGORY_OPTIONS.find((item) => item.id === categoryId) ||
-      CATEGORY_OPTIONS[0],
-    [categoryId],
-  );
+  const selectedCategory = useMemo(() => getCategory(categoryId), [categoryId]);
 
   const currentSnapshot = useMemo(
     () =>
@@ -992,34 +953,34 @@ export default function TaskDetailsModal({
      SAVE
   ------------------------------------------------------- */
 
-const handleSave = async () => {
-  if (!canSave || isSaving) {
-    return;
-  }
+  const handleSave = async () => {
+    if (!canSave || isSaving) {
+      return;
+    }
 
-  const startMinutes = parseTime(startTime);
+    const startMinutes = parseTime(startTime);
 
-  try {
-    setIsSaving(true);
+    try {
+      setIsSaving(true);
 
-    await onSave({
-      title: title.trim(),
-      date: dateInputToStorageDate(dateValue),
-      startTime: formatTime(startMinutes),
-      durationMinutes: duration,
-      categoryId,
-      notes: notes.trim(),
-      repeat,
-      status,
-    });
+      await onSave({
+        title: title.trim(),
+        date: dateInputToStorageDate(dateValue),
+        startTime: formatTime(startMinutes),
+        durationMinutes: duration,
+        categoryId,
+        notes: notes.trim(),
+        repeat,
+        status,
+      });
 
-    setSavedSnapshot(currentSnapshot);
-  } catch (error) {
-    // O HomeScreen já mostra o erro ao utilizador.
-  } finally {
-    setIsSaving(false);
-  }
-};
+      setSavedSnapshot(currentSnapshot);
+    } catch (error) {
+      // O HomeScreen já mostra o erro ao utilizador.
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const closeInlineEditor = () => {
     if (activeScheduleField) {
@@ -1404,7 +1365,7 @@ const handleSave = async () => {
             <Text style={styles.sectionLabel}>Categoria</Text>
 
             <View style={styles.selectorRow}>
-              {CATEGORY_OPTIONS.map((item) => {
+              {categoryOptions.map((item) => {
                 const selected = item.id === categoryId;
 
                 return (

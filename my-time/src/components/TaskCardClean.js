@@ -1,9 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 
-import {
-  DAY_MINUTES,
-  SNAP_MINUTES,
-} from '../constants/timeline';
+import { DAY_MINUTES } from '../constants/timeline';
 
 import {
   formatTimeFromMinutes,
@@ -20,12 +17,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
+import { getCategory } from '../config/categories';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 
-
-const CARD_LEFT = 58; // Ajustado ligeiramente para afastar da espinha
+const CARD_LEFT = 58;
 const CARD_RIGHT = 16;
 const LONG_PRESS_DELAY_MS = 350;
 
@@ -34,32 +30,6 @@ const LONG_PRESS_DELAY_MS = 350;
 ------------------------------------------------------- */
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-/* -------------------------------------------------------
-   TEMAS POR CATEGORIA (Corrigido)
-------------------------------------------------------- */
-const getCategoryTheme = (category) => {
-  const cat = category ? String(category).toLowerCase().trim() : 'inbox';
-
-  switch (cat) {
-    case 'work':
-    case 'trabalho':
-      return { bg: '#FBF0EC', accent: colors.categoryWork }; // Fundo terracota lavado
-    case 'personal':
-    case 'pessoal':
-      return { bg: '#FDF6ED', accent: colors.categoryPersonal }; // Fundo mostarda lavado
-    case 'exercise':
-    case 'exercicio':
-    case 'exercício':
-      return { bg: '#F4F7F5', accent: colors.categoryExercise }; // Fundo sálvia lavado
-    case 'shopping':
-    case 'compras':
-      return { bg: '#F8F6F9', accent: colors.categoryShopping }; // Fundo violeta lavado
-    case 'inbox':
-    default:
-      return { bg: '#F4F6F7', accent: colors.categoryInbox }; // Fundo azul ardósia lavado
-  }
-};
 
 /* -------------------------------------------------------
    COMPONENTE
@@ -138,12 +108,12 @@ export default function TaskCardClean({
   /* -------------------------------------------------------
      TEMA DINÂMICO
   ------------------------------------------------------- */
-
   const categoryId = task.categoryId ?? task.category ?? 'inbox';
-  const theme = getCategoryTheme(categoryId);
 
-  const cardBackground = isNeutralized ? '#F5F4F2' : theme.bg;
-  const accentColor = isNeutralized ? '#C7BFB9' : theme.accent;
+  const category = getCategory(categoryId);
+
+  const cardBackground = isNeutralized ? '#F5F4F2' : category.surface;
+  const accentColor = isNeutralized ? '#C7BFB9' : category.accent;
 
   const titleColor = isAbandoned ? '#AAA19B' : colors.text;
   const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
