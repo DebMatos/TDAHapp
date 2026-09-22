@@ -5,46 +5,44 @@ export const categories = {
     id: 'inbox',
     label: 'Caixa de Entrada',
     icon: 'archive-outline',
-    color: colors.categoryInbox,
-    surface: '#F4F6F7',
+    color: colors.categories.inbox.color,
+    surface: colors.categories.inbox.surface,
   },
 
   work: {
     id: 'work',
     label: 'Trabalho',
     icon: 'briefcase-outline',
-    color: colors.categoryWork,
-    surface: '#FBF0EC',
+    color: colors.categories.work.color,
+    surface: colors.categories.work.surface,
   },
 
   personal: {
     id: 'personal',
     label: 'Pessoal',
     icon: 'home-outline',
-    color: colors.categoryPersonal,
-    surface: '#FDF6ED',
+    color: colors.categories.personal.color,
+    surface: colors.categories.personal.surface,
   },
 
   exercise: {
     id: 'exercise',
     label: 'Exercício',
     icon: 'barbell-outline',
-    color: colors.categoryExercise,
-    surface: '#F4F7F5',
+    color: colors.categories.exercise.color,
+    surface: colors.categories.exercise.surface,
   },
 
   shopping: {
     id: 'shopping',
     label: 'Compras',
     icon: 'cube-outline',
-    color: colors.categoryShopping,
-    surface: '#F8F6F9',
+    color: colors.categories.shopping.color,
+    surface: colors.categories.shopping.surface,
   },
 };
 
-export const categoryOptions =
-  Object.values(categories);
+export const categoryOptions = Object.values(categories);
 
 export const getCategory = (categoryId) =>
-  categories[categoryId] ??
-  categories.inbox;
+  categories[categoryId] ?? categories.inbox;

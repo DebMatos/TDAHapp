@@ -100,14 +100,19 @@ export const saveTasks = async (userId, tasks) => {
     }
 
     if (canonicalTasks.length > 0) {
+      const rowsToUpsert = canonicalTasks.map((task) =>
+        toDatabase(task, userId),
+      );
+
+      console.log('[saveTasks] rowsToUpsert', rowsToUpsert);
+
+      console.log('[saveTasks] upsert start');
+
       const { error: upsertError } = await supabase
         .from('tasks')
-        .upsert(
-          canonicalTasks.map((task) => toDatabase(task, userId)),
-          {
-            onConflict: 'id',
-          },
-        )
+        .upsert(rowsToUpsert, {
+          onConflict: 'id',
+        })
         .abortSignal(timeout.signal);
 
       if (upsertError) {
@@ -122,11 +127,15 @@ export const saveTasks = async (userId, tasks) => {
       .filter((id) => !currentIds.has(id));
 
     if (idsToDelete.length > 0) {
+      console.log('[saveTasks] delete start', idsToDelete);
+
       const { error: deleteError } = await supabase
         .from('tasks')
         .delete()
         .in('id', idsToDelete)
         .abortSignal(timeout.signal);
+
+      console.log('[saveTasks] delete end', deleteError);
 
       if (deleteError) {
         throw deleteError;

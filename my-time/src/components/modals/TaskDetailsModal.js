@@ -378,7 +378,7 @@ export default function TaskDetailsModal({
   const saveIconColor = !canSave
     ? colors.textFaint
     : isDirty
-      ? colors.categoryWork
+      ? colors.categories.work.color
       : colors.textMuted;
 
   /* -------------------------------------------------------
