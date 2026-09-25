@@ -111,8 +111,10 @@ export default function Header({
   }).current;
 
   const handleGoToNow = () => {
-    const now = new Date();
-    const targetIndex = getIndexForDate(now);
+    const currentTimelineDate = getTimelineDate(new Date());
+
+    const targetIndex = getIndexForDate(currentTimelineDate);
+
     const centeredIndex = Math.max(0, targetIndex - 3);
 
     flatListRef.current?.scrollToIndex({
@@ -120,7 +122,7 @@ export default function Header({
       animated: true,
     });
 
-    setVisibleDate(now);
+    setVisibleDate(currentTimelineDate);
 
     onGoToNow?.();
   };
