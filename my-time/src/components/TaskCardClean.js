@@ -1,5 +1,14 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 
+import { DAY_MINUTES } from '../constants/timeline';
+
+import {
+  formatTimeFromMinutes,
+  timeToMinutes,
+  formatDuration,
+  snapMinutes,
+} from '../utils/time';
+
 import {
   Animated,
   PanResponder,
@@ -8,13 +17,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
+import { getCategory } from '../config/categories';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 
-const DAY_MINUTES = 24 * 60;
-const SNAP_MINUTES = 5;
-const CARD_LEFT = 58; // Ajustado ligeiramente para afastar da espinha
+const CARD_LEFT = 58;
 const CARD_RIGHT = 16;
 const LONG_PRESS_DELAY_MS = 350;
 
@@ -23,72 +30,6 @@ const LONG_PRESS_DELAY_MS = 350;
 ------------------------------------------------------- */
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const snap = (minutes) => Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-
-  const hours = Math.floor(normalized / 60);
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
-const timeToMinutes = (value) => {
-  if (!value || !value.includes(':')) {
-    return 7 * 60;
-  }
-
-  const [hours, minutes] = value.split(':').map(Number);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return 7 * 60;
-  }
-
-  return hours * 60 + minutes;
-};
-
-const formatDuration = (minutes) => {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h${String(mins).padStart(2, '0')}`;
-};
-
-/* -------------------------------------------------------
-   TEMAS POR CATEGORIA (Corrigido)
-------------------------------------------------------- */
-const getCategoryTheme = (category) => {
-  const cat = category ? String(category).toLowerCase().trim() : 'inbox';
-
-  switch (cat) {
-    case 'work':
-    case 'trabalho':
-      return { bg: '#FBF0EC', accent: colors.categoryWork }; // Fundo terracota lavado
-    case 'personal':
-    case 'pessoal':
-      return { bg: '#FDF6ED', accent: colors.categoryPersonal }; // Fundo mostarda lavado
-    case 'exercise':
-    case 'exercicio':
-    case 'exercício':
-      return { bg: '#F4F7F5', accent: colors.categoryExercise }; // Fundo sálvia lavado
-    case 'shopping':
-    case 'compras':
-      return { bg: '#F8F6F9', accent: colors.categoryShopping }; // Fundo violeta lavado
-    case 'inbox':
-    default:
-      return { bg: '#F4F6F7', accent: colors.categoryInbox }; // Fundo azul ardósia lavado
-  }
-};
 
 /* -------------------------------------------------------
    COMPONENTE
@@ -167,12 +108,12 @@ export default function TaskCardClean({
   /* -------------------------------------------------------
      TEMA DINÂMICO
   ------------------------------------------------------- */
-
   const categoryId = task.categoryId ?? task.category ?? 'inbox';
-  const theme = getCategoryTheme(categoryId);
 
-  const cardBackground = isNeutralized ? '#F5F4F2' : theme.bg;
-  const accentColor = isNeutralized ? '#C7BFB9' : theme.accent;
+  const category = getCategory(categoryId);
+
+  const cardBackground = isNeutralized ? '#F5F4F2' : category.surface;
+  const accentColor = isNeutralized ? '#C7BFB9' : category.accent;
 
   const titleColor = isAbandoned ? '#AAA19B' : colors.text;
   const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
@@ -227,7 +168,7 @@ export default function TaskCardClean({
           if (isDragActive.current) {
             const finalY = top + gesture.dy;
             const finalMins = clamp(
-              snap(getMinuteFromY(finalY)),
+              snapMinutes(getMinuteFromY(finalY)),
               0,
               DAY_MINUTES - duration,
             );

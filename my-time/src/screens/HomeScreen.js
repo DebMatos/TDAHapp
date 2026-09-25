@@ -9,14 +9,26 @@ import React, {
 import {
   Image,
   PanResponder,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   Alert,
 } from 'react-native';
+import {
+  DAY_MINUTES,
+  TIMELINE_START_MINUTES,
+  MAX_PPM,
+  DEFAULT_PPM,
+} from '../constants/timeline';
+
+import {
+  formatTimeFromMinutes,
+  timeToMinutes,
+  snapMinutes,
+} from '../utils/time';
+
+import { getDateKey, isSameDay, addDays } from '../utils/date';
 import * as taskService from '../services/taskService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -28,23 +40,11 @@ import colors from '../theme/colors';
 
 import { loadTasks as loadStoredTasks } from '../data/taskRepository';
 import { supabase } from '../lib/supabase';
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { getTimelineDate } from '../utils/timelineDate';
 
 /* -------------------------------------------------------
    TIMELINE
 ------------------------------------------------------- */
-
-const DAY_MINUTES = 24 * 60;
-
-const MAX_PPM = 1.75;
-
-const DEFAULT_PPM = 1.25;
 
 const VERTICAL_PADDING = 20;
 
@@ -56,11 +56,7 @@ const TASK_CARD_RIGHT = 22;
 
 const OVERLAP_GAP = 4;
 
-const TIMELINE_START_MINUTES = 7 * 60;
-
-const SNAP_MINUTES = 5;
-
-const CREATE_LONG_PRESS_MS = 500;
+const CREATE_LONG_PRESS_MS = 400;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
@@ -103,53 +99,7 @@ const VERTICAL_SEGMENTS = [
    HELPERS
 ------------------------------------------------------- */
 
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-
-  const hours = Math.floor(normalized / 60);
-
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
-const parseTimeToMinutes = (timeStr) => {
-  if (!timeStr || !timeStr.includes(':')) {
-    return 7 * 60;
-  }
-
-  const [h, m] = timeStr.split(':').map(Number);
-
-  return (Number.isNaN(h) ? 7 : h) * 60 + (Number.isNaN(m) ? 0 : m);
-};
-
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const snapMinutes = (minutes) =>
-  Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-
-const getDateKey = (date) => {
-  const year = date.getFullYear();
-
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
-
-const isSameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
-
-const addDays = (date, amount) => {
-  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  next.setDate(next.getDate() + amount);
-
-  return next;
-};
 
 const getPinchDistance = (touches) => {
   const [t1, t2] = touches;
@@ -166,7 +116,7 @@ const getPinchDistance = (touches) => {
 ------------------------------------------------------- */
 
 const getTaskTimelineInterval = (task) => {
-  const startMinute = parseTimeToMinutes(task.startTime);
+  const startMinute = timeToMinutes(task.startTime);
 
   let start = startMinute - TIMELINE_START_MINUTES;
 
@@ -294,11 +244,12 @@ export default function TimelineScreen() {
   };
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
-  const today = new Date();
+  const now = new Date();
+
+  const currentTimelineDate = getTimelineDate(now);
+  const isViewingToday = isSameDay(selectedDate, currentTimelineDate);
 
   const selectedDateKey = getDateKey(selectedDate);
-
-  const isViewingToday = isSameDay(selectedDate, today);
 
   const scrollRef = useRef(null);
 
@@ -330,11 +281,13 @@ export default function TimelineScreen() {
 
   const visibleTasks = useMemo(() => {
     const todayKey = getDateKey(new Date());
-
     return tasks.filter((task) => {
       const taskDate = task.date || todayKey;
-
-      return taskDate === selectedDateKey;
+      const taskStartTime = task.startTime || '07:00';
+      const taskDateTime = new Date(`${taskDate}T${taskStartTime}:00`);
+      const taskTimelineDate = getTimelineDate(taskDateTime);
+      const taskTimelineDateKey = getDateKey(taskTimelineDate);
+      return taskTimelineDateKey === selectedDateKey;
     });
   }, [tasks, selectedDateKey]);
 
@@ -445,8 +398,6 @@ export default function TimelineScreen() {
      AGORA
   ------------------------------------------------------- */
 
-  const now = new Date();
-
   const currentAbsMins = now.getHours() * 60 + now.getMinutes();
 
   const nowTop = getVisualY(currentAbsMins);
@@ -485,9 +436,18 @@ export default function TimelineScreen() {
 
   useEffect(() => {
     const loadStoredData = async () => {
-      const canonicalTasks = await loadStoredTasks();
+      try {
+        const canonicalTasks = await loadStoredTasks();
 
-      setTasks(canonicalTasks);
+        setTasks(canonicalTasks);
+      } catch (error) {
+        console.error('Erro ao carregar tarefas:', error);
+
+        Alert.alert(
+          'Não foi possível carregar as tarefas',
+          'Não foi possível comunicar com o servidor. Tenta novamente.',
+        );
+      }
     };
 
     loadStoredData();
