@@ -972,7 +972,9 @@ export default function TimelineScreen() {
             ...draft,
             date:
               draft?.date ||
-              getCivilDateForTimelineSlot(selectedDate, startMinutes),
+              getDateKey(
+                getCivilDateForTimelineSlot(selectedTimelineDate, startMinutes),
+              ),
           });
 
           setModalVisible(false);
@@ -998,20 +1000,22 @@ export default function TimelineScreen() {
               detailsMode === 'create'
                 ? await taskService.createTask(
                     {
+                      ...changes,
                       date:
                         changes.date ||
-                        getCivilDateForTimelineSlot(
-                          selectedDate,
-                          timeToMinutes(
-                            changes.startTime,
-                            TIMELINE_START_MINUTES,
+                        getDateKey(
+                          getCivilDateForTimelineSlot(
+                            selectedTimelineDate,
+                            timeToMinutes(
+                              changes.startTime,
+                              TIMELINE_START_MINUTES,
+                            ),
                           ),
                         ),
                     },
                     tasks,
                   )
                 : await taskService.updateTask(detailsTask.id, changes, tasks);
-
             setTasks(savedTasks);
 
             setDetailsTask(null);
