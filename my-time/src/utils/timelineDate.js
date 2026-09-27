@@ -1,4 +1,7 @@
-import { TIMELINE_START_HOUR } from '../constants/timeline';
+import {
+  TIMELINE_START_HOUR,
+  TIMELINE_START_MINUTES,
+} from '../constants/timeline';
 
 export const getTimelineDate = (dateTime) => {
   const timelineDate = new Date(dateTime);
@@ -10,4 +13,18 @@ export const getTimelineDate = (dateTime) => {
   timelineDate.setHours(0, 0, 0, 0);
 
   return timelineDate;
+};
+
+export const getCivilDateForTimelineSlot = (timelineDate, startMinutes) => {
+  const civilDate = new Date(
+    timelineDate.getFullYear(),
+    timelineDate.getMonth(),
+    timelineDate.getDate(),
+  );
+
+  if (startMinutes < TIMELINE_START_MINUTES) {
+    civilDate.setDate(civilDate.getDate() + 1);
+  }
+
+  return civilDate;
 };

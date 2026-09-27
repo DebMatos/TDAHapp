@@ -40,7 +40,10 @@ import colors from '../theme/colors';
 
 import { loadTasks as loadStoredTasks } from '../data/taskRepository';
 import { supabase } from '../lib/supabase';
-import { getTimelineDate } from '../utils/timelineDate';
+import {
+  getTimelineDate,
+  getCivilDateForTimelineSlot,
+} from '../utils/timelineDate';
 
 /* -------------------------------------------------------
    TIMELINE
@@ -242,14 +245,17 @@ export default function TimelineScreen() {
       },
     ]);
   };
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [selectedTimelineDate, setSelectedTimelineDate] = useState(() =>
+    getTimelineDate(new Date()),
+  );
 
   const now = new Date();
 
   const currentTimelineDate = getTimelineDate(now);
-  const isViewingToday = isSameDay(selectedDate, currentTimelineDate);
 
-  const selectedDateKey = getDateKey(selectedDate);
+  const isViewingToday = isSameDay(selectedTimelineDate, currentTimelineDate);
+
+  const selectedTimelineDateKey = getDateKey(selectedTimelineDate);
 
   const scrollRef = useRef(null);
 
@@ -281,26 +287,29 @@ export default function TimelineScreen() {
 
   const visibleTasks = useMemo(() => {
     const todayKey = getDateKey(new Date());
+
     return tasks.filter((task) => {
       const taskDate = task.date || todayKey;
+
       const taskStartTime = task.startTime || '07:00';
+
       const taskDateTime = new Date(`${taskDate}T${taskStartTime}:00`);
+
       const taskTimelineDate = getTimelineDate(taskDateTime);
-      const taskTimelineDateKey = getDateKey(taskTimelineDate);
-      return taskTimelineDateKey === selectedDateKey;
+
+      return getDateKey(taskTimelineDate) === selectedTimelineDateKey;
     });
-  }, [tasks, selectedDateKey]);
+  }, [tasks, selectedTimelineDateKey]);
 
   const [modalVisible, setModalVisible] = useState(false);
 
   const [targetSlotMinutes, setTargetSlotMinutes] = useState(null);
-
   const goToPreviousDay = () => {
-    setSelectedDate((current) => addDays(current, -1));
+    setSelectedTimelineDate((current) => addDays(current, -1));
   };
 
   const goToNextDay = () => {
-    setSelectedDate((current) => addDays(current, 1));
+    setSelectedTimelineDate((current) => addDays(current, 1));
   };
 
   /* -------------------------------------------------------
@@ -457,12 +466,16 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   const handleDragEnd = async (taskId, newMins) => {
+    const taskDate = getDateKey(
+      getCivilDateForTimelineSlot(selectedTimelineDate, newMins),
+    );
+
     const savedTasks = await taskService.moveTask({
       tasks,
-
       taskId,
 
       schedule: {
+        date: taskDate,
         startTime: formatTimeFromMinutes(newMins),
       },
     });
@@ -490,17 +503,19 @@ export default function TimelineScreen() {
     categoryId,
   }) => {
     try {
-      const startMins = targetSlotMinutes ?? 7 * 60;
+      const startMins = targetSlotMinutes ?? TIMELINE_START_MINUTES;
+
+      const taskDate = getDateKey(
+        getCivilDateForTimelineSlot(selectedTimelineDate, startMins),
+      );
 
       const savedTasks = await taskService.createTask(
         {
           title,
-
           notes,
-
           categoryId: categoryId || 'inbox',
 
-          date: selectedDateKey,
+          date: taskDate,
 
           startTime: formatTimeFromMinutes(startMins),
 
@@ -720,7 +735,7 @@ export default function TimelineScreen() {
    NOW BUTTON
 ------------------------------------------------------- */
   const handleGoToNow = () => {
-    const today = new Date();
+    const currentTimelineDate = getTimelineDate(new Date());
 
     const targetY = nowTop - viewportHeight * 0.35;
 
@@ -728,9 +743,7 @@ export default function TimelineScreen() {
 
     const y = clamp(targetY, 0, maxScroll);
 
-    if (!isSameDay(selectedDate, today)) {
-      setSelectedDate(today);
-    }
+    setSelectedTimelineDate(currentTimelineDate);
 
     scrollYRef.current = y;
 
@@ -748,8 +761,8 @@ export default function TimelineScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Header
         onMenuPress={handleMenuPress}
-        selectedDate={selectedDate}
-        onSelectDate={(newDate) => setSelectedDate(newDate)}
+        selectedDate={selectedTimelineDate}
+        onSelectDate={setSelectedTimelineDate}
         onGoToNow={handleGoToNow} // <-- Nova prop de ação
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
@@ -949,12 +962,19 @@ export default function TimelineScreen() {
         }}
         onSave={handleSaveTask}
         onMoreOptions={(draft) => {
+          const startMinutes =
+            targetSlotMinutes ??
+            timeToMinutes(draft?.startTime, TIMELINE_START_MINUTES);
+
           setDetailsMode('create');
 
           setDetailsTask({
             ...draft,
-
-            date: draft?.date || selectedDateKey,
+            date:
+              draft?.date ||
+              getDateKey(
+                getCivilDateForTimelineSlot(selectedTimelineDate, startMinutes),
+              ),
           });
 
           setModalVisible(false);
@@ -981,12 +1001,21 @@ export default function TimelineScreen() {
                 ? await taskService.createTask(
                     {
                       ...changes,
-                      date: changes.date || selectedDateKey,
+                      date:
+                        changes.date ||
+                        getDateKey(
+                          getCivilDateForTimelineSlot(
+                            selectedTimelineDate,
+                            timeToMinutes(
+                              changes.startTime,
+                              TIMELINE_START_MINUTES,
+                            ),
+                          ),
+                        ),
                     },
                     tasks,
                   )
                 : await taskService.updateTask(detailsTask.id, changes, tasks);
-
             setTasks(savedTasks);
 
             setDetailsTask(null);
