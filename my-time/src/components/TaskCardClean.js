@@ -113,7 +113,7 @@ export default function TaskCardClean({
   const category = getCategory(categoryId);
 
   const cardBackground = isNeutralized ? '#F5F4F2' : category.surface;
-  const accentColor = isNeutralized ? '#C7BFB9' : category.accent;
+  const accentColor = isNeutralized ? '#C7BFB9' : category.color;
 
   const titleColor = isAbandoned ? '#AAA19B' : colors.text;
   const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
