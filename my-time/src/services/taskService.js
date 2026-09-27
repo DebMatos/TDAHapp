@@ -6,31 +6,57 @@ import {
 
 import {
   loadTasks,
-  saveTasks,
+  createTask as createStoredTask,
+  updateTask as updateStoredTask,
+  deleteTask as deleteStoredTask,
 } from '../data/taskRepository';
+
+const getNextPosition = (tasks) => {
+  const maxPosition = tasks.reduce(
+    (max, task) => {
+      const position = Number(task.position);
+
+      return Number.isFinite(position)
+        ? Math.max(max, position)
+        : max;
+    },
+    -1,
+  );
+
+  return maxPosition + 1;
+};
+
+/* -------------------------------------------------------
+   CREATE
+------------------------------------------------------- */
 
 export const createTask = async (
   values,
-    currentTasks = null
+  currentTasks = null,
 ) => {
   const tasks =
-  currentTasks ??
-    await loadTasks();
+    currentTasks ?? await loadTasks();
 
-  const task =
-    createTaskModel({
-      ...values,
+  const task = createTaskModel({
+    ...values,
 
-      id: `task-${Date.now()}`,
+    id: `task-${Date.now()}`,
 
-      position: tasks.length,
-    });
+    position: getNextPosition(tasks),
+  });
 
-  return saveTasks([
+  const savedTask =
+    await createStoredTask(task);
+
+  return [
     ...tasks,
-    task,
-  ]);
+    savedTask,
+  ];
 };
+
+/* -------------------------------------------------------
+   MOVE
+------------------------------------------------------- */
 
 export const moveTask = async ({
   tasks: currentTasks,
@@ -38,76 +64,126 @@ export const moveTask = async ({
   schedule,
 }) => {
   const tasks =
-    currentTasks ??
-    await loadTasks();
+    currentTasks ?? await loadTasks();
 
-  const updatedTasks =
-    tasks.map((task) =>
-      task.id === taskId
-        ? updateTaskModel(
-            task,
-            schedule
-          )
-        : task
+  const currentTask =
+    tasks.find(
+      (task) => task.id === taskId,
     );
 
-  return saveTasks(updatedTasks);
+  if (!currentTask) {
+    return tasks;
+  }
+
+  const updatedTask =
+    updateTaskModel(
+      currentTask,
+      schedule,
+    );
+
+  const savedTask =
+    await updateStoredTask(
+      updatedTask,
+    );
+
+  return tasks.map((task) =>
+    task.id === taskId
+      ? savedTask
+      : task,
+  );
 };
+
+/* -------------------------------------------------------
+   TOGGLE COMPLETION
+------------------------------------------------------- */
 
 export const toggleCompletion = async (
   taskId,
- currentTasks = null
-
+  currentTasks = null,
 ) => {
   const tasks =
-    currentTasks ??
-    await loadTasks();
+    currentTasks ?? await loadTasks();
 
-  const updatedTasks =
-    tasks.map((task) =>
-      task.id === taskId
-        ? toggleTaskCompletion(task)
-        : task
+  const currentTask =
+    tasks.find(
+      (task) => task.id === taskId,
     );
 
-  return saveTasks(updatedTasks);
+  if (!currentTask) {
+    return tasks;
+  }
+
+  const updatedTask =
+    toggleTaskCompletion(
+      currentTask,
+    );
+
+  const savedTask =
+    await updateStoredTask(
+      updatedTask,
+    );
+
+  return tasks.map((task) =>
+    task.id === taskId
+      ? savedTask
+      : task,
+  );
 };
+
+/* -------------------------------------------------------
+   UPDATE
+------------------------------------------------------- */
 
 export const updateTask = async (
   taskId,
   changes,
-  currentTasks = null
-
+  currentTasks = null,
 ) => {
   const tasks =
-      currentTasks ??
-    await loadTasks();
+    currentTasks ?? await loadTasks();
 
-  const updatedTasks =
-    tasks.map((task) =>
-      task.id === taskId
-        ? updateTaskModel(
-            task,
-            changes
-          )
-        : task
+  const currentTask =
+    tasks.find(
+      (task) => task.id === taskId,
     );
 
-  return saveTasks(updatedTasks);
+  if (!currentTask) {
+    return tasks;
+  }
+
+  const updatedTask =
+    updateTaskModel(
+      currentTask,
+      changes,
+    );
+
+  const savedTask =
+    await updateStoredTask(
+      updatedTask,
+    );
+
+  return tasks.map((task) =>
+    task.id === taskId
+      ? savedTask
+      : task,
+  );
 };
+
+/* -------------------------------------------------------
+   DELETE
+------------------------------------------------------- */
 
 export const deleteTask = async (
   taskId,
- currentTasks = null
+  currentTasks = null,
 ) => {
   const tasks =
-      currentTasks ??
-    await loadTasks();
+    currentTasks ?? await loadTasks();
 
-  return saveTasks(
-    tasks.filter(
-      (task) =>
-        task.id !== taskId
-    )
+  await deleteStoredTask(taskId);
+
+  return tasks.filter(
+    (task) =>
+      task.id !== taskId,
   );
 };

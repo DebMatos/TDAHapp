@@ -1,16 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { normalizeTasks } from '../domain/taskModel';
-
 import { supabase } from '../lib/supabase';
 
 import {
   loadTasks as loadRemoteTasks,
+  createTask as createRemoteTask,
+  updateTask as updateRemoteTask,
+  deleteTask as deleteRemoteTask,
+  clearTasks as clearRemoteTasks,
   saveTasks as saveRemoteTasks,
 } from '../repositories/supabaseTaskRepository';
 
 const TASKS_STORAGE_KEY = '@my_time_tasks_data_v2';
-
 const TASKS_SCHEMA_VERSION = 2;
 
 const getCurrentUserId = async () => {
@@ -19,14 +21,18 @@ const getCurrentUserId = async () => {
   } = await supabase.auth.getSession();
 
   if (!session?.user?.id) {
-    throw new Error('Não existe um utilizador autenticado.');
+    throw new Error(
+      'Não existe um utilizador autenticado.',
+    );
   }
 
   return session.user.id;
 };
 
 const loadLocalTasks = async () => {
-  const stored = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+  const stored = await AsyncStorage.getItem(
+    TASKS_STORAGE_KEY,
+  );
 
   if (!stored) {
     return [];
@@ -46,23 +52,14 @@ const loadLocalTasks = async () => {
 };
 
 /* -------------------------------------------------------
-   WRITE
-------------------------------------------------------- */
-
-export const saveTasks = async (tasks) => {
-  const userId = await getCurrentUserId();
-
-  const result = await saveRemoteTasks(userId, tasks);
-  return result;
-};
-/* -------------------------------------------------------
    READ
 ------------------------------------------------------- */
 
 export const loadTasks = async () => {
   const userId = await getCurrentUserId();
 
-  const remoteTasks = await loadRemoteTasks(userId);
+  const remoteTasks =
+    await loadRemoteTasks(userId);
 
   if (remoteTasks.length > 0) {
     return remoteTasks;
@@ -72,25 +69,94 @@ export const loadTasks = async () => {
    * Migração única das tarefas que já existiam
    * no telemóvel antes de ligar ao Supabase.
    */
-  const localTasks = await loadLocalTasks();
+  const localTasks =
+    await loadLocalTasks();
 
   if (localTasks.length === 0) {
     return [];
   }
 
-  const migratedTasks = await saveRemoteTasks(userId, localTasks);
+  const migratedTasks =
+    await saveRemoteTasks(
+      userId,
+      localTasks,
+    );
 
-  await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
+  await AsyncStorage.removeItem(
+    TASKS_STORAGE_KEY,
+  );
 
   return migratedTasks;
 };
 
+/* -------------------------------------------------------
+   CREATE
+------------------------------------------------------- */
+
+export const createTask = async (task) => {
+  const userId = await getCurrentUserId();
+
+  return createRemoteTask(
+    userId,
+    task,
+  );
+};
+
+/* -------------------------------------------------------
+   UPDATE
+------------------------------------------------------- */
+
+export const updateTask = async (task) => {
+  const userId = await getCurrentUserId();
+
+  return updateRemoteTask(
+    userId,
+    task,
+  );
+};
+
+/* -------------------------------------------------------
+   DELETE
+------------------------------------------------------- */
+
+export const deleteTask = async (taskId) => {
+  const userId = await getCurrentUserId();
+
+  await deleteRemoteTask(
+    userId,
+    taskId,
+  );
+};
+
+/* -------------------------------------------------------
+   CLEAR
+------------------------------------------------------- */
+
 export const clearTasks = async () => {
   const userId = await getCurrentUserId();
 
-  await saveRemoteTasks(userId, []);
+  await clearRemoteTasks(userId);
 
-  await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
+  await AsyncStorage.removeItem(
+    TASKS_STORAGE_KEY,
+  );
+};
+
+/* -------------------------------------------------------
+   SNAPSHOT SAVE
+
+   Temporariamente mantido para compatibilidade.
+   Depois do refactor do taskService deixa de fazer
+   parte do CRUD normal.
+------------------------------------------------------- */
+
+export const saveTasks = async (tasks) => {
+  const userId = await getCurrentUserId();
+
+  return saveRemoteTasks(
+    userId,
+    tasks,
+  );
 };
 
 export const TASK_STORAGE_INFO = {
