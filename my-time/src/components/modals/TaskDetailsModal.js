@@ -74,6 +74,41 @@ const STATUS_OPTIONS = [
   },
 ];
 
+const PRIORITY_OPTIONS = [
+  {
+    id: null,
+    label: 'Sem prioridade',
+    icon: 'flag-outline',
+    color: colors.textMuted,
+  },
+  {
+    id: 'low',
+    label: 'Baixa',
+    icon: 'flag-outline',
+    color: colors.categories.exercise.color,
+  },
+  {
+    id: 'medium',
+    label: 'Média',
+    icon: 'flag-outline',
+    color: colors.categories.personal.color,
+  },
+  {
+    id: 'high',
+    label: 'Alta',
+    icon: 'flag-outline',
+    color: colors.categories.work.color,
+  },
+];
+
+const getPriorityLabel = (priority) =>
+  PRIORITY_OPTIONS.find((item) => item.id === priority)?.label ??
+  'Sem prioridade';
+
+const getPriorityColor = (priority) =>
+  PRIORITY_OPTIONS.find((item) => item.id === priority)?.color ??
+  colors.textMuted;
+
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
@@ -308,6 +343,10 @@ export default function TaskDetailsModal({
 
   const [status, setStatus] = useState('pending');
 
+  const [priority, setPriority] = useState(null);
+ 
+  const [isEditingPriority, setIsEditingPriority] = useState(false);
+
   const [repeat, setRepeat] = useState('never');
 
   const [isEditingRepeat, setIsEditingRepeat] = useState(false);
@@ -350,6 +389,7 @@ export default function TaskDetailsModal({
         endTime,
         duration,
         categoryId,
+        priority,
         status,
         repeat,
         notes: notes.trim(),
@@ -361,6 +401,7 @@ export default function TaskDetailsModal({
       endTime,
       duration,
       categoryId,
+      priority,
       status,
       repeat,
       notes,
@@ -682,6 +723,8 @@ export default function TaskDetailsModal({
 
     const initialCategory = initialValues?.categoryId || 'inbox';
 
+    const initialPriority = initialValues?.priority ?? null;
+
     const initialRepeat = initialValues?.repeat ?? 'never';
 
     const initialNotes = initialValues?.notes ?? '';
@@ -716,6 +759,10 @@ export default function TaskDetailsModal({
 
     setActiveScheduleField(null);
 
+    setPriority(initialPriority);
+
+    setIsEditingPriority(false);
+
     if (DURATION_PRESETS.includes(initialDuration)) {
       setCustomDuration('');
     } else {
@@ -741,6 +788,8 @@ export default function TaskDetailsModal({
         repeat: initialRepeat,
 
         notes: initialNotes.trim(),
+
+        priority: initialPriority,
       }),
     );
   }, [visible, initialValues]);
@@ -972,6 +1021,7 @@ export default function TaskDetailsModal({
         notes: notes.trim(),
         repeat,
         status,
+        priority,
       });
 
       setSavedSnapshot(currentSnapshot);
@@ -1391,14 +1441,7 @@ export default function TaskDetailsModal({
 
                     {selected && (
                       <Text
-                        style={[
-                          styles.selectorLabel,
-
-                          {
-                            color: item.color,
-                          },
-                        ]}
-                        numberOfLines={1}
+                        style={[styles.selectorLabel, { color: item.color }]}
                       >
                         {item.label}
                       </Text>
@@ -1407,6 +1450,66 @@ export default function TaskDetailsModal({
                 );
               })}
             </View>
+
+            {/* PRIORITY */}
+            <Text style={styles.sectionLabel}>Prioridade</Text>
+
+            {!isEditingPriority ? (
+              <TouchableOpacity
+                style={styles.priorityRestRow}
+                activeOpacity={0.65}
+                onPress={() => {
+                  closeInlineEditor();
+                  setIsEditingPriority(true);
+                }}
+              >
+                <Ionicons
+                  name="flag-outline"
+                  size={20}
+                  color={getPriorityColor(priority)}
+                />
+
+                <Text style={styles.priorityRestText}>
+                  {getPriorityLabel(priority)}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.priorityOptionsRow}>
+                {PRIORITY_OPTIONS.map((item) => {
+                  const selected = item.id === priority;
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id ?? 'none'}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.selectorItem,
+                        selected && styles.selectorItemSelected,
+                      ]}
+                      onPress={() => {
+                        setPriority(item.id);
+                        setIsEditingPriority(false);
+                      }}
+                    >
+                      <Ionicons
+                        name={item.icon}
+                        size={selected ? 23 : 20}
+                        color={selected ? item.color : colors.textMuted}
+                      />
+
+                      {selected && (
+                        <Text
+                          style={[styles.selectorLabel, { color: item.color }]}
+                          numberOfLines={1}
+                        >
+                          {item.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {/* STATUS */}
 
