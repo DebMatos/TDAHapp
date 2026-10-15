@@ -1032,17 +1032,22 @@ export default function TaskDetailsModal({
     }
   };
 
-  const closeInlineEditor = () => {
-    if (activeScheduleField) {
-      setActiveScheduleField(null);
 
-      Keyboard.dismiss();
-    }
+const closeInlineEditor = () => {
+  if (activeScheduleField) {
+    setActiveScheduleField(null);
+    Keyboard.dismiss();
+  }
 
-    if (isEditingRepeat) {
-      setIsEditingRepeat(false);
-    }
-  };
+  if (isEditingRepeat) {
+    setIsEditingRepeat(false);
+  }
+
+  if (isEditingPriority) {
+    setIsEditingPriority(false);
+  }
+};
+
 
   /* -------------------------------------------------------
      SCHEDULE RENDER
@@ -1494,7 +1499,7 @@ export default function TaskDetailsModal({
                       <Ionicons
                         name={item.icon}
                         size={selected ? 23 : 20}
-                        color={selected ? item.color : colors.textMuted}
+                        color={item.color}
                       />
 
                       {selected && (
@@ -2292,5 +2297,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
 
     color: colors.danger,
+  },  
+
+  /* PRIORITY */
+
+  priorityRestRow: {
+    minHeight: 42,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingRight: 10,
   },
+
+  priorityRestText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+
+  priorityOptionsRow: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+
 });
