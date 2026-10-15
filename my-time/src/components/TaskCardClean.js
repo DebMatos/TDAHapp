@@ -118,12 +118,15 @@ export default function TaskCardClean({
   const titleColor = isAbandoned ? '#AAA19B' : colors.text;
   const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
 
-  const priorityColor =
+
+const priorityColor =
   task.priority === 'high'
     ? colors.categories.work.color
-    : task.priority === 'low'
-      ? colors.categories.exercise.color
-      : colors.now;
+    : task.priority === 'medium'
+      ? colors.categories.personal.color
+      : task.priority === 'low'
+        ? colors.categories.exercise.color
+        : null;
 
   /* -------------------------------------------------------
      DRAG
@@ -458,12 +461,15 @@ export default function TaskCardClean({
     {task.title}
   </Text>
 
+
+{priorityColor && (
   <Ionicons
     name="flag-outline"
     size={12}
     color={priorityColor}
     style={styles.priorityFlag}
   />
+)}
 </View>
 
         {hasRoomForMeta && (
