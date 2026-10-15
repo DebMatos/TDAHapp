@@ -8,7 +8,15 @@ import {
 export const syncOperation = async (userId, operation) => {
   switch (operation.type) {
     case 'create':
-      await createRemoteTask(userId, operation.task);
+      try {
+        await createRemoteTask(userId, operation.task);
+      } catch (error) {
+        // 23505: registo com este ID já existe.
+        // Não sobrescrever a tarefa remota.
+        if (error.code !== '23505') {
+          throw error;
+        }
+      }
       break;
 
     case 'update':
