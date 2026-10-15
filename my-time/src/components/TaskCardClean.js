@@ -118,6 +118,16 @@ export default function TaskCardClean({
   const titleColor = isAbandoned ? '#AAA19B' : colors.text;
   const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
 
+
+const priorityColor =
+  task.priority === 'high'
+    ? colors.categories.work.color
+    : task.priority === 'medium'
+      ? colors.categories.personal.color
+      : task.priority === 'low'
+        ? colors.categories.exercise.color
+        : null;
+
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
@@ -436,19 +446,31 @@ export default function TaskCardClean({
           }
         }}
       >
-        <Text
-          style={[
-            styles.taskTitle,
-            { color: titleColor },
-            isNarrow && styles.taskTitleNarrow,
-            isVeryNarrow && styles.taskTitleVeryNarrow,
-            isCompleted && styles.taskTitleCompleted,
-            isAbandoned && styles.taskTitleAbandoned,
-          ]}
-          numberOfLines={1}
-        >
-          {task.title}
-        </Text>
+<View style={styles.cardTopRow}>
+  <Text
+    style={[
+      styles.taskTitle,
+      { color: titleColor },
+      isNarrow && styles.taskTitleNarrow,
+      isVeryNarrow && styles.taskTitleVeryNarrow,
+      isCompleted && styles.taskTitleCompleted,
+      isAbandoned && styles.taskTitleAbandoned,
+    ]}
+    numberOfLines={1}
+  >
+    {task.title}
+  </Text>
+
+
+{priorityColor && (
+  <Ionicons
+    name="flag-outline"
+    size={12}
+    color={priorityColor}
+    style={styles.priorityFlag}
+  />
+)}
+</View>
 
         {hasRoomForMeta && (
           <Text
@@ -520,6 +542,7 @@ const styles = StyleSheet.create({
   },
 
   taskTitle: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '600',
     includeFontPadding: false,
@@ -670,4 +693,17 @@ const styles = StyleSheet.create({
   tinyTitleVeryNarrow: {
     fontSize: 7,
   },
+
+cardTopRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+
+priorityFlag: {
+  marginLeft: 8,
+  marginRight: 4,
+  flexShrink: 0,
+},
+
 });

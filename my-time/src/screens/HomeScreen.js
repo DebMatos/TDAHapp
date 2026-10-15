@@ -501,6 +501,7 @@ export default function TimelineScreen() {
     notes,
     durationMinutes,
     categoryId,
+    priority,
   }) => {
     try {
       const startMins = targetSlotMinutes ?? TIMELINE_START_MINUTES;
@@ -514,6 +515,7 @@ export default function TimelineScreen() {
           title,
           notes,
           categoryId: categoryId || 'inbox',
+          priority,
 
           date: taskDate,
 

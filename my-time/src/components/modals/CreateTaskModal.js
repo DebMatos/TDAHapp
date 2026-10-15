@@ -24,6 +24,13 @@ import colors from '../../theme/colors';
 
 const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
+const PRIORITY_OPTIONS = [
+  { id: null, label: 'Sem prioridade', color: colors.textMuted },
+  { id: 'low', label: 'Baixa', color: colors.categories.exercise.color },
+  { id: 'medium', label: 'Média', color: colors.categories.personal.color },
+  { id: 'high', label: 'Alta', color: colors.categories.work.color },
+];
+
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
@@ -71,15 +78,21 @@ export default function CreateTaskModal({
 
   const [duration, setDuration] = useState(30);
 
+  const [priority, setPriority] = useState(null);
+
   const [categoryId, setCategoryId] = useState('inbox');
 
   const [durationPickerVisible, setDurationPickerVisible] = useState(false);
+
+  const [priorityPickerVisible, setPriorityPickerVisible] = useState(false);
 
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
 
   const selectedCategory = useMemo(() => getCategory(categoryId), [categoryId]);
+
+  const selectedPriority = PRIORITY_OPTIONS.find((item) => item.id === priority);
   /* -------------------------------------------------------
      RESET AO ABRIR
   ------------------------------------------------------- */
@@ -92,6 +105,7 @@ export default function CreateTaskModal({
     setTitle('');
     setDescription('');
     setDuration(30);
+    setPriority(null);
     setCategoryId('inbox');
   }, [visible]);
 
@@ -112,6 +126,7 @@ export default function CreateTaskModal({
         notes: description.trim(),
         durationMinutes: duration,
         categoryId,
+        priority,
       });
     } finally {
       setIsSaving(false);
@@ -132,6 +147,7 @@ export default function CreateTaskModal({
           : '07:00',
       durationMinutes: duration,
       categoryId,
+      priority,
     });
   };
   /* -------------------------------------------------------
@@ -249,20 +265,14 @@ export default function CreateTaskModal({
                 <TouchableOpacity
                   style={styles.iconButton}
                   activeOpacity={0.75}
+                  onPress={() => setPriorityPickerVisible(true)}
                 >
-                  <Ionicons name="flag-outline" size={19} color="#57504B" />
+                  <Ionicons
+                    name="flag-outline"
+                    size={17}
+                    color={selectedPriority.color}
+                  />
                 </TouchableOpacity>
-
-                {/* ETIQUETA */}
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="pricetag-outline" size={19} color="#57504B" />
-                </TouchableOpacity>
-
-                {/* MAIS */}
 
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -359,6 +369,54 @@ export default function CreateTaskModal({
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ---------------------------------------------------
+          PICKER PRIORIDADE
+      --------------------------------------------------- */}
+
+      <Modal
+        visible={priorityPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPriorityPickerVisible(false)}
+      >
+        <Pressable
+          style={styles.pickerOverlay}
+          onPress={() => setPriorityPickerVisible(false)}
+        >
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Prioridade</Text>
+
+            {PRIORITY_OPTIONS.map((item) => (
+              <TouchableOpacity
+                key={item.id ?? 'none'}
+                style={styles.pickerRow}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setPriority(item.id);
+                  setPriorityPickerVisible(false);
+                }}
+              >
+                <View style={styles.categoryLeft}>
+                  <Ionicons name="flag-outline" size={20} color={item.color} />
+                  <Text
+                    style={[
+                      styles.pickerRowText,
+                      item.id === priority && styles.pickerRowTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+
+                {item.id === priority && (
+                  <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         </Pressable>
       </Modal>

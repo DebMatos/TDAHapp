@@ -6,7 +6,7 @@ const VALID_STATUSES = new Set([
 
 const VALID_PRIORITIES = new Set([
   'low',
-  'normal',
+  'medium',
   'high',
 ]);
 
@@ -110,8 +110,7 @@ const normalizeStatus = (value) =>
   VALID_STATUSES.has(value) ? value : 'pending';
 
 const normalizePriority = (value) =>
-  VALID_PRIORITIES.has(value) ? value : 'normal';
-
+  VALID_PRIORITIES.has(value) ? value : null;
 const normalizeRepeat = (value) =>
   VALID_REPEATS.has(value) ? value : 'never';
 
@@ -248,7 +247,7 @@ export const createTask = (
     {
       ...values,
       status: values.status ?? 'pending',
-      priority: values.priority ?? 'normal',
+      priority: values.priority ?? null,
       repeat: values.repeat ?? 'never',
       source: values.source ?? 'app',
       subtasks: values.subtasks ?? [],
