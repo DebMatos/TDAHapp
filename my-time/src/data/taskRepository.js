@@ -9,6 +9,11 @@ import {
   saveState,
 } from '../repositories/localTaskRepository';
 
+
+import { supabase } from '../lib/supabase';
+import { syncOperation } from '../services/taskSyncService';
+
+
 // Serializa operações para evitar gravações concorrentes.
 let writeQueue = Promise.resolve();
 
@@ -169,6 +174,83 @@ export const saveTasks = async (tasks) => {
   });
 
   return canonicalTasks;
+};
+
+
+/* SYNC */
+
+let syncPromise = null;
+
+export const syncPendingTasks = () => {
+  if (syncPromise) {
+    return syncPromise;
+  }
+
+  syncPromise = (async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error || !session?.user?.id) {
+      throw error ?? new Error('Sessão indisponível');
+    }
+
+    const userId = session.user.id;
+    let synced = 0;
+
+    while (true) {
+      // Ler a próxima operação sem interferir
+      // com gravações locais em curso.
+      const operation = await enqueueWrite(async () => {
+        const state = await getState();
+        return state.pendingOps[0] ?? null;
+      });
+
+      if (!operation) {
+        break;
+      }
+
+      // Se falhar, a operação permanece na fila.
+      await syncOperation(userId, operation);
+
+      // Remover apenas a operação confirmada.
+      await enqueueWrite(async () => {
+        const state = await getState();
+
+        const nextState = {
+          ...state,
+          pendingOps: state.pendingOps.filter(
+            (item) => item.id !== operation.id,
+          ),
+        };
+
+        await saveState(nextState);
+      });
+
+      synced += 1;
+    }
+
+    return synced;
+  })();
+
+  // Libertar o bloqueio após sucesso ou erro.
+  const currentPromise = syncPromise;
+
+  currentPromise.then(
+    () => {
+      if (syncPromise === currentPromise) {
+        syncPromise = null;
+      }
+    },
+    () => {
+      if (syncPromise === currentPromise) {
+        syncPromise = null;
+      }
+    },
+  );
+
+  return currentPromise;
 };
 
 export const TASK_STORAGE_INFO = {
