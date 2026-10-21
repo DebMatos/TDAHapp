@@ -187,11 +187,13 @@ export const saveTasks = async (tasks) => {
 /* SYNC */
 
 let syncPromise = null;
+let syncRequested = false;
 
 export const syncPendingTasks = () => {
-  if (syncPromise) {
-    return syncPromise;
-  }
+if (syncPromise) {
+  syncRequested = true;
+  return syncPromise;
+}
 
   syncPromise = (async () => {
     const {
@@ -244,18 +246,27 @@ export const syncPendingTasks = () => {
   // Libertar o bloqueio após sucesso ou erro.
   const currentPromise = syncPromise;
 
-  currentPromise.then(
-    () => {
-      if (syncPromise === currentPromise) {
-        syncPromise = null;
-      }
-    },
-    () => {
-      if (syncPromise === currentPromise) {
-        syncPromise = null;
-      }
-    },
-  );
+currentPromise.then(
+  () => {
+    if (syncPromise !== currentPromise) return;
+
+    syncPromise = null;
+
+    if (syncRequested) {
+      syncRequested = false;
+
+      syncPendingTasks().catch((error) => {
+        console.warn('[Sync] Falha na nova tentativa:', error);
+      });
+    }
+  },
+  () => {
+    if (syncPromise !== currentPromise) return;
+
+    syncPromise = null;
+    syncRequested = false;
+  },
+);
 
   return currentPromise;
 };
