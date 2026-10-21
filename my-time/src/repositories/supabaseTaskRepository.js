@@ -83,7 +83,7 @@ export const createTask = async (
 ) => {
   const canonicalTask =
     normalizeTask(task);
-
+console.log('[Sync] Prioridade enviada:', canonicalTask.priority);
   const { data, error } =
     await supabase
       .from('tasks')

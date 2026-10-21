@@ -13,7 +13,6 @@ import {
 import { supabase } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
 
-
 // Serializa operações para evitar gravações concorrentes.
 let writeQueue = Promise.resolve();
 
@@ -42,13 +41,22 @@ const makeOperation = (type, data) => ({
 });
 
 // Guarda tarefas e operação pendente no mesmo registo.
-const commit = (buildNextState) =>
-  enqueueWrite(async () => {
+const commit = async (buildNextState) => {
+
+  const savedState = await enqueueWrite(async () => {
     const state = await getState();
     const nextState = buildNextState(state);
 
     return saveState(nextState);
   });
+  // A gravação local já terminou.
+  // Sincronizar em segundo plano, sem bloquear a aplicação.
+  syncPendingTasks().catch((error) => {
+    console.warn('[Sync] Falha na sincronização:', error);
+  });
+
+  return savedState;
+};
 
 /* READ */
 
@@ -80,7 +88,6 @@ export const createTask = async (task) => {
 
 export const updateTask = async (task) => {
   const canonicalTask = normalizeTask(task);
-
   await commit((state) => ({
     tasks: state.tasks.map((item) =>
       item.id === canonicalTask.id

@@ -15,6 +15,8 @@ import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/HomeScreen';
 import TimelineSpike from './src/screens/TimelineSpike';
 import colors from './src/theme/colors';
+import { syncPendingTasks } from './src/data/taskRepository';
+import NetInfo from '@react-native-community/netinfo';
 
 const Tab = createBottomTabNavigator();
 
@@ -84,6 +86,33 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+  if (!session?.user?.id) return;
+
+  const unsubscribe = NetInfo.addEventListener((state) => {
+    if (state.isConnected === true &&
+        state.isInternetReachable === true) {
+      syncPendingTasks().catch((error) => {
+        console.warn('[Sync] Falha ao recuperar ligação:', error);
+      });
+    }
+  });
+
+  return () => unsubscribe();
+}, [session?.user?.id]);
+  useEffect(() => {
+  if (!session?.user?.id) return;
+
+  syncPendingTasks()
+    .then((count) => {
+      console.log(`[Sync] ${count} operações sincronizadas`);
+    })
+    .catch((error) => {
+      console.warn('[Sync] Falha na sincronização:', error);
+    });
+}, [session?.user?.id]);
+
 
   if (!fontsLoaded || session === undefined) {
     return (
