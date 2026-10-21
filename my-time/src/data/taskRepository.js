@@ -1,165 +1,277 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import { normalizeTasks } from '../domain/taskModel';
-import { supabase } from '../lib/supabase';
 
 import {
-  loadTasks as loadRemoteTasks,
-  createTask as createRemoteTask,
-  updateTask as updateRemoteTask,
-  deleteTask as deleteRemoteTask,
-  clearTasks as clearRemoteTasks,
-  saveTasks as saveRemoteTasks,
-} from '../repositories/supabaseTaskRepository';
+  normalizeTask,
+  normalizeTasks,
+} from '../domain/taskModel';
 
-const TASKS_STORAGE_KEY = '@my_time_tasks_data_v2';
-const TASKS_SCHEMA_VERSION = 2;
+import {
+  loadState,
+  saveState,
+} from '../repositories/localTaskRepository';
 
-const getCurrentUserId = async () => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
 
-  if (!session?.user?.id) {
-    throw new Error(
-      'Não existe um utilizador autenticado.',
-    );
-  }
+import { supabase } from '../lib/supabase';
+import { syncOperation } from '../services/taskSyncService';
 
-  return session.user.id;
+// Serializa operações para evitar gravações concorrentes.
+let writeQueue = Promise.resolve();
+
+const enqueueWrite = (operation) => {
+  const result = writeQueue.then(operation);
+
+  // Uma falha não deve bloquear as próximas operações.
+  writeQueue = result.catch(() => {});
+
+  return result;
 };
 
-const loadLocalTasks = async () => {
-  const stored = await AsyncStorage.getItem(
-    TASKS_STORAGE_KEY,
-  );
+const getState = async () => {
+  const state = await loadState();
 
-  if (!stored) {
-    return [];
-  }
-
-  const parsed = JSON.parse(stored);
-
-  if (
-    !parsed ||
-    parsed.schemaVersion !== TASKS_SCHEMA_VERSION ||
-    !Array.isArray(parsed.tasks)
-  ) {
-    return [];
-  }
-
-  return normalizeTasks(parsed.tasks);
+  return state ?? {
+    tasks: [],
+    pendingOps: [],
+  };
 };
 
-/* -------------------------------------------------------
-   READ
-------------------------------------------------------- */
+const makeOperation = (type, data) => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  type,
+  ...data,
+});
+
+// Guarda tarefas e operação pendente no mesmo registo.
+const commit = async (buildNextState) => {
+
+  const savedState = await enqueueWrite(async () => {
+    const state = await getState();
+    const nextState = buildNextState(state);
+
+    return saveState(nextState);
+  });
+  // A gravação local já terminou.
+  // Sincronizar em segundo plano, sem bloquear a aplicação.
+  syncPendingTasks().catch((error) => {
+    console.warn('[Sync] Falha na sincronização:', error);
+  });
+
+  return savedState;
+};
+
+/* READ */
 
 export const loadTasks = async () => {
-  const userId = await getCurrentUserId();
+  // Aguarda alterações locais ainda em curso.
+  await writeQueue;
 
-  const remoteTasks =
-    await loadRemoteTasks(userId);
-
-  if (remoteTasks.length > 0) {
-    return remoteTasks;
-  }
-
-  /*
-   * Migração única das tarefas que já existiam
-   * no telemóvel antes de ligar ao Supabase.
-   */
-  const localTasks =
-    await loadLocalTasks();
-
-  if (localTasks.length === 0) {
-    return [];
-  }
-
-  const migratedTasks =
-    await saveRemoteTasks(
-      userId,
-      localTasks,
-    );
-
-  await AsyncStorage.removeItem(
-    TASKS_STORAGE_KEY,
-  );
-
-  return migratedTasks;
+  const state = await getState();
+  return state.tasks;
 };
 
-/* -------------------------------------------------------
-   CREATE
-------------------------------------------------------- */
+/* CREATE */
 
 export const createTask = async (task) => {
-  const userId = await getCurrentUserId();
+  const canonicalTask = normalizeTask(task);
 
-  return createRemoteTask(
-    userId,
-    task,
-  );
+  await commit((state) => ({
+    tasks: [...state.tasks, canonicalTask],
+    pendingOps: [
+      ...state.pendingOps,
+      makeOperation('create', { task: canonicalTask }),
+    ],
+  }));
+
+  return canonicalTask;
 };
 
-/* -------------------------------------------------------
-   UPDATE
-------------------------------------------------------- */
+/* UPDATE */
 
 export const updateTask = async (task) => {
-  const userId = await getCurrentUserId();
+  const canonicalTask = normalizeTask(task);
+  await commit((state) => ({
+    tasks: state.tasks.map((item) =>
+      item.id === canonicalTask.id
+        ? canonicalTask
+        : item,
+    ),
+    pendingOps: [
+      ...state.pendingOps,
+      makeOperation('update', { task: canonicalTask }),
+    ],
+  }));
 
-  return updateRemoteTask(
-    userId,
-    task,
-  );
+  return canonicalTask;
 };
 
-/* -------------------------------------------------------
-   DELETE
-------------------------------------------------------- */
+/* DELETE */
 
 export const deleteTask = async (taskId) => {
-  const userId = await getCurrentUserId();
-
-  await deleteRemoteTask(
-    userId,
-    taskId,
-  );
+  await commit((state) => ({
+    tasks: state.tasks.filter(
+      (task) => task.id !== taskId,
+    ),
+    pendingOps: [
+      ...state.pendingOps,
+      makeOperation('delete', { taskId }),
+    ],
+  }));
 };
 
-/* -------------------------------------------------------
-   CLEAR
-------------------------------------------------------- */
+/* CLEAR */
 
 export const clearTasks = async () => {
-  const userId = await getCurrentUserId();
-
-  await clearRemoteTasks(userId);
-
-  await AsyncStorage.removeItem(
-    TASKS_STORAGE_KEY,
-  );
+  await commit((state) => ({
+    tasks: [],
+    pendingOps: [
+      ...state.pendingOps,
+      ...state.tasks.map((task) =>
+        makeOperation('delete', { taskId: task.id }),
+      ),
+    ],
+  }));
 };
 
-/* -------------------------------------------------------
-   SNAPSHOT SAVE
-
-   Temporariamente mantido para compatibilidade.
-   Depois do refactor do taskService deixa de fazer
-   parte do CRUD normal.
-------------------------------------------------------- */
+/* SNAPSHOT SAVE - COMPATIBILIDADE */
 
 export const saveTasks = async (tasks) => {
-  const userId = await getCurrentUserId();
+  const canonicalTasks = normalizeTasks(tasks);
 
-  return saveRemoteTasks(
-    userId,
-    tasks,
-  );
+  await commit((state) => {
+    const previous = new Map(
+      state.tasks.map((task) => [task.id, task]),
+    );
+
+    const next = new Map(
+      canonicalTasks.map((task) => [task.id, task]),
+    );
+
+    const operations = [];
+
+    for (const task of canonicalTasks) {
+      const oldTask = previous.get(task.id);
+
+      if (!oldTask) {
+        operations.push(
+          makeOperation('create', { task }),
+        );
+      } else if (
+        JSON.stringify(oldTask) !== JSON.stringify(task)
+      ) {
+        operations.push(
+          makeOperation('update', { task }),
+        );
+      }
+    }
+
+    for (const task of state.tasks) {
+      if (!next.has(task.id)) {
+        operations.push(
+          makeOperation('delete', { taskId: task.id }),
+        );
+      }
+    }
+
+    return {
+      tasks: canonicalTasks,
+      pendingOps: [
+        ...state.pendingOps,
+        ...operations,
+      ],
+    };
+  });
+
+  return canonicalTasks;
+};
+
+
+/* SYNC */
+
+let syncPromise = null;
+let syncRequested = false;
+
+export const syncPendingTasks = () => {
+if (syncPromise) {
+  syncRequested = true;
+  return syncPromise;
+}
+
+  syncPromise = (async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error || !session?.user?.id) {
+      throw error ?? new Error('Sessão indisponível');
+    }
+
+    const userId = session.user.id;
+    let synced = 0;
+
+    while (true) {
+      // Ler a próxima operação sem interferir
+      // com gravações locais em curso.
+      const operation = await enqueueWrite(async () => {
+        const state = await getState();
+        return state.pendingOps[0] ?? null;
+      });
+
+      if (!operation) {
+        break;
+      }
+
+      // Se falhar, a operação permanece na fila.
+      await syncOperation(userId, operation);
+
+      // Remover apenas a operação confirmada.
+      await enqueueWrite(async () => {
+        const state = await getState();
+
+        const nextState = {
+          ...state,
+          pendingOps: state.pendingOps.filter(
+            (item) => item.id !== operation.id,
+          ),
+        };
+
+        await saveState(nextState);
+      });
+
+      synced += 1;
+    }
+
+    return synced;
+  })();
+
+  // Libertar o bloqueio após sucesso ou erro.
+  const currentPromise = syncPromise;
+
+currentPromise.then(
+  () => {
+    if (syncPromise !== currentPromise) return;
+
+    syncPromise = null;
+
+    if (syncRequested) {
+      syncRequested = false;
+
+      syncPendingTasks().catch((error) => {
+        console.warn('[Sync] Falha na nova tentativa:', error);
+      });
+    }
+  },
+  () => {
+    if (syncPromise !== currentPromise) return;
+
+    syncPromise = null;
+    syncRequested = false;
+  },
+);
+
+  return currentPromise;
 };
 
 export const TASK_STORAGE_INFO = {
-  schemaVersion: TASKS_SCHEMA_VERSION,
-  key: TASKS_STORAGE_KEY,
+  schemaVersion: 1,
+  key: '@my_time_tasks_local_v1',
 };
