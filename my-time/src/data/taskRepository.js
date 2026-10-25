@@ -120,41 +120,55 @@ export const loadTasks = async () => {
   return state.tasks;
 };
 
-export const pullRemoteTasks = async () => {
+let pullPromise = null;
+
+const recoverRemoteTasks = async () => {
   const userId = await getAuthenticatedUserId();
-  const remoteTasks = await loadRemoteTasks(userId);
 
-  return enqueueWrite(async () => {
-    const state = await getState();
+  // A changed local revision invalidates the remote response, including when
+  // a pending delete was confirmed and removed while the request was in flight.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const revision = await enqueueWrite(() => tasksRevision);
+    const remoteTasks = await loadRemoteTasks(userId);
 
-    const localIds = new Set(
-      state.tasks.map((task) => task.id),
-    );
+    const result = await enqueueWrite(async () => {
+      if (await getAuthenticatedUserId() !== userId) {
+        throw new Error('Sessão alterada durante a recuperação de tarefas');
+      }
+      if (revision !== tasksRevision) return null;
 
-    // Tarefas com alterações locais ainda por sincronizar.
-    const pendingIds = new Set(
-      state.pendingOps
-        .map((op) => op.task?.id ?? op.taskId)
-        .filter(Boolean),
-    );
+      const state = await getState();
+      const knownIds = new Set(state.tasks.map(task => task.id));
+      const pendingIds = new Set(
+        state.pendingOps.map(op => op.task?.id ?? op.taskId).filter(Boolean),
+      );
+      const missingTasks = remoteTasks.filter(task => {
+        if (knownIds.has(task.id) || pendingIds.has(task.id)) return false;
+        knownIds.add(task.id);
+        return true;
+      });
 
-    const missingTasks = remoteTasks.filter(
-      (task) =>
-        !localIds.has(task.id) &&
-        !pendingIds.has(task.id),
-    );
-
-    if (missingTasks.length === 0) {
-      return state.tasks;
-    }
-
-    const savedState = await saveState({
-      ...state,
-      tasks: [...state.tasks, ...missingTasks],
+      if (missingTasks.length === 0) return state.tasks;
+      const savedState = await saveState({
+        ...state,
+        tasks: [...state.tasks, ...missingTasks],
+      });
+      return savedState.tasks;
     });
 
-    return savedState.tasks;
+    if (result !== null) return result;
+  }
+
+  // Keep local data intact rather than applying a stale response under load.
+  throw new Error('Recuperação adiada devido a alterações locais concorrentes');
+};
+
+export const pullRemoteTasks = () => {
+  if (pullPromise) return pullPromise;
+  pullPromise = recoverRemoteTasks().finally(() => {
+    pullPromise = null;
   });
+  return pullPromise;
 };
 
 /* CREATE */

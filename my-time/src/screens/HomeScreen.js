@@ -37,6 +37,7 @@ import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
+import NetInfo from '@react-native-community/netinfo';
 import {
   loadTasksSnapshot,
   subscribeTasks,
@@ -468,9 +469,22 @@ export default function TimelineScreen() {
     };
     loadStoredData();
 
+    let wasReachable = false;
+    const unsubscribeNetwork = NetInfo.addEventListener(network => {
+      const reachable = network.isConnected === true &&
+        network.isInternetReachable === true;
+      if (reachable && !wasReachable) {
+        pullRemoteTasks().catch(error => {
+          console.warn('[Sync] Falha ao recuperar tarefas na reconexão:', error);
+        });
+      }
+      wasReachable = reachable;
+    });
+
     return () => {
       active = false;
       unsubscribe();
+      unsubscribeNetwork();
     };
   }, []);
   /* -------------------------------------------------------
