@@ -35,7 +35,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
-import TaskErrorDialog from '../components/TaskErrorDialog';
+import TaskBanner from '../components/TaskBanner';
+import { subscribeTaskSyncStatus } from '../data/taskSyncStatus';
+import { createTaskSyncNoticeTracker } from '../data/taskSyncNotices';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
 import NetInfo from '@react-native-community/netinfo';
@@ -231,6 +233,20 @@ const calculateOverlapColumns = (tasks) => {
 
 export default function TimelineScreen() {
   const [taskError, setTaskError] = useState(null);
+  const [syncNotice, setSyncNotice] = useState(null);
+  const banner = taskError ?? syncNotice;
+  const dismissBanner = () => {
+    if (taskError) setTaskError(null);
+    else setSyncNotice(null);
+  };
+  useEffect(() => {
+    const track = createTaskSyncNoticeTracker();
+    return subscribeTaskSyncStatus(status => {
+      const event = track(status);
+      if (event?.kind === 'notice') setSyncNotice(event.notice);
+      if (event?.kind === 'clear') setSyncNotice(null);
+    });
+  }, []);
   const showTaskError = (title, error) => {
     setTaskError({
       title,
@@ -478,7 +494,7 @@ export default function TimelineScreen() {
           message: 'Não foi possível ler as tarefas deste dispositivo. Os dados não foram apagados.',
           retry: loadStoredData,
         });
-        return;
+        return false;
       }
       if (!active) return;
       try {
@@ -486,6 +502,7 @@ export default function TimelineScreen() {
       } catch (error) {
         console.warn('[Sync] Falha ao recuperar tarefas:', error);
       }
+      return true;
     };
     loadStoredData();
 
@@ -813,7 +830,7 @@ export default function TimelineScreen() {
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
-      <TaskErrorDialog error={!modalVisible && !detailsTask ? taskError : null} onClose={() => setTaskError(null)} />
+      <TaskBanner notice={!modalVisible && !detailsTask ? banner : null} onDismiss={dismissBanner} />
 
       <View
         ref={timelineViewportRef}
@@ -1001,7 +1018,8 @@ export default function TimelineScreen() {
 
       <CreateTaskModal
         visible={modalVisible}
-        errorMessage={taskError?.message}
+        banner={banner}
+        onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
         onClose={() => {
           setTaskError(null);
@@ -1034,7 +1052,8 @@ export default function TimelineScreen() {
 
       <TaskDetailsModal
         visible={Boolean(detailsTask)}
-        errorMessage={taskError?.message}
+        banner={banner}
+        onDismissBanner={dismissBanner}
         mode={detailsMode}
         initialValues={detailsTask}
         onClose={() => {

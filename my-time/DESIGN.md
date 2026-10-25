@@ -31,9 +31,18 @@ remain available offline. Colors come from `src/theme/colors.js`.
 
 ## Components
 
-`TaskErrorDialog` owns task-operation errors, including failed initial local reads.
-Its shared `TaskErrorMessage` is rendered inside open forms instead of stacking
-native modals.
+`TaskBanner` owns non-modal, floating task feedback without layout space. It sits
+above the timeline near its bottom, or near the top inside an open task modal.
+It never adds another modal or dims the interface. The host passes through touches
+outside the banner. Local errors have priority over remote notices and remain
+until dismissed or another local attempt starts. Informational notices expire
+after six seconds; important errors require manual dismissal. No routine success
+notifications are shown.
+
+`taskSyncNotices.js` emits at most one remote notice per failure episode. Automatic
+retries do not repeat it; confirmed recovery re-arms the next episode. Offline
+failures are left in the header panel without an extra banner. Dismissing a banner
+does not clear synchronization error details in the panel.
 Keep the task form open on local failure; close only after successful persistence.
 Do not display raw server errors or task identifiers to users.
 
