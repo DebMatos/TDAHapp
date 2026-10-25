@@ -38,7 +38,8 @@ import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
 import {
-  loadTasks as loadStoredTasks,
+  loadTasksSnapshot,
+  subscribeTasks,
   pullRemoteTasks,
 } from '../data/taskRepository';import { supabase } from '../lib/supabase';
 import {
@@ -445,36 +446,33 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   useEffect(() => {
-  let active = true;
+    let active = true;
+    let latestRevision = -1;
 
-  const loadStoredData = async () => {
-    try {
-      // 1. Mostrar imediatamente as tarefas locais.
-      const localTasks = await loadStoredTasks();
+    const applySnapshot = ({ tasks: savedTasks, revision }) => {
+      if (!active || revision <= latestRevision) return;
+      latestRevision = revision;
+      setTasks(savedTasks);
+    };
 
-      if (!active) return;
-      setTasks(localTasks);
+    // Subscribe before reading so writes during initial loading are observed.
+    const unsubscribe = subscribeTasks(applySnapshot);
+    const loadStoredData = async () => {
+      try {
+        applySnapshot(await loadTasksSnapshot());
+        if (!active) return;
+        await pullRemoteTasks();
+      } catch (error) {
+        console.warn('[Sync] Falha ao recuperar tarefas:', error);
+      }
+    };
+    loadStoredData();
 
-      // 2. Recuperar tarefas que faltam do Supabase.
-      await pullRemoteTasks();
-
-      // 3. Atualizar a interface com o estado guardado.
-      const updatedTasks = await loadStoredTasks();
-
-      if (!active) return;
-      setTasks(updatedTasks);
-    } catch (error) {
-      console.warn('[Sync] Falha ao recuperar tarefas:', error);
-      console.error('[Sync] Stack:', error.stack);
-    }
-  };
-
-  loadStoredData();
-
-  return () => {
-    active = false;
-  };
-}, []);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
@@ -484,8 +482,7 @@ export default function TimelineScreen() {
       getCivilDateForTimelineSlot(selectedTimelineDate, newMins),
     );
 
-    const savedTasks = await taskService.moveTask({
-      tasks,
+    await taskService.moveTask({
       taskId,
 
       schedule: {
@@ -494,7 +491,6 @@ export default function TimelineScreen() {
       },
     });
 
-    setTasks(savedTasks);
   };
 
   /* -------------------------------------------------------
@@ -502,9 +498,8 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   const toggleTaskComplete = async (taskId) => {
-    const savedTasks = await taskService.toggleCompletion(taskId, tasks);
+    await taskService.toggleCompletion(taskId);
 
-    setTasks(savedTasks);
   };
   /* -------------------------------------------------------
      QUICK CREATE
@@ -524,7 +519,7 @@ export default function TimelineScreen() {
         getCivilDateForTimelineSlot(selectedTimelineDate, startMins),
       );
 
-      const savedTasks = await taskService.createTask(
+      await taskService.createTask(
         {
           title,
           notes,
@@ -537,10 +532,8 @@ export default function TimelineScreen() {
 
           durationMinutes,
         },
-        tasks,
       );
 
-      setTasks(savedTasks);
 
       setTargetSlotMinutes(null);
 
@@ -1012,8 +1005,7 @@ export default function TimelineScreen() {
         }}
         onSave={async (changes) => {
           try {
-            const savedTasks =
-              detailsMode === 'create'
+            detailsMode === 'create'
                 ? await taskService.createTask(
                     {
                       ...changes,
@@ -1029,10 +1021,8 @@ export default function TimelineScreen() {
                           ),
                         ),
                     },
-                    tasks,
                   )
-                : await taskService.updateTask(detailsTask.id, changes, tasks);
-            setTasks(savedTasks);
+                : await taskService.updateTask(detailsTask.id, changes);
 
             setDetailsTask(null);
 
@@ -1053,11 +1043,9 @@ export default function TimelineScreen() {
         onDelete={
           detailsMode === 'edit'
             ? async () => {
-                const savedTasks = await taskService.deleteTask(
+                await taskService.deleteTask(
                   detailsTask.id,
-                  tasks,
                 );
-                setTasks(savedTasks);
                 setDetailsTask(null);
               }
             : undefined

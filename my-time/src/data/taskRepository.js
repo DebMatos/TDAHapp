@@ -8,7 +8,7 @@ import {
 
 import {
   loadState,
-  saveState,
+  saveState as persistState,
 } from '../repositories/localTaskRepository';
 
 import {
@@ -38,6 +38,34 @@ const getState = async () => {
     pendingOps: [],
   };
 };
+
+// Revisions order snapshots within this repository instance.
+let tasksRevision = 0;
+const taskListeners = new Set();
+
+export const subscribeTasks = (listener) => {
+  taskListeners.add(listener);
+  return () => taskListeners.delete(listener);
+};
+
+const saveState = async (state) => {
+  const savedState = await persistState(state);
+  const snapshot = { tasks: savedState.tasks, revision: ++tasksRevision };
+  for (const listener of taskListeners) {
+    try {
+      listener(snapshot);
+    } catch (error) {
+      // A presentation failure must not turn a committed write into a failure.
+      console.warn('[Tasks] Falha ao atualizar interface:', error);
+    }
+  }
+  return savedState;
+};
+
+export const loadTasksSnapshot = () => enqueueWrite(async () => {
+  const state = await getState();
+  return { tasks: state.tasks, revision: tasksRevision };
+});
 
 const getAuthenticatedUserId = async () => {
   const {
