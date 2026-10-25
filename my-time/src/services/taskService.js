@@ -82,9 +82,7 @@ export const moveTask = async ({
     );
 
   const savedTask =
-    await updateStoredTask(
-      updatedTask,
-    );
+  await updateStoredTask(taskId, updatedTask);
 
   return tasks.map((task) =>
     task.id === taskId
@@ -121,7 +119,7 @@ export const toggleCompletion = async (
   const savedTask =
     await updateStoredTask(
       updatedTask,
-    );
+    );await updateStoredTask(taskId, updatedTask);
 
   return tasks.map((task) =>
     task.id === taskId
