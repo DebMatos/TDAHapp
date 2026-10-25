@@ -37,9 +37,10 @@ import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
-
-import { loadTasks as loadStoredTasks } from '../data/taskRepository';
-import { supabase } from '../lib/supabase';
+import {
+  loadTasks as loadStoredTasks,
+  pullRemoteTasks,
+} from '../data/taskRepository';import { supabase } from '../lib/supabase';
 import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
@@ -444,23 +445,36 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   useEffect(() => {
-    const loadStoredData = async () => {
-      try {
-        const canonicalTasks = await loadStoredTasks();
+  let active = true;
 
-        setTasks(canonicalTasks);
-      } catch (error) {
-        console.error('Erro ao carregar tarefas:', error);
+  const loadStoredData = async () => {
+    try {
+      // 1. Mostrar imediatamente as tarefas locais.
+      const localTasks = await loadStoredTasks();
 
-        Alert.alert(
-          'Não foi possível carregar as tarefas',
-          'Não foi possível comunicar com o servidor. Tenta novamente.',
-        );
-      }
-    };
+      if (!active) return;
+      setTasks(localTasks);
 
-    loadStoredData();
-  }, []);
+      // 2. Recuperar tarefas que faltam do Supabase.
+      await pullRemoteTasks();
+
+      // 3. Atualizar a interface com o estado guardado.
+      const updatedTasks = await loadStoredTasks();
+
+      if (!active) return;
+      setTasks(updatedTasks);
+    } catch (error) {
+      console.warn('[Sync] Falha ao recuperar tarefas:', error);
+      console.error('[Sync] Stack:', error.stack);
+    }
+  };
+
+  loadStoredData();
+
+  return () => {
+    active = false;
+  };
+}, []);
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */

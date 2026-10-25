@@ -9,6 +9,9 @@ import {
   saveState,
 } from '../repositories/localTaskRepository';
 
+import {
+  loadTasks as loadRemoteTasks,
+} from '../repositories/supabaseTaskRepository';
 
 import { supabase } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
@@ -20,7 +23,7 @@ const enqueueWrite = (operation) => {
   const result = writeQueue.then(operation);
 
   // Uma falha não deve bloquear as próximas operações.
-  writeQueue = result.catch(() => {});
+  writeQueue = result.catch(() => { });
 
   return result;
 };
@@ -32,6 +35,23 @@ const getState = async () => {
     tasks: [],
     pendingOps: [],
   };
+};
+
+const getAuthenticatedUserId = async () => {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!session?.user?.id) {
+    throw new Error('Sessão indisponível');
+  }
+
+  return session.user.id;
 };
 
 const makeOperation = (type, data) => ({
@@ -48,7 +68,7 @@ const commit = async (buildNextState) => {
     const nextState = buildNextState(state);
 
     return saveState(nextState);
-  });
+  });pendingOps
   // A gravação local já terminou.
   // Sincronizar em segundo plano, sem bloquear a aplicação.
   syncPendingTasks().catch((error) => {
@@ -65,13 +85,54 @@ export const loadTasks = async () => {
   await writeQueue;
 
   const state = await getState();
+    console.log('[Debug] Operações pendentes:', state.pendingOps);
+
   return state.tasks;
+};
+
+export const pullRemoteTasks = async () => {
+  const userId = await getAuthenticatedUserId();
+  const remoteTasks = await loadRemoteTasks(userId);
+
+  return enqueueWrite(async () => {
+    const state = await getState();
+
+    const localIds = new Set(
+      state.tasks.map((task) => task.id),
+    );
+
+    // Tarefas com alterações locais ainda por sincronizar.
+    const pendingIds = new Set(
+      state.pendingOps
+        .map((op) => op.task?.id ?? op.taskId)
+        .filter(Boolean),
+    );
+
+    const missingTasks = remoteTasks.filter(
+      (task) =>
+        !localIds.has(task.id) &&
+        !pendingIds.has(task.id),
+    );
+
+    if (missingTasks.length === 0) {
+      return state.tasks;
+    }
+
+    const savedState = await saveState({
+      ...state,
+      tasks: [...state.tasks, ...missingTasks],
+    });
+
+    return savedState.tasks;
+  });
 };
 
 /* CREATE */
 
 export const createTask = async (task) => {
   const canonicalTask = normalizeTask(task);
+
+  console.log('[Debug] A criar tarefa:', canonicalTask.id);
 
   await commit((state) => ({
     tasks: [...state.tasks, canonicalTask],
@@ -80,6 +141,8 @@ export const createTask = async (task) => {
       makeOperation('create', { task: canonicalTask }),
     ],
   }));
+
+  console.log('[Debug] Tarefa guardada localmente:', canonicalTask.id);
 
   return canonicalTask;
 };
@@ -190,22 +253,13 @@ let syncPromise = null;
 let syncRequested = false;
 
 export const syncPendingTasks = () => {
-if (syncPromise) {
-  syncRequested = true;
-  return syncPromise;
-}
+  if (syncPromise) {
+    syncRequested = true;
+    return syncPromise;
+  }
 
   syncPromise = (async () => {
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-
-    if (error || !session?.user?.id) {
-      throw error ?? new Error('Sessão indisponível');
-    }
-
-    const userId = session.user.id;
+    const userId = await getAuthenticatedUserId();
     let synced = 0;
 
     while (true) {
@@ -246,27 +300,27 @@ if (syncPromise) {
   // Libertar o bloqueio após sucesso ou erro.
   const currentPromise = syncPromise;
 
-currentPromise.then(
-  () => {
-    if (syncPromise !== currentPromise) return;
+  currentPromise.then(
+    () => {
+      if (syncPromise !== currentPromise) return;
 
-    syncPromise = null;
+      syncPromise = null;
 
-    if (syncRequested) {
+      if (syncRequested) {
+        syncRequested = false;
+
+        syncPendingTasks().catch((error) => {
+          console.warn('[Sync] Falha na nova tentativa:', error);
+        });
+      }
+    },
+    () => {
+      if (syncPromise !== currentPromise) return;
+
+      syncPromise = null;
       syncRequested = false;
-
-      syncPendingTasks().catch((error) => {
-        console.warn('[Sync] Falha na nova tentativa:', error);
-      });
-    }
-  },
-  () => {
-    if (syncPromise !== currentPromise) return;
-
-    syncPromise = null;
-    syncRequested = false;
-  },
-);
+    },
+  );
 
   return currentPromise;
 };
