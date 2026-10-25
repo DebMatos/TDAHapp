@@ -35,7 +35,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
-import TaskSyncStatus from '../components/TaskSyncStatus';
 import TaskErrorDialog from '../components/TaskErrorDialog';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
@@ -814,7 +813,6 @@ export default function TimelineScreen() {
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
-      <TaskSyncStatus />
       <TaskErrorDialog error={!modalVisible && !detailsTask ? taskError : null} onClose={() => setTaskError(null)} />
 
       <View

@@ -18,9 +18,16 @@ Retain the application’s platform font and existing task-sheet hierarchy.
 
 ## Layout
 
-`TaskSyncStatus` owns persistent timeline synchronization feedback and retry.
-Reserve its region below the header to avoid moving timeline controls as status
-changes. Allow messages and actions to wrap on narrow screens.
+`TaskSyncStatus` owns one fixed-size synchronization icon between “Agora” and
+its header menu, plus a contextual overlay panel and retry. It reserves no region
+below the header and never moves the timeline when status changes. The panel
+closes through its close action, outside press or platform back/Escape. Header
+text may truncate on narrow screens, while actions retain fixed hit regions.
+
+Offline takes priority over activity, then errors, then confirmed synchronization.
+Checking and queued work use neutral, non-rotating icons. Rotation occurs only
+while sending or pulling and respects reduced-motion preferences. Error details
+remain available offline. Colors come from `src/theme/colors.js`.
 
 ## Components
 
