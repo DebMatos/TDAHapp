@@ -17,6 +17,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
+import { classifyTaskSyncError } from '../services/taskSyncErrors';
 import { updateTaskSyncStatus } from './taskSyncStatus';
 
 // Serializa operações para evitar gravações concorrentes.
@@ -51,7 +52,10 @@ export const subscribeTasks = (listener) => {
 
 const saveState = async (state) => {
   const savedState = await persistState(state);
-  updateTaskSyncStatus({ pending: savedState.pendingOps.length });
+  updateTaskSyncStatus({
+    pending: savedState.pendingOps.length,
+    failureCategory: savedState.pendingOps[0]?.sync?.category ?? null,
+  });
   const snapshot = { tasks: savedState.tasks, revision: ++tasksRevision };
   for (const listener of taskListeners) {
     try {
@@ -66,7 +70,10 @@ const saveState = async (state) => {
 
 export const loadTasksSnapshot = () => enqueueWrite(async () => {
   const state = await getState();
-  updateTaskSyncStatus({ pending: state.pendingOps.length });
+  updateTaskSyncStatus({
+    pending: state.pendingOps.length,
+    failureCategory: state.pendingOps[0]?.sync?.category ?? null,
+  });
   return { tasks: state.tasks, revision: tasksRevision };
 });
 
@@ -373,8 +380,35 @@ export const syncPendingTasks = () => {
         break;
       }
 
-      // Se falhar, a operação permanece na fila.
-      await syncOperation(userId, operation);
+      // Preserve the operation and record only safe, actionable metadata.
+      try {
+        await syncOperation(userId, operation);
+      } catch (error) {
+        const failure = classifyTaskSyncError(error);
+        try {
+          await enqueueWrite(async () => {
+            const state = await getState();
+            await saveState({
+              ...state,
+              pendingOps: state.pendingOps.map(item => item.id === operation.id
+                ? {
+                    ...item,
+                    sync: {
+                      ...failure,
+                      attempts: (Number.isSafeInteger(item.sync?.attempts) && item.sync.attempts >= 0
+                        ? item.sync.attempts : 0) + 1,
+                      lastAttemptAt: new Date().toISOString(),
+                    },
+                  }
+                : item),
+            });
+          });
+        } catch {
+          // Metadata persistence must not remove work or hide the send error.
+          console.warn('[Sync] Não foi possível guardar o diagnóstico da operação.');
+        }
+        throw error;
+      }
 
       // Remover apenas a operação confirmada.
       await enqueueWrite(async () => {
@@ -414,11 +448,15 @@ export const syncPendingTasks = () => {
         });
       }
     },
-    () => {
+    (error) => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
-      updateTaskSyncStatus({ sending: false, sendFailed: true });
+      updateTaskSyncStatus({
+        sending: false,
+        sendFailed: true,
+        failureCategory: classifyTaskSyncError(error).category,
+      });
       syncRequested = false;
     },
   );

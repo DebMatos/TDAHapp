@@ -35,6 +35,13 @@ must retain pending operations; a failed pull must retain local tasks. Retry mus
 not create another task. An empty status message makes no claim that all devices
 or remote versions are reconciled.
 
+Failed queue operations retain safe error categories, recognised protocol codes,
+failed-attempt counts and timestamps. Unknown errors stay pending. Known data
+rejections are labelled blocked but remain in FIFO order; retries are still
+allowed and never silently discard or skip work. Correcting the displayed task
+alone does not replace an earlier rejected operation. No queue-resolution UI is
+provided yet.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.
