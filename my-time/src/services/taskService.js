@@ -118,8 +118,9 @@ export const toggleCompletion = async (
 
   const savedTask =
     await updateStoredTask(
+      taskId,
       updatedTask,
-    );await updateStoredTask(taskId, updatedTask);
+    );
 
   return tasks.map((task) =>
     task.id === taskId
