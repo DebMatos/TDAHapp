@@ -17,6 +17,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
+import { updateTaskSyncStatus } from './taskSyncStatus';
 
 // Serializa operações para evitar gravações concorrentes.
 let writeQueue = Promise.resolve();
@@ -50,6 +51,7 @@ export const subscribeTasks = (listener) => {
 
 const saveState = async (state) => {
   const savedState = await persistState(state);
+  updateTaskSyncStatus({ pending: savedState.pendingOps.length });
   const snapshot = { tasks: savedState.tasks, revision: ++tasksRevision };
   for (const listener of taskListeners) {
     try {
@@ -64,6 +66,7 @@ const saveState = async (state) => {
 
 export const loadTasksSnapshot = () => enqueueWrite(async () => {
   const state = await getState();
+  updateTaskSyncStatus({ pending: state.pendingOps.length });
   return { tasks: state.tasks, revision: tasksRevision };
 });
 
@@ -165,7 +168,12 @@ const recoverRemoteTasks = async () => {
 
 export const pullRemoteTasks = () => {
   if (pullPromise) return pullPromise;
-  pullPromise = recoverRemoteTasks().finally(() => {
+  updateTaskSyncStatus({ pulling: true, pullFailed: false });
+  pullPromise = recoverRemoteTasks().catch(error => {
+    updateTaskSyncStatus({ pullFailed: true });
+    throw error;
+  }).finally(() => {
+    updateTaskSyncStatus({ pulling: false });
     pullPromise = null;
   });
   return pullPromise;
@@ -212,7 +220,9 @@ const commitTaskUpdate = async (taskId, buildUpdatedTask) => {
     );
 
     if (!currentTask) {
-      throw new Error(`Tarefa não encontrada: ${taskId}`);
+      const error = new Error(`Tarefa não encontrada: ${taskId}`);
+      error.code = 'TASK_NOT_FOUND';
+      throw error;
     }
 
     const updatedTask = buildUpdatedTask(currentTask);
@@ -346,6 +356,7 @@ export const syncPendingTasks = () => {
     return syncPromise;
   }
 
+  updateTaskSyncStatus({ sending: true, sendFailed: false });
   syncPromise = (async () => {
     const userId = await getAuthenticatedUserId();
     let synced = 0;
@@ -393,6 +404,7 @@ export const syncPendingTasks = () => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
+      updateTaskSyncStatus({ sending: false, sendFailed: false });
 
       if (syncRequested) {
         syncRequested = false;
@@ -406,6 +418,7 @@ export const syncPendingTasks = () => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
+      updateTaskSyncStatus({ sending: false, sendFailed: true });
       syncRequested = false;
     },
   );

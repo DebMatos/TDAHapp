@@ -1,3 +1,4 @@
+import { TaskErrorMessage } from '../TaskErrorDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -69,6 +70,7 @@ export default function CreateTaskModal({
   visible,
   onClose,
   onSave,
+  errorMessage,
   onMoreOptions,
   initialMinutes = null,
 }) {
@@ -188,6 +190,8 @@ export default function CreateTaskModal({
             {/* HANDLE */}
 
             <View style={styles.handle} />
+
+            <TaskErrorMessage message={errorMessage} />
 
             {/* TÍTULO */}
 

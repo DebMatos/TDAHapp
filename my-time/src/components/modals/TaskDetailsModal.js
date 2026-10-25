@@ -1,3 +1,4 @@
+import { TaskErrorMessage } from '../TaskErrorDialog';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -315,6 +316,7 @@ export default function TaskDetailsModal({
   initialValues = null,
   onClose,
   onSave,
+  errorMessage,
   onDelete,
 }) {
   const isEdit = mode === 'edit';
@@ -1248,6 +1250,8 @@ const closeInlineEditor = () => {
             },
           ]}
         >
+          <TaskErrorMessage message={errorMessage} />
+
           {/* TOP */}
 
           <View style={styles.topBar}>
