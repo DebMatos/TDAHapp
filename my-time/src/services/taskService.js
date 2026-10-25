@@ -8,6 +8,7 @@ import {
   loadTasks,
   createTask as createStoredTask,
   updateTask as updateStoredTask,
+  updateTaskAndLoadTasks,
   deleteTask as deleteStoredTask,
 } from '../data/taskRepository';
 
@@ -137,12 +138,10 @@ export const updateTask = async (
   taskId,
   changes,
 ) => {
-  await updateStoredTask(
+  return updateTaskAndLoadTasks(
     taskId,
     changes,
   );
-
-  return loadTasks();
 };
 
 /* -------------------------------------------------------

@@ -149,10 +149,8 @@ export const createTask = async (task) => {
 };
 
 /* UPDATE */
-export const updateTask = async (taskId, changes) => {
-  let updatedTask;
-
-  await commit((state) => {
+const commitTaskUpdate = async (taskId, changes) => {
+  return commit((state) => {
     const currentTask = state.tasks.find(
       task => task.id === taskId
     );
@@ -161,7 +159,7 @@ export const updateTask = async (taskId, changes) => {
       throw new Error(`Tarefa não encontrada: ${taskId}`);
     }
 
-    updatedTask = updateTaskModel(currentTask, changes);
+    const updatedTask = updateTaskModel(currentTask, changes);
 
     return {
       ...state,
@@ -175,7 +173,16 @@ export const updateTask = async (taskId, changes) => {
     };
   });
 
-  return updatedTask;
+};
+
+export const updateTask = async (taskId, changes) => {
+  const savedState = await commitTaskUpdate(taskId, changes);
+  return savedState.tasks.find(task => task.id === taskId);
+};
+
+export const updateTaskAndLoadTasks = async (taskId, changes) => {
+  const savedState = await commitTaskUpdate(taskId, changes);
+  return savedState.tasks;
 };
 
 /* DELETE */
