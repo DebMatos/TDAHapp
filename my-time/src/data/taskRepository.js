@@ -15,7 +15,7 @@ import {
   loadTasks as loadRemoteTasks,
 } from '../repositories/supabaseTaskRepository';
 
-import { supabase } from '../lib/supabase';
+import { supabase, getSessionIdentity } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
 import { classifyTaskSyncError } from '../services/taskSyncErrors';
 import { updateTaskSyncStatus } from './taskSyncStatus';
@@ -133,21 +133,34 @@ export const loadTasks = async () => {
 let pullPromise = null;
 
 const recoverRemoteTasks = async () => {
+  const identityRevision = getSessionIdentity().revision;
   const userId = await getAuthenticatedUserId();
+  const assertSameIdentity = () => {
+    const identity = getSessionIdentity();
+    if (identity.revision !== identityRevision ||
+        identity.userId !== undefined && identity.userId !== userId) {
+      throw new Error('Sessão alterada durante a recuperação de tarefas');
+    }
+  };
+  assertSameIdentity();
 
   // A changed local revision invalidates the remote response, including when
   // a pending delete was confirmed and removed while the request was in flight.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const revision = await enqueueWrite(() => tasksRevision);
     const remoteTasks = await loadRemoteTasks(userId);
+    // Session refresh may use the network: never await it inside writeQueue.
+    if (await getAuthenticatedUserId() !== userId) {
+      throw new Error('Sessão alterada durante a recuperação de tarefas');
+    }
+    assertSameIdentity();
 
     const result = await enqueueWrite(async () => {
-      if (await getAuthenticatedUserId() !== userId) {
-        throw new Error('Sessão alterada durante a recuperação de tarefas');
-      }
+      assertSameIdentity();
       if (revision !== tasksRevision) return null;
 
       const state = await getState();
+      assertSameIdentity();
       const knownIds = new Set(state.tasks.map(task => task.id));
       const pendingIds = new Set(
         state.pendingOps.map(op => op.task?.id ?? op.taskId).filter(Boolean),

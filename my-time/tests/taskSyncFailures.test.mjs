@@ -21,10 +21,11 @@ function setup() {
   const status = new Function('console', `${stripImports(read('data/taskSyncStatus.js'))}; return { subscribeTaskSyncStatus, updateTaskSyncStatus, getTaskSyncMessage };`)({ warn() {} });
   let observed;
   status.subscribeTaskSyncStatus(value => { observed = value; });
-  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
+  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => structuredClone(state), async next => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
     async () => [], { auth: { getSession: async () => ({ data: { session: { user: { id: 'u' } } } }) } },
+    () => ({ userId: 'u', revision: 0 }),
     async (userId, op) => { sent.push(op.id); if (error) throw error; }, classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
   const repository = new Function(...names, `${stripImports(read('data/taskRepository.js'))}; return { syncPendingTasks, loadTasksSnapshot };`)(...values);
@@ -100,4 +101,91 @@ test('diagnostic write failure preserves original queue and send error', async (
   await assert.rejects(h.repository.syncPendingTasks(), error => error === original);
   assert.equal(h.state().pendingOps.length, 2);
   assert.equal(h.state().pendingOps[0].sync, undefined);
+});
+
+function setupPull() {
+  let state = { tasks: [model.createTask({ id: 'a', title: 'Original' })], pendingOps: [] };
+  let authCalls = 0, authWaiting = false, releaseAuth, authListener;
+  const auth = {
+    onAuthStateChange: listener => { authListener = listener; },
+    getSession: async () => {
+      if (++authCalls === 2) {
+        authWaiting = true;
+        await new Promise(resolve => { releaseAuth = resolve; });
+      }
+      return { data: { session: { user: { id: 'u' } } } };
+    },
+  };
+  // Execute the actual synchronous identity tracker, without creating a client.
+  const lib = read('lib/supabase.js');
+  const tracker = lib.slice(lib.indexOf('// Track identity'), lib.indexOf("if (Platform.OS !== 'web')"));
+  const getSessionIdentity = new Function('supabase', `${tracker.replace(/export const /g, 'const ')};return getSessionIdentity;`)({ auth });
+  const emit = (event, userId) => authListener(event, userId ? { user: { id: userId } } : null);
+  emit('INITIAL_SESSION', 'u');
+  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
+  const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
+    async () => structuredClone(state), async next => (state = structuredClone(next)),
+    async () => [model.createTask({ id: 'remote', title: 'Remote' })], { auth }, getSessionIdentity,
+    async () => { throw Error('offline'); }, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
+  const repository = new Function(...names, `${stripImports(read('data/taskRepository.js'))};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask };`)(...values);
+  return { repository, emit, identity: getSessionIdentity, waiting: () => authWaiting,
+    release: () => releaseAuth(), state: () => state };
+}
+
+const until = async predicate => {
+  for (let i = 0; i < 300; i += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw Error('Expected condition not reached');
+};
+
+for (const action of ['create', 'update', 'delete']) {
+  test(`P1: ${action} completes while pull session revalidation is suspended`, async () => {
+    const h = setupPull();
+    const pull = h.repository.pullRemoteTasks();
+    await until(h.waiting);
+    if (action === 'create') await h.repository.createTaskAndLoadTasks({ id: 'b', title: 'Local' });
+    if (action === 'update') await h.repository.updateTaskAndLoadTasks('a', { title: 'Edited' });
+    if (action === 'delete') await h.repository.deleteTask('a');
+    if (action === 'create') assert.ok(h.state().tasks.some(task => task.id === 'b'));
+    if (action === 'update') assert.equal(h.state().tasks[0].title, 'Edited');
+    if (action === 'delete') assert.equal(h.state().tasks.length, 0);
+    h.release();
+    await pull;
+    assert.ok(h.state().tasks.some(task => task.id === 'remote'));
+  });
+}
+
+test('P1: sign-out during revalidation rejects remote response', async () => {
+  const h = setupPull();
+  const pull = h.repository.pullRemoteTasks();
+  await until(h.waiting);
+  h.emit('SIGNED_OUT', null);
+  h.release();
+  await assert.rejects(pull, /Sessão alterada/);
+  assert.deepEqual(h.state().tasks.map(task => task.id), ['a']);
+});
+
+test('P1: sign-out and sign-in to the same account still invalidates response', async () => {
+  const h = setupPull();
+  const pull = h.repository.pullRemoteTasks();
+  await until(h.waiting);
+  h.emit('SIGNED_OUT', null);
+  h.emit('SIGNED_IN', 'u');
+  h.release();
+  await assert.rejects(pull, /Sessão alterada/);
+  assert.equal(h.state().tasks.length, 1);
+});
+
+test('P1: normal token refresh keeps identity revision and allows pull', async () => {
+  const h = setupPull();
+  const revision = h.identity().revision;
+  const pull = h.repository.pullRemoteTasks();
+  await until(h.waiting);
+  h.emit('TOKEN_REFRESHED', 'u');
+  assert.equal(h.identity().revision, revision);
+  h.release();
+  await pull;
+  assert.equal(h.state().tasks.length, 2);
 });
