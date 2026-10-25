@@ -189,7 +189,10 @@ const recoverRemoteTasks = async () => {
 export const pullRemoteTasks = () => {
   if (pullPromise) return pullPromise;
   updateTaskSyncStatus({ pulling: true, pullFailed: false });
-  pullPromise = recoverRemoteTasks().catch(error => {
+  pullPromise = recoverRemoteTasks().then(tasks => {
+    updateTaskSyncStatus({ pullConfirmed: true });
+    return tasks;
+  }).catch(error => {
     updateTaskSyncStatus({ pullFailed: true });
     throw error;
   }).finally(() => {
@@ -451,7 +454,7 @@ export const syncPendingTasks = () => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
-      updateTaskSyncStatus({ sending: false, sendFailed: false });
+      updateTaskSyncStatus({ sending: false, sendFailed: false, sendConfirmed: true });
 
       if (syncRequested) {
         syncRequested = false;

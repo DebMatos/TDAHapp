@@ -1,4 +1,8 @@
-let status = { pending: null, sending: false, pulling: false, sendFailed: false, pullFailed: false, failureCategory: null };
+let status = {
+  pending: null, sending: false, pulling: false,
+  sendFailed: false, pullFailed: false, failureCategory: null,
+  connectivity: 'unknown', sendConfirmed: false, pullConfirmed: false,
+};
 const listeners = new Set();
 
 const notify = (listener) => {
@@ -11,7 +15,32 @@ const notify = (listener) => {
 
 export const updateTaskSyncStatus = (changes) => {
   status = { ...status, ...changes };
+  if (status.pending > 0 || status.sendFailed) status.sendConfirmed = false;
+  if (status.pullFailed) status.pullConfirmed = false;
   listeners.forEach(notify);
+};
+
+// Reuse the App's existing NetInfo subscription. Null does not prove offline.
+export const updateTaskSyncConnectivity = (network) => {
+  const connectivity = network.isConnected === false || network.isInternetReachable === false
+    ? 'offline'
+    : network.isConnected === true && network.isInternetReachable === true
+      ? 'online' : 'unknown';
+  if (connectivity === status.connectivity) return;
+  updateTaskSyncStatus({ connectivity, sendConfirmed: false, pullConfirmed: false });
+};
+
+export const getTaskSyncState = (state) => {
+  if (state.connectivity === 'offline') return 'offline';
+  if (state.sending || state.pulling) return 'syncing';
+  if (state.sendFailed || state.pullFailed ||
+      state.pending > 0 && ['validation', 'conflict', 'auth'].includes(state.failureCategory)) {
+    return 'error';
+  }
+  if (state.connectivity === 'online' && state.pending === 0 &&
+      state.sendConfirmed && state.pullConfirmed) return 'synced';
+  if (state.pending > 0) return 'pending';
+  return 'checking';
 };
 
 export const subscribeTaskSyncStatus = (listener) => {

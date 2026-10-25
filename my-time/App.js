@@ -17,6 +17,7 @@ import TimelineSpike from './src/screens/TimelineSpike';
 import colors from './src/theme/colors';
 import { syncPendingTasks } from './src/data/taskRepository';
 import NetInfo from '@react-native-community/netinfo';
+import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
 
 const Tab = createBottomTabNavigator();
 
@@ -91,6 +92,7 @@ export default function App() {
   if (!session?.user?.id) return;
 
   const unsubscribe = NetInfo.addEventListener((state) => {
+    updateTaskSyncConnectivity(state);
     if (state.isConnected === true &&
         state.isInternetReachable === true) {
       syncPendingTasks().catch((error) => {
