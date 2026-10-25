@@ -3,6 +3,7 @@ import {
   normalizeTask,
   normalizeTasks,
   updateTask as updateTaskModel,
+  toggleTaskCompletion,
 } from '../domain/taskModel';
 
 import {
@@ -130,26 +131,39 @@ export const pullRemoteTasks = async () => {
 
 /* CREATE */
 
+const commitTaskCreation = async (task, assignPosition = false) => {
+  return commit((state) => {
+    const position = assignPosition
+      ? state.tasks.reduce(
+          (max, item) => Math.max(max, Number(item.position) || 0),
+          -1,
+        ) + 1
+      : task.position;
+    const canonicalTask = normalizeTask({ ...task, position });
+
+    return {
+      ...state,
+      tasks: [...state.tasks, canonicalTask],
+      pendingOps: [
+        ...state.pendingOps,
+        makeOperation('create', { task: canonicalTask }),
+      ],
+    };
+  });
+};
+
 export const createTask = async (task) => {
-  const canonicalTask = normalizeTask(task);
+  const savedState = await commitTaskCreation(task);
+  return savedState.tasks[savedState.tasks.length - 1];
+};
 
-  console.log('[Debug] A criar tarefa:', canonicalTask.id);
-
-  await commit((state) => ({
-    tasks: [...state.tasks, canonicalTask],
-    pendingOps: [
-      ...state.pendingOps,
-      makeOperation('create', { task: canonicalTask }),
-    ],
-  }));
-
-  console.log('[Debug] Tarefa guardada localmente:', canonicalTask.id);
-
-  return canonicalTask;
+export const createTaskAndLoadTasks = async (task) => {
+  const savedState = await commitTaskCreation(task, true);
+  return savedState.tasks;
 };
 
 /* UPDATE */
-const commitTaskUpdate = async (taskId, changes) => {
+const commitTaskUpdate = async (taskId, buildUpdatedTask) => {
   return commit((state) => {
     const currentTask = state.tasks.find(
       task => task.id === taskId
@@ -159,7 +173,7 @@ const commitTaskUpdate = async (taskId, changes) => {
       throw new Error(`Tarefa não encontrada: ${taskId}`);
     }
 
-    const updatedTask = updateTaskModel(currentTask, changes);
+    const updatedTask = buildUpdatedTask(currentTask);
 
     return {
       ...state,
@@ -176,19 +190,30 @@ const commitTaskUpdate = async (taskId, changes) => {
 };
 
 export const updateTask = async (taskId, changes) => {
-  const savedState = await commitTaskUpdate(taskId, changes);
+  const savedState = await commitTaskUpdate(
+    taskId,
+    task => updateTaskModel(task, changes),
+  );
   return savedState.tasks.find(task => task.id === taskId);
 };
 
 export const updateTaskAndLoadTasks = async (taskId, changes) => {
-  const savedState = await commitTaskUpdate(taskId, changes);
+  const savedState = await commitTaskUpdate(
+    taskId,
+    task => updateTaskModel(task, changes),
+  );
+  return savedState.tasks;
+};
+
+export const toggleCompletionAndLoadTasks = async (taskId) => {
+  const savedState = await commitTaskUpdate(taskId, toggleTaskCompletion);
   return savedState.tasks;
 };
 
 /* DELETE */
 
 export const deleteTask = async (taskId) => {
-  await commit((state) => ({
+  const savedState = await commit((state) => ({
     tasks: state.tasks.filter(
       (task) => task.id !== taskId,
     ),
@@ -197,6 +222,8 @@ export const deleteTask = async (taskId) => {
       makeOperation('delete', { taskId }),
     ],
   }));
+
+  return savedState.tasks;
 };
 
 /* CLEAR */
