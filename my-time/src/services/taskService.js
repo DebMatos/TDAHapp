@@ -137,36 +137,13 @@ export const toggleCompletion = async (
 export const updateTask = async (
   taskId,
   changes,
-  currentTasks = null,
 ) => {
-  const tasks =
-    currentTasks ?? await loadTasks();
-
-  const currentTask =
-    tasks.find(
-      (task) => task.id === taskId,
-    );
-
-  if (!currentTask) {
-    return tasks;
-  }
-
-  const updatedTask =
-    updateTaskModel(
-      currentTask,
-      changes,
-    );
-
-  const savedTask =
-    await updateStoredTask(
-      updatedTask,
-    );
-
-  return tasks.map((task) =>
-    task.id === taskId
-      ? savedTask
-      : task,
+  await updateStoredTask(
+    taskId,
+    changes,
   );
+
+  return loadTasks();
 };
 
 /* -------------------------------------------------------

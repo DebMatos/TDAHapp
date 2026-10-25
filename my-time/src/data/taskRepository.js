@@ -2,6 +2,7 @@
 import {
   normalizeTask,
   normalizeTasks,
+  updateTask as updateTaskModel,
 } from '../domain/taskModel';
 
 import {
@@ -68,7 +69,7 @@ const commit = async (buildNextState) => {
     const nextState = buildNextState(state);
 
     return saveState(nextState);
-  });pendingOps
+  });
   // A gravação local já terminou.
   // Sincronizar em segundo plano, sem bloquear a aplicação.
   syncPendingTasks().catch((error) => {
@@ -148,22 +149,33 @@ export const createTask = async (task) => {
 };
 
 /* UPDATE */
+export const updateTask = async (taskId, changes) => {
+  let updatedTask;
 
-export const updateTask = async (task) => {
-  const canonicalTask = normalizeTask(task);
-  await commit((state) => ({
-    tasks: state.tasks.map((item) =>
-      item.id === canonicalTask.id
-        ? canonicalTask
-        : item,
-    ),
-    pendingOps: [
-      ...state.pendingOps,
-      makeOperation('update', { task: canonicalTask }),
-    ],
-  }));
+  await commit((state) => {
+    const currentTask = state.tasks.find(
+      task => task.id === taskId
+    );
 
-  return canonicalTask;
+    if (!currentTask) {
+      throw new Error(`Tarefa não encontrada: ${taskId}`);
+    }
+
+    updatedTask = updateTaskModel(currentTask, changes);
+
+    return {
+      ...state,
+      tasks: state.tasks.map(task =>
+        task.id === taskId ? updatedTask : task
+      ),
+      pendingOps: [
+        ...state.pendingOps,
+        makeOperation('update', { task: updatedTask }),
+      ],
+    };
+  });
+
+  return updatedTask;
 };
 
 /* DELETE */
