@@ -1,3 +1,4 @@
+import TaskBanner from '../TaskBanner';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -315,6 +316,8 @@ export default function TaskDetailsModal({
   initialValues = null,
   onClose,
   onSave,
+  banner,
+  onDismissBanner,
   onDelete,
 }) {
   const isEdit = mode === 'edit';
@@ -1236,6 +1239,7 @@ const closeInlineEditor = () => {
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
+        <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
 
         <Animated.View
           style={[

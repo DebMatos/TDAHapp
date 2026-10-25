@@ -30,6 +30,26 @@ export const supabase = createClient(
   }
 );
 
+// Track identity changes synchronously; normal token refreshes keep the marker.
+let sessionUserId;
+let sessionIdentityRevision = 0;
+supabase.auth.onAuthStateChange((event, session) => {
+  const userId = session?.user?.id ?? null;
+  if (event === 'INITIAL_SESSION' && sessionUserId === undefined) {
+    sessionUserId = userId;
+    return;
+  }
+  if (userId !== sessionUserId) {
+    sessionUserId = userId;
+    sessionIdentityRevision += 1;
+  }
+});
+
+export const getSessionIdentity = () => ({
+  userId: sessionUserId,
+  revision: sessionIdentityRevision,
+});
+
 if (Platform.OS !== 'web') {
   AppState.addEventListener('change', (state) => {
     if (state === 'active') {

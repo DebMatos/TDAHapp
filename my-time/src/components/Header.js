@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
+import TaskSyncStatus from './TaskSyncStatus';
 import { isSameDay } from '../utils/date';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const STRIP_PADDING = 12;
@@ -130,7 +131,7 @@ export default function Header({
     <View style={styles.headerContainer}>
       {/* 1. LINHA SUPERIOR */}
       <View style={styles.topRow}>
-        <Text style={styles.monthTitle}>{`${monthName} ${year}`}</Text>
+        <Text numberOfLines={1} style={styles.monthTitle}>{`${monthName} ${year}`}</Text>
 
         <View style={styles.centerTasksContainer} pointerEvents="none">
           <View style={styles.tasksInline}>
@@ -155,6 +156,8 @@ export default function Header({
             />
             <Text style={styles.nowText}>Agora</Text>
           </TouchableOpacity>
+
+          <TaskSyncStatus />
 
           <TouchableOpacity
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -252,15 +255,16 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   monthTitle: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
     letterSpacing: -0.3,
   },
   centerTasksContainer: {
-    position: 'absolute',
-    left: 20,
-    right: 0,
+    marginHorizontal: 6,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -279,7 +283,8 @@ const styles = StyleSheet.create({
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexShrink: 0,
+    gap: 4,
   },
   nowButton: {
     flexDirection: 'row',

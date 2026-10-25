@@ -1,3 +1,4 @@
+import TaskBanner from '../TaskBanner';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -69,6 +70,8 @@ export default function CreateTaskModal({
   visible,
   onClose,
   onSave,
+  banner,
+  onDismissBanner,
   onMoreOptions,
   initialMinutes = null,
 }) {
@@ -181,6 +184,7 @@ export default function CreateTaskModal({
           {/* FUNDO */}
 
           <Pressable style={styles.backdrop} onPress={onClose} />
+          <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
 
           {/* SHEET */}
 

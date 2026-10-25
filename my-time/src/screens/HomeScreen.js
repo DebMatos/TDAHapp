@@ -35,11 +35,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TaskDetailsModal from '../components/modals/TaskDetailsModal';
 import TaskCardClean from '../components/TaskCardClean';
 import Header from '../components/Header';
+import TaskBanner from '../components/TaskBanner';
+import { subscribeTaskSyncStatus } from '../data/taskSyncStatus';
+import { createTaskSyncNoticeTracker } from '../data/taskSyncNotices';
 import CreateTaskModal from '../components/modals/CreateTaskModal';
 import colors from '../theme/colors';
-
-import { loadTasks as loadStoredTasks } from '../data/taskRepository';
-import { supabase } from '../lib/supabase';
+import NetInfo from '@react-native-community/netinfo';
+import {
+  loadTasksSnapshot,
+  subscribeTasks,
+  pullRemoteTasks,
+} from '../data/taskRepository';import { supabase } from '../lib/supabase';
 import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
@@ -226,6 +232,30 @@ const calculateOverlapColumns = (tasks) => {
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
+  const [taskError, setTaskError] = useState(null);
+  const [syncNotice, setSyncNotice] = useState(null);
+  const banner = taskError ?? syncNotice;
+  const dismissBanner = () => {
+    if (taskError) setTaskError(null);
+    else setSyncNotice(null);
+  };
+  useEffect(() => {
+    const track = createTaskSyncNoticeTracker();
+    return subscribeTaskSyncStatus(status => {
+      const event = track(status);
+      if (event?.kind === 'notice') setSyncNotice(event.notice);
+      if (event?.kind === 'clear') setSyncNotice(null);
+    });
+  }, []);
+  const showTaskError = (title, error) => {
+    setTaskError({
+      title,
+      message: error.code === 'TASK_NOT_FOUND'
+        ? 'Esta tarefa já não existe neste dispositivo. Fecha os detalhes e verifica a lista.'
+        : 'Não foi possível guardar a alteração neste dispositivo. Tenta novamente.',
+    });
+  };
+
   const handleMenuPress = () => {
     Alert.alert('Terminar sessão', 'Queres terminar sessão nesta app?', [
       {
@@ -444,22 +474,55 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   useEffect(() => {
-    const loadStoredData = async () => {
-      try {
-        const canonicalTasks = await loadStoredTasks();
+    let active = true;
+    let latestRevision = -1;
 
-        setTasks(canonicalTasks);
-      } catch (error) {
-        console.error('Erro ao carregar tarefas:', error);
-
-        Alert.alert(
-          'Não foi possível carregar as tarefas',
-          'Não foi possível comunicar com o servidor. Tenta novamente.',
-        );
-      }
+    const applySnapshot = ({ tasks: savedTasks, revision }) => {
+      if (!active || revision <= latestRevision) return;
+      latestRevision = revision;
+      setTasks(savedTasks);
     };
 
+    // Subscribe before reading so writes during initial loading are observed.
+    const unsubscribe = subscribeTasks(applySnapshot);
+    const loadStoredData = async () => {
+      try {
+        applySnapshot(await loadTasksSnapshot());
+      } catch (error) {
+        if (active) setTaskError({
+          title: 'Não foi possível carregar as tarefas locais',
+          message: 'Não foi possível ler as tarefas deste dispositivo. Os dados não foram apagados.',
+          retry: loadStoredData,
+        });
+        return false;
+      }
+      if (!active) return;
+      try {
+        await pullRemoteTasks();
+      } catch (error) {
+        console.warn('[Sync] Falha ao recuperar tarefas:', error);
+      }
+      return true;
+    };
     loadStoredData();
+
+    let wasReachable = false;
+    const unsubscribeNetwork = NetInfo.addEventListener(network => {
+      const reachable = network.isConnected === true &&
+        network.isInternetReachable === true;
+      if (reachable && !wasReachable) {
+        pullRemoteTasks().catch(error => {
+          console.warn('[Sync] Falha ao recuperar tarefas na reconexão:', error);
+        });
+      }
+      wasReachable = reachable;
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+      unsubscribeNetwork();
+    };
   }, []);
   /* -------------------------------------------------------
      DRAG
@@ -470,17 +533,17 @@ export default function TimelineScreen() {
       getCivilDateForTimelineSlot(selectedTimelineDate, newMins),
     );
 
-    const savedTasks = await taskService.moveTask({
-      tasks,
-      taskId,
-
-      schedule: {
-        date: taskDate,
-        startTime: formatTimeFromMinutes(newMins),
-      },
-    });
-
-    setTasks(savedTasks);
+    try {
+      await taskService.moveTask({
+        taskId,
+        schedule: {
+          date: taskDate,
+          startTime: formatTimeFromMinutes(newMins),
+        },
+      });
+    } catch (error) {
+      showTaskError('Não foi possível mover a tarefa', error);
+    }
   };
 
   /* -------------------------------------------------------
@@ -488,9 +551,11 @@ export default function TimelineScreen() {
   ------------------------------------------------------- */
 
   const toggleTaskComplete = async (taskId) => {
-    const savedTasks = await taskService.toggleCompletion(taskId, tasks);
-
-    setTasks(savedTasks);
+    try {
+      await taskService.toggleCompletion(taskId);
+    } catch (error) {
+      showTaskError('Não foi possível alterar o estado da tarefa', error);
+    }
   };
   /* -------------------------------------------------------
      QUICK CREATE
@@ -503,6 +568,7 @@ export default function TimelineScreen() {
     categoryId,
     priority,
   }) => {
+    setTaskError(null);
     try {
       const startMins = targetSlotMinutes ?? TIMELINE_START_MINUTES;
 
@@ -510,7 +576,7 @@ export default function TimelineScreen() {
         getCivilDateForTimelineSlot(selectedTimelineDate, startMins),
       );
 
-      const savedTasks = await taskService.createTask(
+      await taskService.createTask(
         {
           title,
           notes,
@@ -523,10 +589,8 @@ export default function TimelineScreen() {
 
           durationMinutes,
         },
-        tasks,
       );
 
-      setTasks(savedTasks);
 
       setTargetSlotMinutes(null);
 
@@ -534,10 +598,7 @@ export default function TimelineScreen() {
     } catch (error) {
       console.error('Erro ao criar tarefa:', error);
 
-      Alert.alert(
-        'Não foi possível criar a tarefa',
-        'A tarefa não foi guardada. Tenta novamente.',
-      );
+      showTaskError('Não foi possível criar a tarefa', error);
     }
   };
 
@@ -769,6 +830,7 @@ export default function TimelineScreen() {
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
+      <TaskBanner notice={!modalVisible && !detailsTask ? banner : null} onDismiss={dismissBanner} />
 
       <View
         ref={timelineViewportRef}
@@ -956,8 +1018,11 @@ export default function TimelineScreen() {
 
       <CreateTaskModal
         visible={modalVisible}
+        banner={banner}
+        onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
         onClose={() => {
+          setTaskError(null);
           setModalVisible(false);
 
           setTargetSlotMinutes(null);
@@ -987,9 +1052,12 @@ export default function TimelineScreen() {
 
       <TaskDetailsModal
         visible={Boolean(detailsTask)}
+        banner={banner}
+        onDismissBanner={dismissBanner}
         mode={detailsMode}
         initialValues={detailsTask}
         onClose={() => {
+          setTaskError(null);
           setDetailsTask(null);
 
           if (detailsMode === 'create') {
@@ -997,9 +1065,9 @@ export default function TimelineScreen() {
           }
         }}
         onSave={async (changes) => {
+          setTaskError(null);
           try {
-            const savedTasks =
-              detailsMode === 'create'
+            detailsMode === 'create'
                 ? await taskService.createTask(
                     {
                       ...changes,
@@ -1015,10 +1083,8 @@ export default function TimelineScreen() {
                           ),
                         ),
                     },
-                    tasks,
                   )
-                : await taskService.updateTask(detailsTask.id, changes, tasks);
-            setTasks(savedTasks);
+                : await taskService.updateTask(detailsTask.id, changes);
 
             setDetailsTask(null);
 
@@ -1026,12 +1092,7 @@ export default function TimelineScreen() {
           } catch (error) {
             console.error('Erro ao guardar tarefa:', error);
 
-            Alert.alert(
-              'Não foi possível guardar a tarefa',
-              detailsMode === 'create'
-                ? 'A tarefa não foi criada. Tenta novamente.'
-                : 'As alterações não foram guardadas. Tenta novamente.',
-            );
+            showTaskError('Não foi possível guardar a tarefa', error);
 
             throw error;
           }
@@ -1039,12 +1100,13 @@ export default function TimelineScreen() {
         onDelete={
           detailsMode === 'edit'
             ? async () => {
-                const savedTasks = await taskService.deleteTask(
-                  detailsTask.id,
-                  tasks,
-                );
-                setTasks(savedTasks);
-                setDetailsTask(null);
+                setTaskError(null);
+                try {
+                  await taskService.deleteTask(detailsTask.id);
+                  setDetailsTask(null);
+                } catch (error) {
+                  showTaskError('Não foi possível apagar a tarefa', error);
+                }
               }
             : undefined
         }
