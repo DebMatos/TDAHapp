@@ -14,10 +14,17 @@ for error handling. Errors must be explained in text, not color alone.
 
 Functional colors are independent from category colors: `priority.low/medium/high`
 identify priority, `saveAction` identifies unsaved editable work, and
-`selectionIndicator` identifies the selected appearance option. Their initial
-values preserve the existing light/dark visuals. They must not reference category
+`selectionIndicator` identifies the selected appearance option. Their values distinguish category identity from action and selection. They must not reference category
 objects, even when their current hex values coincide. Category colors and surfaces
 remain responsible for task identity; `now` remains responsible for current time.
+
+Light text and controls use stronger contrast: action/save use blue-petrol
+`#276E7A`; filled selection uses green `#66734F`; selection text/indicators
+use `#596642`; muted text and placeholders use `#756B64`. Dark action/save use
+`#79BCC8`, with selection indicators using `#B9C69B`. Yellow is reserved for
+current time, not selected appearance preferences. Priority has its own
+muted red/ochre/green palette. Category accents, category surfaces and timeline
+segments remain unchanged. No new border, shadow or glow is introduced.
 
 ## Typography
 
