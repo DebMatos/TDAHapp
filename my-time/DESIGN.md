@@ -109,6 +109,14 @@ including slots after midnight. Save and expand carry the chosen civil date and
 slot time explicitly. Expansion preserves raw title/notes and never persists a
 task. Shared date-input helpers interpret stored dates without UTC conversion.
 
+Task Details presents properties as icon-and-label rows in both create and edit.
+Only one inline editor is open at a time. Existing selectors close on selection;
+text, date, time and custom duration use an explicit confirmation. Notes keep
+multiline input. Confirming a property changes the draft; the sheet save action
+still owns persistence. Postponement actions share a compact horizontal bar,
+including the existing Tomorrow shortcut. Read rows have no added surfaces or
+borders, and category, priority and status colors retain their semantic roles.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.

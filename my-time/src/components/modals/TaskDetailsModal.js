@@ -246,7 +246,11 @@ export default function TaskDetailsModal({
 
   const [title, setTitle] = useState('');
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  // One inline editor at a time; task values remain in their existing state.
+  const [activeField, setActiveField] = useState(null);
+  const isEditingTitle = activeField === 'title';
+  const isEditingPriority = activeField === 'priority';
+  const isEditingRepeat = activeField === 'repeat';
 
   const [dateValue, setDateValue] = useState(getTodayDateInput());
 
@@ -258,8 +262,6 @@ export default function TaskDetailsModal({
 
   const [customDuration, setCustomDuration] = useState('');
 
-  const [activeScheduleField, setActiveScheduleField] = useState(null);
-
   const [postponeSelection, setPostponeSelection] = useState(null);
 
   const [categoryId, setCategoryId] = useState('inbox');
@@ -268,11 +270,7 @@ export default function TaskDetailsModal({
 
   const [priority, setPriority] = useState(null);
 
-  const [isEditingPriority, setIsEditingPriority] = useState(false);
-
   const [repeat, setRepeat] = useState('never');
-
-  const [isEditingRepeat, setIsEditingRepeat] = useState(false);
 
   const [notes, setNotes] = useState('');
 
@@ -540,7 +538,7 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (!isEdit || !isEditingTitle) {
+    if (!isEditingTitle) {
       return;
     }
 
@@ -555,10 +553,10 @@ export default function TaskDetailsModal({
     }, 80);
 
     return () => clearTimeout(timer);
-  }, [isEdit, isEditingTitle]);
+  }, [isEditingTitle]);
 
   useEffect(() => {
-    if (activeScheduleField === 'date') {
+    if (activeField === 'date') {
       const timer = setTimeout(() => {
         dateInputRef.current?.focus();
       }, 60);
@@ -566,7 +564,7 @@ export default function TaskDetailsModal({
       return () => clearTimeout(timer);
     }
 
-    if (activeScheduleField === 'time') {
+    if (activeField === 'time') {
       const timer = setTimeout(() => {
         startInputRef.current?.focus();
       }, 60);
@@ -575,7 +573,7 @@ export default function TaskDetailsModal({
     }
 
     return undefined;
-  }, [activeScheduleField]);
+  }, [activeField]);
 
   /* -------------------------------------------------------
      RESET
@@ -586,13 +584,9 @@ export default function TaskDetailsModal({
       return;
     }
 
-    setIsEditingTitle(false);
-
-    setActiveScheduleField(null);
+    setActiveField(null);
 
     setPostponeSelection(null);
-
-    setIsEditingRepeat(false);
 
     setIsExpanded(false);
 
@@ -674,17 +668,13 @@ export default function TaskDetailsModal({
 
     setRepeat(initialRepeat);
 
-    setIsEditingRepeat(false);
+    setActiveField(null);
 
     setNotes(initialNotes);
 
     setPostponeSelection(null);
 
-    setActiveScheduleField(null);
-
     setPriority(initialPriority);
-
-    setIsEditingPriority(false);
 
     if (DURATION_PRESETS.includes(initialDuration)) {
       setCustomDuration('');
@@ -818,7 +808,7 @@ export default function TaskDetailsModal({
 
     updateDuration(preset);
 
-    setActiveScheduleField(null);
+    setActiveField(null);
 
     Keyboard.dismiss();
   };
@@ -854,9 +844,7 @@ export default function TaskDetailsModal({
   };
 
   const selectPostponeMinutes = (option) => {
-    setActiveScheduleField(null);
-
-    setIsEditingRepeat(false);
+    setActiveField(null);
 
     Keyboard.dismiss();
 
@@ -890,9 +878,7 @@ export default function TaskDetailsModal({
   };
 
   const selectPostponeTomorrow = () => {
-    setActiveScheduleField(null);
-
-    setIsEditingRepeat(false);
+    setActiveField(null);
 
     Keyboard.dismiss();
 
@@ -955,7 +941,6 @@ export default function TaskDetailsModal({
     }
   };
 
-
   const handleDelete = async () => {
     if (isBusy || !onDelete) return;
     setIsDeleting(true);
@@ -968,21 +953,40 @@ export default function TaskDetailsModal({
     }
   };
 
-const closeInlineEditor = () => {
-  if (activeScheduleField) {
-    setActiveScheduleField(null);
+  const closeInlineEditor = () => {
+    setActiveField(null);
     Keyboard.dismiss();
-  }
+  };
 
-  if (isEditingRepeat) {
-    setIsEditingRepeat(false);
-  }
+  const openInlineEditor = (field) => {
+    Keyboard.dismiss();
+    setActiveField(field);
+  };
 
-  if (isEditingPriority) {
-    setIsEditingPriority(false);
-  }
-};
+  const canConfirmField =
+    activeField === 'title' ? Boolean(title.trim()) :
+    activeField === 'date' ? isValidDateInput(dateValue) :
+    activeField === 'time' ? isValidTime(startTime) && isValidTime(endTime) : true;
 
+  const confirmInlineEditor = () => {
+    if (!isBusy && canConfirmField) closeInlineEditor();
+  };
+
+  const renderInlineConfirmation = (label) => (
+    <TouchableOpacity
+      disabled={isBusy || !canConfirmField}
+      accessibilityRole="button"
+      accessibilityLabel={`Confirmar ${label}`}
+      accessibilityHint={!canConfirmField ? 'Introduz um valor válido para confirmar.' : undefined}
+      accessibilityState={{ disabled: isBusy || !canConfirmField }}
+      style={styles.inlineConfirm}
+      activeOpacity={0.7}
+      onPress={confirmInlineEditor}
+    >
+      <Ionicons name="checkmark" size={22}
+        color={canConfirmField ? colors.selectionText : colors.textFaint} />
+    </TouchableOpacity>
+  );
 
   /* -------------------------------------------------------
      SCHEDULE RENDER
@@ -990,7 +994,7 @@ const closeInlineEditor = () => {
 
   const renderScheduleLine = () => {
     const dateContent =
-      activeScheduleField === 'date' ? (
+      activeField === 'date' ? (
         <TextInput
           editable={!isBusy}
           accessibilityLabel="Data, dia mês e ano"
@@ -1000,7 +1004,6 @@ const closeInlineEditor = () => {
           onChangeText={updateDate}
           keyboardType="number-pad"
           maxLength={10}
-          onBlur={() => setActiveScheduleField(null)}
         />
       ) : (
         <TouchableOpacity
@@ -1008,14 +1011,11 @@ const closeInlineEditor = () => {
           accessibilityRole="button"
           accessibilityState={{ disabled: isBusy }}
           activeOpacity={0.7}
-          onPress={() => {
-            setIsEditingRepeat(false);
-
-            Keyboard.dismiss();
-
-            setActiveScheduleField('date');
-          }}
+          style={styles.propertyTouch}
+          accessibilityLabel="Editar data"
+          onPress={() => openInlineEditor('date')}
         >
+          <Text style={styles.propertyLabel}>Data</Text>
           <Text style={styles.inlineDateText}>
             {getDateDisplayLabel(dateValue)}
           </Text>
@@ -1023,7 +1023,7 @@ const closeInlineEditor = () => {
       );
 
     const timeContent =
-      activeScheduleField === 'time' ? (
+      activeField === 'time' ? (
         <View style={styles.inlineTimeEditor}>
           <TextInput
             editable={!isBusy}
@@ -1046,7 +1046,7 @@ const closeInlineEditor = () => {
             onChangeText={updateEndTime}
             keyboardType="number-pad"
             maxLength={5}
-            onSubmitEditing={() => setActiveScheduleField(null)}
+            onSubmitEditing={confirmInlineEditor}
           />
         </View>
       ) : (
@@ -1055,14 +1055,11 @@ const closeInlineEditor = () => {
           accessibilityRole="button"
           accessibilityState={{ disabled: isBusy }}
           activeOpacity={0.7}
-          onPress={() => {
-            setIsEditingRepeat(false);
-
-            Keyboard.dismiss();
-
-            setActiveScheduleField('time');
-          }}
+          style={styles.propertyTouch}
+          accessibilityLabel="Editar horário"
+          onPress={() => openInlineEditor('time')}
         >
+          <Text style={styles.propertyLabel}>Horário</Text>
           <Text style={styles.inlineTimeText}>
             {startTime}
             {'  →  '}
@@ -1072,7 +1069,7 @@ const closeInlineEditor = () => {
       );
 
     const durationContent =
-      activeScheduleField === 'duration' ? (
+      activeField === 'duration' ? (
         <View style={styles.inlineDurationEditor}>
           {DURATION_PRESETS.map((preset) => {
             const selected = duration === preset && customDuration === '';
@@ -1115,16 +1112,7 @@ const closeInlineEditor = () => {
               maxLength={4}
               placeholder="45"
               placeholderTextColor={colors.textFaint}
-              onBlur={() => {
-                setActiveScheduleField(null);
-
-                Keyboard.dismiss();
-              }}
-              onSubmitEditing={() => {
-                setActiveScheduleField(null);
-
-                Keyboard.dismiss();
-              }}
+              onSubmitEditing={confirmInlineEditor}
             />
 
             <Text style={styles.inlineCustomDurationUnit}>min</Text>
@@ -1136,47 +1124,38 @@ const closeInlineEditor = () => {
           accessibilityRole="button"
           accessibilityState={{ disabled: isBusy }}
           activeOpacity={0.7}
-          onPress={() => {
-            setIsEditingRepeat(false);
-
-            Keyboard.dismiss();
-
-            setActiveScheduleField('duration');
-          }}
+          style={styles.propertyTouch}
+          accessibilityLabel="Editar duração"
+          onPress={() => openInlineEditor('duration')}
         >
+          <Text style={styles.propertyLabel}>Duração</Text>
           <Text style={styles.inlineDurationText}>
             {formatDuration(duration)}
           </Text>
         </TouchableOpacity>
       );
 
-    if (activeScheduleField === 'duration') {
-      return (
-        <View style={styles.scheduleBlock}>
-          <View style={styles.scheduleLine}>
-            {dateContent}
-
-            <Text style={styles.scheduleDot}>·</Text>
-
-            {timeContent}
-          </View>
-
-          {durationContent}
-        </View>
-      );
-    }
-
     return (
-      <View style={styles.scheduleLine}>
-        {dateContent}
-
-        <Text style={styles.scheduleDot}>·</Text>
-
-        {timeContent}
-
-        <Text style={styles.scheduleDot}>·</Text>
-
-        {durationContent}
+      <View style={styles.scheduleBlock}>
+        {[
+          { field: 'date', label: 'Data', icon: 'calendar-outline', content: dateContent },
+          { field: 'time', label: 'Horário', icon: 'time-outline', content: timeContent },
+          { field: 'duration', label: 'Duração', icon: 'timer-outline', content: durationContent },
+        ].map(({ field, label, icon, content }) => (
+          <View key={field} style={styles.propertyRow}>
+            <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.propertyIcon} />
+            <View style={styles.propertyContent}>
+              {activeField === field && <Text style={styles.propertyLabel}>{label}</Text>}
+              {content}
+              {activeField === field && !canConfirmField && (
+                <Text style={styles.propertyLabel} accessibilityLiveRegion="polite">
+                  {field === 'date' ? 'Usa uma data válida: DD/MM/AAAA.' : 'Usa horas válidas: HH:MM.'}
+                </Text>
+              )}
+            </View>
+            {activeField === field && renderInlineConfirmation(label.toLowerCase())}
+          </View>
+        ))}
       </View>
     );
   };
@@ -1237,70 +1216,55 @@ const closeInlineEditor = () => {
           >
             {/* TITLE */}
 
-            {isEdit ? (
-              <View style={styles.titleRow}>
-                <Ionicons
-                  name={selectedCategory.icon}
-                  size={24}
-                  color={selectedCategory.color}
-                  style={styles.titleCategoryIcon}
-                />
-
-                {isEditingTitle ? (
-                  <TextInput
-                    editable={!isBusy}
-                    accessibilityLabel="Título da tarefa"
-                    ref={titleInputRef}
-                    style={[styles.titleInput, styles.editTitleInput]}
-                    value={title}
-                    onChangeText={setTitle}
-                    returnKeyType="done"
-                    onBlur={() => setIsEditingTitle(false)}
-                    onSubmitEditing={() => setIsEditingTitle(false)}
-                    placeholder="O que vais fazer?"
-                    placeholderTextColor={colors.textFaint}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    disabled={isBusy}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: isBusy }}
-                    style={styles.editTitleTouch}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      closeInlineEditor();
-
-                      scrollRef.current?.scrollTo({
-                        y: 0,
-
-                        animated: false,
-                      });
-
-                      setIsEditingTitle(true);
-                    }}
-                  >
-                    <Text style={styles.editTitle} numberOfLines={3}>
-                      {title || 'O que vais fazer?'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              <TextInput
-                editable={!isBusy}
-                accessibilityLabel="Título da tarefa"
-                style={styles.titleInput}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="O que vais fazer?"
-                placeholderTextColor={colors.textFaint}
-                autoFocus={!embedded}
+            <View style={styles.titleRow}>
+              <Ionicons
+                name={selectedCategory.icon}
+                size={24}
+                color={selectedCategory.color}
+                style={styles.titleCategoryIcon}
               />
-            )}
 
-            {/* SCHEDULE */}
+              {isEditingTitle ? (
+                <TextInput
+                  editable={!isBusy}
+                  accessibilityLabel="Título da tarefa"
+                  ref={titleInputRef}
+                  style={[styles.titleInput, styles.editTitleInput]}
+                  value={title}
+                  onChangeText={setTitle}
+                  autoFocus={!embedded}
+                  returnKeyType="done"
+                  onSubmitEditing={confirmInlineEditor}
+                  placeholder="O que vais fazer?"
+                  placeholderTextColor={colors.textFaint}
+                />
+              ) : (
+                <TouchableOpacity
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isBusy }}
+                  style={styles.editTitleTouch}
+                  accessibilityLabel="Editar título da tarefa"
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    closeInlineEditor();
 
-            <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+                    scrollRef.current?.scrollTo({
+                      y: 0,
+
+                      animated: false,
+                    });
+
+                    setActiveField('title');
+                  }}
+                >
+                  <Text style={styles.editTitle} numberOfLines={3}>
+                    {title || 'O que vais fazer?'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {isEditingTitle && renderInlineConfirmation('título')}
+            </View>
 
             {/* POSTPONE */}
 
@@ -1313,7 +1277,7 @@ const closeInlineEditor = () => {
                     <TouchableOpacity
                       disabled={isBusy}
                       accessibilityRole="button"
-                      accessibilityState={{ disabled: isBusy }}
+                      accessibilityState={{ disabled: isBusy, selected }}
                       key={option.id}
                       style={[
                         styles.postponeButton,
@@ -1343,7 +1307,8 @@ const closeInlineEditor = () => {
                 <TouchableOpacity
                   disabled={isBusy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isBusy }}
+                  accessibilityState={{ disabled: isBusy, selected: postponeSelection === 'tomorrow' }}
+                  accessibilityLabel="Amanhã"
                   style={[
                     styles.postponeButton,
 
@@ -1381,75 +1346,99 @@ const closeInlineEditor = () => {
               </View>
             )}
 
+            {/* SCHEDULE */}
+
+            <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+
             {/* CATEGORY */}
 
-            <Text style={styles.sectionLabel}>Categoria</Text>
+            {activeField !== 'category' ? (
+              <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Editar categoria"
+                accessibilityState={{ disabled: isBusy }}
+                style={styles.propertyRow}
+                activeOpacity={0.7}
+                onPress={() => openInlineEditor('category')}
+              >
+                <View style={styles.propertyIcon}><Ionicons name={selectedCategory.icon} size={20} color={selectedCategory.color} /></View>
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Categoria</Text>
+                  <Text style={[styles.propertyText, { color: selectedCategory.color }]}>{selectedCategory.label}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.selectorRow}>
+                {categoryOptions.map((item) => {
+                  const selected = item.id === categoryId;
 
-            <View style={styles.selectorRow}>
-              {categoryOptions.map((item) => {
-                const selected = item.id === categoryId;
+                  return (
+                    <TouchableOpacity
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: isBusy, selected: selected }}
+                      accessibilityLabel={item.label}
+                      key={item.id}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.selectorItem,
 
-                return (
-                  <TouchableOpacity
-                    disabled={isBusy}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: isBusy, selected: selected }}
-                    accessibilityLabel={item.label}
-                    key={item.id}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.selectorItem,
+                        selected && styles.selectorItemSelected,
+                      ]}
+                      onPress={() => {
+                        closeInlineEditor();
 
-                      selected && styles.selectorItemSelected,
-                    ]}
-                    onPress={() => {
-                      closeInlineEditor();
+                        setCategoryId(item.id);
+                      }}
+                    >
+                      <Ionicons
+                        name={item.icon}
+                        size={selected ? 24 : 21}
+                        color={selected ? item.color : colors.textMuted}
+                      />
 
-                      setCategoryId(item.id);
-                    }}
-                  >
-                    <Ionicons
-                      name={item.icon}
-                      size={selected ? 24 : 21}
-                      color={selected ? item.color : colors.textMuted}
-                    />
-
-                    {selected && (
-                      <Text
-                        style={[styles.selectorLabel, { color: item.color }]}
-                      >
-                        {item.label}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      {selected && (
+                        <Text
+                          style={[styles.selectorLabel, { color: item.color }]}
+                        >
+                          {item.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {/* PRIORITY */}
-            <Text style={styles.sectionLabel}>Prioridade</Text>
 
             {!isEditingPriority ? (
               <TouchableOpacity
                 disabled={isBusy}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: isBusy }}
-                style={styles.priorityRestRow}
+                style={styles.propertyRow}
+                accessibilityLabel="Editar prioridade"
                 activeOpacity={0.7}
                 onPress={() => {
                   closeInlineEditor();
-                  setIsEditingPriority(true);
+                  setActiveField('priority');
                 }}
               >
                 <Ionicons
                   name="flag-outline"
+                  style={styles.propertyIcon}
                   size={20}
                   color={getPriorityColor(priority, priorityOptions, colors)}
                 />
 
-                <Text style={styles.priorityRestText}>
-                  {getPriorityLabel(priority, priorityOptions)}
-                </Text>
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Prioridade</Text>
+                  <Text style={[styles.propertyText, { color: getPriorityColor(priority, priorityOptions, colors) }]}>
+                    {getPriorityLabel(priority, priorityOptions)}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ) : (
               <View style={styles.priorityOptionsRow}>
@@ -1470,7 +1459,7 @@ const closeInlineEditor = () => {
                       ]}
                       onPress={() => {
                         setPriority(item.id);
-                        setIsEditingPriority(false);
+                        setActiveField(null);
                       }}
                     >
                       <Ionicons
@@ -1495,77 +1484,92 @@ const closeInlineEditor = () => {
 
             {/* STATUS */}
 
-            <Text style={styles.sectionLabel}>Estado</Text>
+            {activeField !== 'status' ? (
+              <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Editar estado"
+                accessibilityState={{ disabled: isBusy }}
+                style={styles.propertyRow}
+                activeOpacity={0.7}
+                onPress={() => openInlineEditor('status')}
+              >
+                <View style={styles.propertyIcon}><StatusIcon type={status} selected /></View>
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Estado</Text>
+                  <Text style={[styles.propertyText, { color: colors.selectionText }]}>{STATUS_OPTIONS.find((item) => item.id === status)?.label}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.selectorRow, styles.statusSelectorRow]}>
+                {STATUS_OPTIONS.map((item) => {
+                  const selected = item.id === status;
 
-            <View style={[styles.selectorRow, styles.statusSelectorRow]}>
-              {STATUS_OPTIONS.map((item) => {
-                const selected = item.id === status;
+                  return (
+                    <TouchableOpacity
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: isBusy, selected: selected }}
+                      accessibilityLabel={item.label}
+                      key={item.id}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.selectorItem,
 
-                return (
-                  <TouchableOpacity
-                    disabled={isBusy}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: isBusy, selected: selected }}
-                    accessibilityLabel={item.label}
-                    key={item.id}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.selectorItem,
+                        selected && styles.selectorItemSelected,
+                      ]}
+                      onPress={() => {
+                        closeInlineEditor();
 
-                      selected && styles.selectorItemSelected,
-                    ]}
-                    onPress={() => {
-                      closeInlineEditor();
+                        setStatus(item.id);
+                      }}
+                    >
+                      <StatusIcon type={item.id} selected={selected} />
 
-                      setStatus(item.id);
-                    }}
-                  >
-                    <StatusIcon type={item.id} selected={selected} />
-
-                    {selected && (
-                      <Text
-                        style={[
-                          styles.selectorLabel,
-                          styles.statusSelectorLabel,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.label}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      {selected && (
+                        <Text
+                          style={[
+                            styles.selectorLabel,
+                            styles.statusSelectorLabel,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.label}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {/* REPEAT */}
-
-            <Text style={styles.sectionLabel}>Repetir</Text>
 
             {!isEditingRepeat ? (
               <TouchableOpacity
                 disabled={isBusy}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: isBusy }}
-                style={styles.repeatRestRow}
+                style={styles.propertyRow}
+                accessibilityLabel="Editar repetição"
                 activeOpacity={0.7}
                 onPress={() => {
-                  setActiveScheduleField(null);
-
-                  Keyboard.dismiss();
-
-                  setIsEditingRepeat(true);
+                  openInlineEditor('repeat');
                 }}
               >
                 <Ionicons
                   name="repeat-outline"
+                  style={styles.propertyIcon}
                   size={20}
                   color={colors.textMuted}
                 />
 
-                <Text style={styles.repeatRestText}>
-                  {REPEAT_LABELS[repeat]}
-                </Text>
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Repetição</Text>
+                  <Text style={[styles.propertyText, repeat === 'never' && styles.neutralText]}>
+                    {REPEAT_LABELS[repeat]}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ) : (
               <View style={styles.repeatEditor}>
@@ -1596,7 +1600,7 @@ const closeInlineEditor = () => {
                         onPress={() => {
                           setRepeat(item);
 
-                          setIsEditingRepeat(false);
+                          setActiveField(null);
                         }}
                       >
                         <Text
@@ -1617,20 +1621,45 @@ const closeInlineEditor = () => {
 
             {/* NOTES */}
 
-            <Text style={styles.notesLabel}>Notas</Text>
-
-            <TextInput
-              editable={!isBusy}
-              accessibilityLabel="Notas"
-              style={styles.notesInput}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              placeholder="Adicionar notas..."
-              placeholderTextColor={colors.textFaint}
-              textAlignVertical="top"
-              onFocus={closeInlineEditor}
-            />
+            {activeField !== 'notes' ? (
+              <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Editar notas"
+                accessibilityState={{ disabled: isBusy }}
+                style={styles.propertyRow}
+                activeOpacity={0.7}
+                onPress={() => openInlineEditor('notes')}
+              >
+                <Ionicons name="document-text-outline" size={20} color={colors.textMuted} style={styles.propertyIcon} />
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Notas</Text>
+                  <Text style={[styles.propertyText, !notes && styles.neutralText]}>
+                    {notes || 'Adicionar notas…'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.propertyRow}>
+                <Ionicons name="document-text-outline" size={20} color={colors.textMuted} style={styles.propertyIcon} />
+                <View style={styles.propertyContent}>
+                  <Text style={styles.propertyLabel}>Notas</Text>
+                  <TextInput
+                    editable={!isBusy}
+                    accessibilityLabel="Notas"
+                    style={styles.notesInput}
+                    value={notes}
+                    onChangeText={setNotes}
+                    multiline
+                    autoFocus
+                    placeholder="Adicionar notas..."
+                    placeholderTextColor={colors.textFaint}
+                    textAlignVertical="top"
+                  />
+                </View>
+                {renderInlineConfirmation('notas')}
+              </View>
+            )}
 
             {/* DELETE */}
 
@@ -1713,6 +1742,21 @@ const createStyles = (colors) => {
     paddingBottom: Platform.OS === 'ios' ? 40 : 56,
   },
 
+  propertyRow: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  propertyIcon: { width: 24, alignItems: 'center', textAlign: 'center' },
+  propertyContent: { flex: 1, minWidth: 0 },
+  propertyLabel: { fontSize: 11, lineHeight: 16, color: colors.textMuted },
+  propertyText: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: colors.text },
+  neutralText: { color: colors.textMuted, fontWeight: '400' },
+  propertyTouch: { minHeight: 44, justifyContent: 'center' },
+  inlineConfirm: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+
   /* TITLE */
 
   titleRow: {
@@ -1786,25 +1830,7 @@ const createStyles = (colors) => {
   },
 
   scheduleBlock: {
-    gap: 9,
-  },
-
-  scheduleLine: {
-    minHeight: 34,
-
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    flexWrap: 'wrap',
-
-    gap: 7,
-  },
-
-  scheduleDot: {
-    fontSize: 14,
-
-    color: colors.textFaint,
+    gap: 0,
   },
 
   inlineDateText: {
@@ -1840,7 +1866,7 @@ const createStyles = (colors) => {
   inlineDateInput: {
     width: 104,
 
-    minHeight: 34,
+    minHeight: 44,
 
     paddingHorizontal: 7,
 
@@ -1868,7 +1894,7 @@ const createStyles = (colors) => {
   inlineTimeInput: {
     width: 54,
 
-    minHeight: 34,
+    minHeight: 44,
 
     paddingHorizontal: 4,
 
@@ -1943,7 +1969,7 @@ const createStyles = (colors) => {
   inlineCustomDuration: {
     width: 70,
 
-    minHeight: 34,
+    minHeight: 44,
 
     flexDirection: 'row',
 
@@ -1962,6 +1988,7 @@ const createStyles = (colors) => {
 
   inlineCustomDurationInput: {
     width: 36,
+    minHeight: 44,
     padding: 0,
     textAlign: 'center',
     fontSize: 13,
@@ -1978,17 +2005,18 @@ const createStyles = (colors) => {
   /* POSTPONE */
 
   postponeRow: {
-    marginTop: 14,
+    marginTop: 8,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'flex-start',
+    gap: 6,
   },
 
   postponeButton: {
     minHeight: 44,
-    paddingHorizontal: 13,
+    flex: 1,
+    paddingHorizontal: 4,
     borderRadius: 9,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2021,18 +2049,6 @@ const createStyles = (colors) => {
 
   /* SECTIONS */
 
-  sectionLabel: {
-    marginTop: 17,
-
-    marginBottom: 8,
-
-    fontSize: 12,
-
-    fontWeight: '600',
-
-    color: colors.textMuted,
-  },
-
   /* CATEGORY + STATUS */
 
   selectorRow: {
@@ -2042,11 +2058,12 @@ const createStyles = (colors) => {
 
     alignItems: 'center',
 
-    gap: 18,
+    gap: 10,
+    flexWrap: 'wrap',
   },
 
   selectorItem: {
-    minWidth: 32,
+    minWidth: 44,
 
     height: 44,
 
@@ -2082,7 +2099,7 @@ const createStyles = (colors) => {
   },
 
   statusSelectorRow: {
-    gap: 22,
+    gap: 10,
   },
 
   statusSelectorLabel: {
@@ -2118,28 +2135,6 @@ const createStyles = (colors) => {
   },
 
   /* REPEAT */
-
-  repeatRestRow: {
-    minHeight: 42,
-
-    alignSelf: 'flex-start',
-
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    gap: 9,
-
-    paddingRight: 10,
-  },
-
-  repeatRestText: {
-    fontSize: 14,
-
-    fontWeight: '600',
-
-    color: colors.text,
-  },
 
   repeatEditor: {
     gap: 8,
@@ -2197,18 +2192,6 @@ const createStyles = (colors) => {
 
   /* NOTES */
 
-  notesLabel: {
-    marginTop: 17,
-
-    marginBottom: 7,
-
-    fontSize: 12,
-
-    fontWeight: '600',
-
-    color: colors.textMuted,
-  },
-
   notesInput: {
     minHeight: 68,
 
@@ -2257,26 +2240,12 @@ const createStyles = (colors) => {
 
   /* PRIORITY */
 
-  priorityRestRow: {
-    minHeight: 42,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingRight: 10,
-  },
-
-  priorityRestText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-
   priorityOptionsRow: {
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 10,
+    flexWrap: 'wrap',
   },
   });
 };
