@@ -1155,18 +1155,18 @@ export default function TaskDetailsModal({
       );
 
     return (
-      <ScrollView horizontal contentContainerStyle={styles.scheduleLine} keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false}>
+      <View style={styles.scheduleLine}>
         {[
           { field: 'date', icon: 'calendar-outline', content: dateContent },
           { field: 'time', icon: 'time-outline', content: timeContent },
           { field: 'duration', icon: 'timer-outline', content: durationContent },
         ].map(({ field, icon, content }) => (
-          <View key={field} style={styles.scheduleItem}>
+          <View key={field} style={[styles.scheduleItem, field === 'duration' && activeField === 'duration' && styles.scheduleDurationEditing]}>
             <Ionicons name={icon} size={16} color={colors.textMuted} />
             {content}
           </View>
         ))}
-      </ScrollView>
+      </View>
     );
   };
 
@@ -1766,7 +1766,8 @@ const createStyles = (colors) => {
   neutralText: { color: colors.textMuted, fontWeight: '400' },
   propertyTouch: { minHeight: 44, justifyContent: 'center' },
   stickyTitle: { paddingHorizontal: 18 },
-  scheduleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scheduleLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  scheduleDurationEditing: { maxWidth: '100%', flexShrink: 1 },
   scheduleItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
 
   /* TITLE */
