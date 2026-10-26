@@ -72,6 +72,14 @@ allowed and never silently discard or skip work. Correcting the displayed task
 alone does not replace an earlier rejected operation. No queue-resolution UI is
 provided yet.
 
+Task forms use the same pressed opacity (0.7), accessible labels for icon actions
+and fields, and explicit disabled/busy semantics. Small form controls use at least
+44-pixel action regions where their layout owns the target. Editing controls are
+disabled while saving or deleting so later edits cannot be silently discarded.
+The existing modal dismissal and drag gestures are unchanged. Failed writes leave
+the draft open; error banners remain owned by the parent. Delete has its own busy
+state and cannot run alongside save. No new confirmation or navigation is added.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.

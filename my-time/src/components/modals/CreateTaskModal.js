@@ -135,6 +135,8 @@ export default function CreateTaskModal({
         categoryId,
         priority,
       });
+    } catch {
+      // The parent presents the local error; keep this draft open.
     } finally {
       setIsSaving(false);
     }
@@ -145,6 +147,7 @@ export default function CreateTaskModal({
   ------------------------------------------------------- */
 
   const handleMoreOptions = () => {
+    if (isSaving) return;
     onMoreOptions?.({
       title: title.trim(),
       notes: description.trim(),
@@ -200,6 +203,8 @@ export default function CreateTaskModal({
             {/* TÍTULO */}
 
             <TextInput
+              editable={!isSaving}
+              accessibilityLabel="Título da tarefa"
               style={styles.titleInput}
               value={title}
               onChangeText={setTitle}
@@ -213,6 +218,8 @@ export default function CreateTaskModal({
             {/* DESCRIÇÃO */}
 
             <TextInput
+              editable={!isSaving}
+              accessibilityLabel="Descrição"
               style={styles.descriptionInput}
               value={description}
               onChangeText={setDescription}
@@ -243,8 +250,12 @@ export default function CreateTaskModal({
                 {/* DURAÇÃO */}
 
                 <TouchableOpacity
+                  disabled={isSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityLabel={`Duração: ${formatDuration(duration)}`}
                   style={styles.actionPill}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                   onPress={() => setDurationPickerVisible(true)}
                 >
                   <Ionicons name="timer-outline" size={17} color={colors.textSecondary} />
@@ -257,8 +268,12 @@ export default function CreateTaskModal({
                 {/* CATEGORIA */}
 
                 <TouchableOpacity
+                  disabled={isSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityLabel={`Categoria: ${selectedCategory.label}`}
                   style={styles.iconButton}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                   onPress={() => setCategoryPickerVisible(true)}
                 >
                   <Ionicons
@@ -271,8 +286,12 @@ export default function CreateTaskModal({
                 {/* PRIORIDADE */}
 
                 <TouchableOpacity
+                  disabled={isSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityLabel={`Prioridade: ${selectedPriority.label}`}
                   style={styles.iconButton}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                   onPress={() => setPriorityPickerVisible(true)}
                 >
                   <Ionicons
@@ -283,8 +302,12 @@ export default function CreateTaskModal({
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  disabled={isSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityLabel="Mais opções da tarefa"
                   style={styles.iconButton}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                   onPress={handleMoreOptions}
                 >
                   <MaterialCommunityIcons
@@ -303,11 +326,14 @@ export default function CreateTaskModal({
               {title.trim().length > 0 && (
                 <View style={styles.saveRow}>
                   <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !title.trim() || isSaving, busy: isSaving }}
+                    accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
                     style={[
                       styles.saveButton,
                       isSaving && styles.saveButtonDisabled,
                     ]}
-                    activeOpacity={0.75}
+                    activeOpacity={0.7}
                     disabled={isSaving}
                     onPress={handleSave}
                   >
@@ -352,6 +378,9 @@ export default function CreateTaskModal({
             >
               {DURATION_OPTIONS.map((item) => (
                 <TouchableOpacity
+                  disabled={isSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSaving, selected: item === duration }}
                   key={item}
                   style={styles.pickerRow}
                   activeOpacity={0.7}
@@ -400,6 +429,9 @@ export default function CreateTaskModal({
 
             {priorityOptions.map((item) => (
               <TouchableOpacity
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isSaving, selected: item.id === priority }}
                 key={item.id ?? 'none'}
                 style={styles.pickerRow}
                 activeOpacity={0.7}
@@ -448,6 +480,9 @@ export default function CreateTaskModal({
 
             {categoryOptions.map((item) => (
               <TouchableOpacity
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isSaving, selected: item.id === categoryId }}
                 key={item.id}
                 style={styles.categoryRow}
                 activeOpacity={0.7}
@@ -584,7 +619,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   actionPill: {
-    height: 34,
+    height: 44,
 
     paddingHorizontal: 9,
 
@@ -606,8 +641,8 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   iconButton: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
 
     borderRadius: 10,
 
@@ -627,7 +662,7 @@ const createStyles = (colors) => StyleSheet.create({
     marginTop: 8,
   },
   saveButton: {
-    height: 40,
+    height: 44,
 
     paddingHorizontal: 14,
 

@@ -328,6 +328,8 @@ export default function TaskDetailsModal({
   const isEdit = mode === 'edit';
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isBusy = isSaving || isDeleting;
 
   const [title, setTitle] = useState('');
 
@@ -1011,7 +1013,7 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   const handleSave = async () => {
-    if (!canSave || isSaving) {
+    if (!canSave || isBusy) {
       return;
     }
 
@@ -1041,6 +1043,18 @@ export default function TaskDetailsModal({
   };
 
 
+  const handleDelete = async () => {
+    if (isBusy || !onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete();
+    } catch {
+      // The parent presents the local error; keep the form open.
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 const closeInlineEditor = () => {
   if (activeScheduleField) {
     setActiveScheduleField(null);
@@ -1065,6 +1079,8 @@ const closeInlineEditor = () => {
     const dateContent =
       activeScheduleField === 'date' ? (
         <TextInput
+          editable={!isBusy}
+          accessibilityLabel="Data, dia mês e ano"
           ref={dateInputRef}
           style={styles.inlineDateInput}
           value={dateValue}
@@ -1075,7 +1091,10 @@ const closeInlineEditor = () => {
         />
       ) : (
         <TouchableOpacity
-          activeOpacity={0.65}
+          disabled={isBusy}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isBusy }}
+          activeOpacity={0.7}
           onPress={() => {
             setIsEditingRepeat(false);
 
@@ -1094,6 +1113,8 @@ const closeInlineEditor = () => {
       activeScheduleField === 'time' ? (
         <View style={styles.inlineTimeEditor}>
           <TextInput
+            editable={!isBusy}
+            accessibilityLabel="Hora de início"
             ref={startInputRef}
             style={styles.inlineTimeInput}
             value={startTime}
@@ -1105,6 +1126,8 @@ const closeInlineEditor = () => {
           <Text style={styles.inlineArrow}>→</Text>
 
           <TextInput
+            editable={!isBusy}
+            accessibilityLabel="Hora de fim"
             style={styles.inlineTimeInput}
             value={endTime}
             onChangeText={updateEndTime}
@@ -1115,7 +1138,10 @@ const closeInlineEditor = () => {
         </View>
       ) : (
         <TouchableOpacity
-          activeOpacity={0.65}
+          disabled={isBusy}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isBusy }}
+          activeOpacity={0.7}
           onPress={() => {
             setIsEditingRepeat(false);
 
@@ -1140,6 +1166,9 @@ const closeInlineEditor = () => {
 
             return (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy, selected: selected }}
                 key={preset}
                 style={[
                   styles.inlineDurationPreset,
@@ -1164,6 +1193,8 @@ const closeInlineEditor = () => {
 
           <View style={styles.inlineCustomDuration}>
             <TextInput
+              editable={!isBusy}
+              accessibilityLabel="Duração em minutos"
               style={styles.inlineCustomDurationInput}
               value={customDuration}
               onChangeText={handleCustomDuration}
@@ -1188,7 +1219,10 @@ const closeInlineEditor = () => {
         </View>
       ) : (
         <TouchableOpacity
-          activeOpacity={0.65}
+          disabled={isBusy}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isBusy }}
+          activeOpacity={0.7}
           onPress={() => {
             setIsEditingRepeat(false);
 
@@ -1265,13 +1299,16 @@ const closeInlineEditor = () => {
             </View>
 
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canSave || isBusy, busy: isSaving }}
+              accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Guardar tarefa'}
               style={[
                 styles.saveIconButton,
 
-                (!canSave || isSaving) && styles.saveIconButtonDisabled,
+                (!canSave || isBusy) && styles.saveIconButtonDisabled,
               ]}
-              disabled={!canSave || isSaving}
-              activeOpacity={0.65}
+              disabled={!canSave || isBusy}
+              activeOpacity={0.7}
               onPress={handleSave}
             >
               <Ionicons
@@ -1304,6 +1341,8 @@ const closeInlineEditor = () => {
 
                 {isEditingTitle ? (
                   <TextInput
+                    editable={!isBusy}
+                    accessibilityLabel="Título da tarefa"
                     ref={titleInputRef}
                     style={[styles.titleInput, styles.editTitleInput]}
                     value={title}
@@ -1316,6 +1355,9 @@ const closeInlineEditor = () => {
                   />
                 ) : (
                   <TouchableOpacity
+                    disabled={isBusy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy }}
                     style={styles.editTitleTouch}
                     activeOpacity={0.7}
                     onPress={() => {
@@ -1338,6 +1380,8 @@ const closeInlineEditor = () => {
               </View>
             ) : (
               <TextInput
+                editable={!isBusy}
+                accessibilityLabel="Título da tarefa"
                 style={styles.titleInput}
                 value={title}
                 onChangeText={setTitle}
@@ -1360,6 +1404,9 @@ const closeInlineEditor = () => {
 
                   return (
                     <TouchableOpacity
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: isBusy }}
                       key={option.id}
                       style={[
                         styles.postponeButton,
@@ -1387,6 +1434,9 @@ const closeInlineEditor = () => {
                 })}
 
                 <TouchableOpacity
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isBusy }}
                   style={[
                     styles.postponeButton,
 
@@ -1434,6 +1484,10 @@ const closeInlineEditor = () => {
 
                 return (
                   <TouchableOpacity
+                    disabled={isBusy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy, selected: selected }}
+                    accessibilityLabel={item.label}
                     key={item.id}
                     activeOpacity={0.7}
                     style={[
@@ -1470,8 +1524,11 @@ const closeInlineEditor = () => {
 
             {!isEditingPriority ? (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy }}
                 style={styles.priorityRestRow}
-                activeOpacity={0.65}
+                activeOpacity={0.7}
                 onPress={() => {
                   closeInlineEditor();
                   setIsEditingPriority(true);
@@ -1494,6 +1551,10 @@ const closeInlineEditor = () => {
 
                   return (
                     <TouchableOpacity
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: isBusy, selected: selected }}
+                      accessibilityLabel={item.label}
                       key={item.id ?? 'none'}
                       activeOpacity={0.7}
                       style={[
@@ -1535,6 +1596,10 @@ const closeInlineEditor = () => {
 
                 return (
                   <TouchableOpacity
+                    disabled={isBusy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy, selected: selected }}
+                    accessibilityLabel={item.label}
                     key={item.id}
                     activeOpacity={0.7}
                     style={[
@@ -1572,8 +1637,11 @@ const closeInlineEditor = () => {
 
             {!isEditingRepeat ? (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy }}
                 style={styles.repeatRestRow}
-                activeOpacity={0.65}
+                activeOpacity={0.7}
                 onPress={() => {
                   setActiveScheduleField(null);
 
@@ -1608,6 +1676,9 @@ const closeInlineEditor = () => {
 
                     return (
                       <TouchableOpacity
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: isBusy, selected: selected }}
                         key={item}
                         style={[
                           styles.repeatOption,
@@ -1642,6 +1713,8 @@ const closeInlineEditor = () => {
             <Text style={styles.notesLabel}>Notas</Text>
 
             <TextInput
+              editable={!isBusy}
+              accessibilityLabel="Notas"
               style={styles.notesInput}
               value={notes}
               onChangeText={setNotes}
@@ -1656,9 +1729,13 @@ const closeInlineEditor = () => {
 
             {isEdit && onDelete && (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy, busy: isDeleting }}
+                accessibilityLabel={isDeleting ? 'A apagar tarefa' : 'Apagar tarefa'}
                 style={styles.deleteTaskButton}
                 activeOpacity={0.7}
-                onPress={onDelete}
+                onPress={handleDelete}
               >
                 <Ionicons
                   name="trash-outline"
@@ -1666,7 +1743,7 @@ const closeInlineEditor = () => {
                   color={colors.danger}
                 />
 
-                <Text style={styles.deleteTaskText}>Apagar tarefa</Text>
+                <Text style={styles.deleteTaskText}>{isDeleting ? 'A apagar…' : 'Apagar tarefa'}</Text>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -1707,7 +1784,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   topBar: {
-    height: 38,
+    height: 44,
 
     position: 'relative',
 
@@ -1737,11 +1814,11 @@ const createStyles = (colors) => StyleSheet.create({
 
     right: 14,
 
-    top: 3,
+    top: 0,
 
-    width: 34,
+    width: 44,
 
-    height: 34,
+    height: 44,
 
     alignItems: 'center',
 
@@ -1957,7 +2034,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   inlineDurationPreset: {
-    minHeight: 34,
+    minHeight: 44,
 
     paddingHorizontal: 9,
 
@@ -2040,7 +2117,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   postponeButton: {
-    minHeight: 38,
+    minHeight: 44,
     paddingHorizontal: 13,
     borderRadius: 9,
     flexDirection: 'row',
@@ -2101,7 +2178,7 @@ const createStyles = (colors) => StyleSheet.create({
   selectorItem: {
     minWidth: 32,
 
-    height: 42,
+    height: 44,
 
     flexDirection: 'row',
 
@@ -2217,7 +2294,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   repeatOption: {
-    minHeight: 36,
+    minHeight: 44,
 
     paddingHorizontal: 11,
 
@@ -2287,7 +2364,7 @@ const createStyles = (colors) => StyleSheet.create({
 
     marginTop: 20,
 
-    minHeight: 40,
+    minHeight: 44,
 
     paddingHorizontal: 10,
 

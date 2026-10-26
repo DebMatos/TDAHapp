@@ -114,3 +114,80 @@ test('pending menu operation disables actions and prevents a second operation af
   await changing;
   assert.equal(h.theme().props.disabled, false);
 });
+
+function formHandler(file, name, context) {
+  const source = read(`components/modals/${file}.js`);
+  const tree = parser.parse(source, { sourceType: 'module', plugins: ['jsx'] });
+  let expression;
+  const scan = node => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'VariableDeclarator' && node.id?.name === name) expression = source.slice(node.init.start, node.init.end);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(scan);
+      else if (value && typeof value === 'object') scan(value);
+    }
+  };
+  scan(tree);
+  assert.ok(expression, name);
+  return new Function('context', `with (context) { return ${expression}; }`)(context);
+}
+
+test('Quick Create handles rejected saves and keeps draft; more options blocked while saving', async () => {
+  const context = { title: ' Draft ', description: ' Notes ', duration: 30, categoryId: 'work', priority: 'high', isSaving: false,
+    setIsSaving: value => { context.isSaving = value; }, onSave: async () => { throw Error('storage'); } };
+  await formHandler('CreateTaskModal', 'handleSave', context)();
+  assert.equal(context.isSaving, false);
+  assert.equal(context.title, ' Draft ');
+  context.isSaving = true;
+  context.onMoreOptions = () => assert.fail('should not leave saving form');
+  formHandler('CreateTaskModal', 'handleMoreOptions', context)();
+});
+
+test('Details cannot save during delete and cannot delete during save', async () => {
+  const context = { isBusy: true, canSave: true, onSave: () => assert.fail('save'), onDelete: () => assert.fail('delete') };
+  await formHandler('TaskDetailsModal', 'handleSave', context)();
+  await formHandler('TaskDetailsModal', 'handleDelete', context)();
+});
+
+test('Details deletion releases busy state on failure and leaves closing to parent', async () => {
+  const changes = [];
+  const context = { isBusy: false, onDelete: async () => { throw Error('storage'); }, setIsDeleting: value => changes.push(value) };
+  await formHandler('TaskDetailsModal', 'handleDelete', context)();
+  assert.deepEqual(changes, [true, false]);
+});
+
+test('Details deletion invokes parent exactly once and releases busy state on success', async () => {
+  let count = 0;
+  const changes = [];
+  const context = { isBusy: false, onDelete: async () => { count++; }, setIsDeleting: value => changes.push(value) };
+  await formHandler('TaskDetailsModal', 'handleDelete', context)();
+  assert.equal(count, 1);
+  assert.deepEqual(changes, [true, false]);
+});
+
+test('all form buttons expose disabled state and all fields stop editing during writes', () => {
+  for (const file of ['CreateTaskModal', 'TaskDetailsModal']) {
+    const source = read(`components/modals/${file}.js`);
+    const tree = parser.parse(source, { sourceType: 'module', plugins: ['jsx'] });
+    const scan = node => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'JSXOpeningElement') {
+        const has = name => node.attributes.some(attribute => attribute.name?.name === name);
+        if (node.name.name === 'TouchableOpacity') {
+          assert.ok(has('disabled'), file);
+          assert.ok(has('accessibilityRole'), file);
+          assert.ok(has('accessibilityState'), file);
+        }
+        if (node.name.name === 'TextInput') {
+          assert.ok(has('editable'), file);
+          assert.ok(has('accessibilityLabel'), file);
+        }
+      }
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) value.forEach(scan);
+        else if (value && typeof value === 'object') scan(value);
+      }
+    };
+    scan(tree);
+  }
+});
