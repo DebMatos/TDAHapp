@@ -37,9 +37,10 @@ function setup() {
     initialMinutes: 90, dateValue: '31/12/2026', isDateValid: true, isBusy: false, isHandleActive: false, windowHeight: 780, TASK_DETAILS_HEIGHT_RATIO: 0.78,
     transitioned: { current: false }, handleDragged: { current: false }, sheetHeight: { current: 280 },
     dragOriginHeight: { current: 280 }, animatedHeight: { setValue() {} }, translateY: { setValue() {} },
-    gestureActions: { current: null }, setIsHandleActive() {},
+    gestureActions: { current: null }, activeAnimation: { current: null },
+    setIsHandleActive: value => { events.handleActive = value; }, useCallback: fn => fn,
     ...dates, formatTimeFromMinutes: time.formatTimeFromMinutes, TIMELINE_START_MINUTES: 420,
-    Keyboard: { dismiss() {} }, setIsTransitioning() {}, setIsSaving() {},
+    Keyboard: { dismiss() {} }, setIsTransitioning: value => { events.transitioning = value; }, setIsSaving() {},
     setDateEditorVisible: value => { events.editor = value; }, resetDrag: () => { events.resets++; },
     onExpand: draft => events.expanded.push(draft), onClose: () => { events.closed++; },
     onSave: async task => events.saved.push(task),
@@ -48,6 +49,8 @@ function setup() {
       parallel: () => ({ start: callback => callback({ finished: true }) }),
     },
   };
+  context.stopSheetAnimation = handler('stopSheetAnimation', context);
+  context.startSheetAnimation = handler('startSheetAnimation', context);
   return { context, events };
 }
 
@@ -196,4 +199,139 @@ test('Quick Create keeps the arrow submit button in the options row, without a t
   const details = read('components/modals/TaskDetailsModal.js');
   assert.ok(details.includes('if (embedded) return visible ? content : null'));
   assert.ok(details.includes('autoFocus={!embedded}'));
+});
+
+// Completion is manually controlled so cancellation and delayed callbacks are observable.
+function deferredAnimations(context) {
+  const animations = [];
+  const make = () => {
+    const animation = {
+      stops: 0,
+      start(callback) { this.callback = callback; },
+      stop() { this.stops++; this.callback?.({ finished: false }); },
+      finish(finished = true) { this.callback?.({ finished }); },
+    };
+    animations.push(animation);
+    return animation;
+  };
+  context.Animated = { timing: make, spring: make, parallel: make };
+  return animations;
+}
+const evaluate = (code, context) => new Function('context', `with(context){return ${code}}`)(context);
+function layoutEffect(code) {
+  let callback;
+  walk(parser.parse(code, { sourceType: 'module', plugins: ['jsx'] }), node => {
+    if (node.type === 'CallExpression' && node.callee?.name === 'useLayoutEffect') {
+      const body = code.slice(node.arguments[0].start, node.arguments[0].end);
+      if (body.includes('stopSheetAnimation')) callback = body;
+    }
+  });
+  assert.ok(callback, 'animation lifecycle effect'); return callback;
+}
+
+test('Quick Create layout and transform animations never promote their shared style graph to native', () => {
+  let count = 0;
+  walk(ast, node => {
+    if (node.type !== 'CallExpression' || node.callee?.object?.name !== 'Animated' || !['timing', 'spring'].includes(node.callee.property?.name)) return;
+    const driver = node.arguments[1].properties.find(p => p.key?.name === 'useNativeDriver');
+    assert.equal(driver?.value.value, false, source.slice(node.start, node.end)); count++;
+  });
+  assert.equal(count, 5);
+});
+
+test('interrupted expansion unlocks Quick Create and permits a new attempt without saving', () => {
+  const { context, events } = setup(); const animations = deferredAnimations(context);
+  const expand = handler('handleExpand', context);
+  expand(); animations.at(-1).finish(false);
+  assert.equal(context.transitioned.current, false);
+  assert.equal(events.transitioning, false); assert.equal(events.handleActive, false);
+  assert.equal(events.expanded.length, 0);
+  expand(); animations.at(-1).finish();
+  assert.equal(events.expanded.length, 1); assert.equal(events.saved.length, 0);
+});
+
+test('dismissing Quick Create cancels expansion and ignores even a delayed successful callback', () => {
+  const { context, events } = setup(); const animations = deferredAnimations(context);
+  handler('handleExpand', context)(); const expansion = animations.at(-1);
+  handler('dismissQuickCreate', context)();
+  assert.equal(expansion.stops, 1); assert.equal(events.closed, 1);
+  expansion.finish(); assert.equal(events.expanded.length, 0);
+});
+
+test('hiding, switching content or unmounting Quick Create invalidates the active callback', () => {
+  for (const state of [{ visible: false, expandedContent: null }, { visible: true, expandedContent: {} }, null]) {
+    const { context, events } = setup(); const animations = deferredAnimations(context);
+    handler('handleExpand', context)(); const expansion = animations.at(-1);
+    if (state) evaluate(layoutEffect(source), { ...context, ...state })();
+    else evaluate(layoutEffect(source), { ...context, visible: true, expandedContent: null })()();
+    expansion.finish();
+    assert.equal(expansion.stops, 1); assert.equal(events.expanded.length, 0);
+  }
+});
+
+test('a new gesture cancels rebound without allowing its callback to deactivate the new handle', () => {
+  const { context, events } = setup(); const animations = deferredAnimations(context);
+  handler('resetDrag', context)(); const rebound = animations.at(-1);
+  context.PanResponder = { create: callbacks => callbacks }; context.useMemo = factory => factory();
+  const pan = handler('handlePanResponder', context);
+  pan.onPanResponderGrant(); rebound.finish();
+  assert.equal(rebound.stops, 1); assert.equal(events.handleActive, true);
+});
+
+const detailsSource = read('components/modals/TaskDetailsModal.js');
+const detailsHandler = (name, context) => evaluate(expression(name, detailsSource), context);
+function detailsAnimationSetup() {
+  const events = { closed: 0, expanded: false };
+  const value = initial => ({ current: initial, setValue(next) { this.current = next; }, stopAnimation(callback) { callback(this.current); } });
+  const context = {
+    activeAnimation: { current: null }, useCallback: fn => fn, useMemo: fn => fn(),
+    sheetHeight: value(500), sheetBottom: value(0), dragStartHeightRef: { current: 0 },
+    MIN_SHEET_HEIGHT: 260, NORMAL_SHEET_HEIGHT: 608, EXPANDED_SHEET_HEIGHT: 733,
+    keyboardHeight: 0, isExpanded: false, PanResponder: { create: x => x },
+    clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
+    setIsExpanded: v => { events.expanded = v; }, setKeyboardHeight() {},
+    setActiveField() {}, setPostponeSelection() {}, setSavedSnapshot() {},
+    onClose: () => { events.closed++; },
+  };
+  const animations = deferredAnimations(context);
+  context.stopSheetAnimation = detailsHandler('stopSheetAnimation', context);
+  context.animateGeometry = detailsHandler('animateGeometry', context);
+  context.animateSheetTo = detailsHandler('animateSheetTo', context);
+  context.closeFromDrag = detailsHandler('closeFromDrag', context);
+  return { context, animations, events };
+}
+
+test('Details interrupted close never dismisses; a completed close dismisses exactly once', () => {
+  const { context, animations, events } = detailsAnimationSetup();
+  context.closeFromDrag(); animations.at(-1).finish(false);
+  assert.equal(events.closed, 0);
+  context.closeFromDrag(); const close = animations.at(-1); close.finish(); close.finish();
+  assert.equal(events.closed, 1); assert.equal(context.sheetHeight.current, 608);
+});
+
+test('Details new gesture cancels closing, ignores the old completion and starts at the current height', () => {
+  const { context, animations, events } = detailsAnimationSetup();
+  context.closeFromDrag(); const close = animations.at(-1);
+  const pan = detailsHandler('sheetPanResponder', context); pan.onPanResponderGrant();
+  close.finish();
+  assert.equal(close.stops, 1); assert.equal(events.closed, 0);
+  assert.equal(context.dragStartHeightRef.current, 500);
+  pan.onPanResponderMove(null, { dy: -20 }); assert.equal(context.sheetHeight.current, 520);
+});
+
+test('Details keyboard adjustment cancels previous closing without executing its callback', () => {
+  const { context, animations, events } = detailsAnimationSetup();
+  context.closeFromDrag(); const close = animations.at(-1);
+  context.animateGeometry(608, 250); close.finish();
+  assert.equal(close.stops, 1); assert.equal(events.closed, 0);
+  assert.notEqual(context.activeAnimation.current, close);
+});
+
+test('Details cleanup prevents a closing callback from affecting a hidden or reopened sheet', () => {
+  const { context, animations, events } = detailsAnimationSetup();
+  context.closeFromDrag(); const close = animations.at(-1);
+  evaluate(layoutEffect(detailsSource), { ...context, visible: false })();
+  close.finish(); assert.equal(events.closed, 0); assert.equal(close.stops, 1);
+  evaluate(layoutEffect(detailsSource), { ...context, visible: true })();
+  close.finish(); assert.equal(events.closed, 0); assert.equal(context.sheetHeight.current, 608);
 });

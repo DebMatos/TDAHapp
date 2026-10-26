@@ -27,7 +27,7 @@ function harness(colors = lightColors, overrides = {}) {
   };
   const React = { createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
   const context = {
-    React, useState, useRef, useMemo: fn => fn(), useEffect() {},
+    React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect() {},
     useLayoutEffect: fn => layouts.push(fn),
     useTheme: () => ({ colors }), ...dates, ...categories,
     Animated: { Value: class { setValue() {} }, View: 'animated' },

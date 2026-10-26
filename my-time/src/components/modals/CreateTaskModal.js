@@ -1,5 +1,5 @@
 import TaskBanner from '../TaskBanner';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Animated,
@@ -112,6 +112,19 @@ export default function CreateTaskModal({
   const gestureActions = useRef(null);
   const transitioned = useRef(false);
   const handleDragged = useRef(false);
+  const activeAnimation = useRef(null);
+
+  const stopSheetAnimation = useCallback(() => {
+    const animation = activeAnimation.current;
+    // Invalidate first: stop() can synchronously invoke the completion callback.
+    activeAnimation.current = null;
+    animation?.stop();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!visible || expandedContent) stopSheetAnimation();
+    return stopSheetAnimation;
+  }, [visible, expandedContent, stopSheetAnimation]);
 
   const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
 
@@ -125,6 +138,7 @@ export default function CreateTaskModal({
       return;
     }
 
+    stopSheetAnimation();
     setTitle('');
     setDescription('');
     setDuration(30);
@@ -140,7 +154,7 @@ export default function CreateTaskModal({
     setIsTransitioning(false);
     setIsHandleActive(false);
     translateY.setValue(0);
-  }, [visible, initialDate, translateY]);
+  }, [visible, initialDate, translateY, stopSheetAnimation]);
 
   /* -------------------------------------------------------
      GUARDAR
@@ -174,11 +188,36 @@ export default function CreateTaskModal({
      EXPANSÃO PELO HANDLE
   ------------------------------------------------------- */
 
+  const startSheetAnimation = (animation, onComplete) => {
+    stopSheetAnimation();
+    activeAnimation.current = animation;
+    animation.start(({ finished }) => {
+      if (activeAnimation.current !== animation) return;
+      activeAnimation.current = null;
+      if (!finished) {
+        transitioned.current = false;
+        setIsTransitioning(false);
+        setIsHandleActive(false);
+        translateY.setValue(0);
+        return;
+      }
+      onComplete();
+    });
+  };
+
+  const dismissQuickCreate = () => {
+    stopSheetAnimation();
+    transitioned.current = true;
+    onClose();
+  };
+
   const resetDrag = () => {
-    Animated.parallel([
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
+    if (transitioned.current) return;
+    // Height and transform share one Animated.View, so both stay JS-driven.
+    startSheetAnimation(Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: false }),
       Animated.spring(animatedHeight, { toValue: dragOriginHeight.current, useNativeDriver: false }),
-    ]).start(({ finished }) => { if (finished) setIsHandleActive(false); });
+    ]), () => setIsHandleActive(false));
   };
 
   const handleExpand = () => {
@@ -197,36 +236,39 @@ export default function CreateTaskModal({
       categoryId,
       priority,
     };
+    stopSheetAnimation();
     transitioned.current = true;
     setIsTransitioning(true);
     Keyboard.dismiss();
     if (!isHandleActive) animatedHeight.setValue(sheetHeight.current);
-    Animated.parallel([
+    startSheetAnimation(Animated.parallel([
       Animated.timing(animatedHeight, {
         toValue: Math.round(windowHeight * TASK_DETAILS_HEIGHT_RATIO), duration: 200, useNativeDriver: false,
       }),
-      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-    ]).start(({ finished }) => { if (finished) onExpand(draft); });
+      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: false }),
+    ]), () => onExpand(draft));
   };
 
   const closeFromDrag = () => {
     if (isBusy || transitioned.current) return;
+    stopSheetAnimation();
     transitioned.current = true;
     setIsTransitioning(true);
     Keyboard.dismiss();
-    Animated.timing(translateY, {
-      toValue: sheetHeight.current, duration: 160, useNativeDriver: true,
-    }).start(({ finished }) => { if (finished) onClose(); });
+    startSheetAnimation(Animated.timing(translateY, {
+      toValue: sheetHeight.current, duration: 160, useNativeDriver: false,
+    }), onClose);
   };
 
   // Keep the responder stable while renders update draft and active-handle state.
   gestureActions.current = { isBusy, expand: handleExpand, close: closeFromDrag, reset: resetDrag, windowHeight };
   const handlePanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => !gestureActions.current.isBusy,
-    onStartShouldSetPanResponderCapture: () => !gestureActions.current.isBusy,
-    onMoveShouldSetPanResponder: () => !gestureActions.current.isBusy,
-    onMoveShouldSetPanResponderCapture: () => !gestureActions.current.isBusy,
+    onStartShouldSetPanResponder: () => !gestureActions.current.isBusy && !transitioned.current,
+    onStartShouldSetPanResponderCapture: () => !gestureActions.current.isBusy && !transitioned.current,
+    onMoveShouldSetPanResponder: () => !gestureActions.current.isBusy && !transitioned.current,
+    onMoveShouldSetPanResponderCapture: () => !gestureActions.current.isBusy && !transitioned.current,
     onPanResponderGrant: () => {
+      stopSheetAnimation();
       handleDragged.current = true;
       dragOriginHeight.current = sheetHeight.current;
       animatedHeight.setValue(sheetHeight.current);
@@ -249,7 +291,7 @@ export default function CreateTaskModal({
       else gestureActions.current.reset();
     },
     onPanResponderTerminate: () => gestureActions.current.reset(),
-  }), [animatedHeight, translateY]);
+  }), [animatedHeight, translateY, stopSheetAnimation]);
 
   const timeLabel = formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
   const dateLabel = isDateValid ? getDateDisplayLabel(dateValue) : 'Data inválida';
@@ -269,7 +311,7 @@ export default function CreateTaskModal({
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={expandedContent ? onExpandedClose : onClose}
+        onRequestClose={expandedContent ? onExpandedClose : dismissQuickCreate}
       >
         {expandedContent || <KeyboardAvoidingView
           style={styles.overlay}
@@ -278,7 +320,7 @@ export default function CreateTaskModal({
         >
           {/* FUNDO */}
 
-          <Pressable style={styles.backdrop} onPress={onClose} />
+          <Pressable style={styles.backdrop} onPress={dismissQuickCreate} />
           <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
 
           {/* SHEET */}

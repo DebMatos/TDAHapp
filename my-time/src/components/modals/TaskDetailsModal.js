@@ -1,5 +1,5 @@
 import TaskBanner from '../TaskBanner';
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Animated,
@@ -297,6 +297,18 @@ export default function TaskDetailsModal({
   const sheetHeight = useRef(new Animated.Value(NORMAL_SHEET_HEIGHT)).current;
 
   const sheetBottom = useRef(new Animated.Value(0)).current;
+  const activeAnimation = useRef(null);
+
+  const stopSheetAnimation = useCallback(() => {
+    const animation = activeAnimation.current;
+    activeAnimation.current = null;
+    animation?.stop();
+  }, []);
+
+  const dismissDetails = () => {
+    stopSheetAnimation();
+    onClose?.();
+  };
 
   const dragStartHeightRef = useRef(NORMAL_SHEET_HEIGHT);
   const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
@@ -348,13 +360,14 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   const animateGeometry = (baseHeight, bottomValue) => {
+    stopSheetAnimation();
     const height = Math.max(
       MIN_SHEET_HEIGHT,
 
       baseHeight - bottomValue,
     );
 
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.spring(sheetHeight, {
         toValue: height,
 
@@ -374,7 +387,11 @@ export default function TaskDetailsModal({
 
         friction: 11,
       }),
-    ]).start();
+    ]);
+    activeAnimation.current = animation;
+    animation.start(() => {
+      if (activeAnimation.current === animation) activeAnimation.current = null;
+    });
   };
 
   const animateSheetTo = (expanded) => {
@@ -386,7 +403,8 @@ export default function TaskDetailsModal({
   };
 
   const closeFromDrag = () => {
-    Animated.parallel([
+    stopSheetAnimation();
+    const animation = Animated.parallel([
       Animated.timing(sheetHeight, {
         toValue: 0,
 
@@ -402,7 +420,12 @@ export default function TaskDetailsModal({
 
         useNativeDriver: false,
       }),
-    ]).start(() => {
+    ]);
+    activeAnimation.current = animation;
+    animation.start(({ finished }) => {
+      if (activeAnimation.current !== animation) return;
+      activeAnimation.current = null;
+      if (!finished) return;
       sheetHeight.setValue(NORMAL_SHEET_HEIGHT);
 
       sheetBottom.setValue(0);
@@ -424,9 +447,10 @@ export default function TaskDetailsModal({
           keyboardHeight === 0 && Math.abs(gesture.dy) > 3,
 
         onPanResponderGrant: () => {
-          dragStartHeightRef.current = isExpanded
-            ? EXPANDED_SHEET_HEIGHT
-            : NORMAL_SHEET_HEIGHT;
+          stopSheetAnimation();
+          sheetHeight.stopAnimation((height) => {
+            dragStartHeightRef.current = height;
+          });
         },
 
         onPanResponderMove: (_, gesture) => {
@@ -477,7 +501,7 @@ export default function TaskDetailsModal({
           animateSheetTo(isExpanded);
         },
       }),
-    [isExpanded, keyboardHeight, sheetHeight],
+    [isExpanded, keyboardHeight, sheetHeight, stopSheetAnimation],
   );
 
   /* -------------------------------------------------------
@@ -580,6 +604,7 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   useLayoutEffect(() => {
+    stopSheetAnimation();
     if (!visible) {
       return;
     }
@@ -597,7 +622,8 @@ export default function TaskDetailsModal({
     sheetHeight.setValue(NORMAL_SHEET_HEIGHT);
 
     sheetBottom.setValue(0);
-  }, [visible, sheetHeight, sheetBottom]);
+    return stopSheetAnimation;
+  }, [visible, sheetHeight, sheetBottom, stopSheetAnimation]);
 
   /* -------------------------------------------------------
      LOAD
@@ -1162,7 +1188,7 @@ export default function TaskDetailsModal({
 
   const content = (
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={styles.backdrop} onPress={dismissDetails} />
         <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
 
         <Animated.View
@@ -1688,7 +1714,7 @@ export default function TaskDetailsModal({
   );
   if (embedded) return visible ? content : null;
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismissDetails} statusBarTranslucent>
       {content}
     </Modal>
   );
