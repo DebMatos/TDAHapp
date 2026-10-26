@@ -328,6 +328,7 @@ export default function TimelineScreen() {
   const [detailsTask, setDetailsTask] = useState(null);
 
   const [detailsMode, setDetailsMode] = useState('create');
+  const [detailsFromQuick, setDetailsFromQuick] = useState(false);
 
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -839,6 +840,69 @@ export default function TimelineScreen() {
       });
     });
   };
+  const closeDetails = () => {
+    setTaskError(null);
+    setDetailsTask(null);
+    setDetailsFromQuick(false);
+    if (detailsMode === 'create') setTargetSlotMinutes(null);
+  };
+  const detailsContent = (
+      <TaskDetailsModal
+        visible={Boolean(detailsTask)}
+        embedded={detailsFromQuick}
+        banner={banner}
+        onDismissBanner={dismissBanner}
+        mode={detailsMode}
+        initialValues={detailsTask}
+        onClose={closeDetails}
+        onSave={async (changes) => {
+          setTaskError(null);
+          try {
+            detailsMode === 'create'
+              ? await taskService.createTask({
+                  ...changes,
+                  date:
+                    changes.date ||
+                    getDateKey(
+                      getCivilDateForTimelineSlot(
+                        selectedTimelineDate,
+                        timeToMinutes(
+                          changes.startTime,
+                          TIMELINE_START_MINUTES,
+                        ),
+                      ),
+                    ),
+                })
+              : await taskService.updateTask(detailsTask.id, changes);
+
+            setDetailsTask(null);
+            setDetailsFromQuick(false);
+
+            setTargetSlotMinutes(null);
+          } catch (error) {
+            console.error('Erro ao guardar tarefa:', error);
+
+            showTaskError('Não foi possível guardar a tarefa', error);
+
+            throw error;
+          }
+        }}
+        onDelete={
+          detailsMode === 'edit'
+            ? async () => {
+                setTaskError(null);
+                try {
+                  await taskService.deleteTask(detailsTask.id);
+                  setDetailsTask(null);
+                } catch (error) {
+                  showTaskError('Não foi possível apagar a tarefa', error);
+                }
+              }
+            : undefined
+        }
+      />
+  );
+
   /* -------------------------------------------------------
      RENDER
   ------------------------------------------------------- */
@@ -1057,7 +1121,9 @@ export default function TimelineScreen() {
       {/* QUICK CREATE */}
 
       <CreateTaskModal
-        visible={modalVisible}
+        visible={modalVisible || (detailsFromQuick && Boolean(detailsTask))}
+        expandedContent={detailsFromQuick ? detailsContent : null}
+        onExpandedClose={closeDetails}
         banner={banner}
         onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
@@ -1074,6 +1140,7 @@ export default function TimelineScreen() {
         onExpand={(draft) => {
           setTaskError(null);
           setDetailsMode('create');
+          setDetailsFromQuick(true);
           setDetailsTask(draft);
           setModalVisible(false);
         }}
@@ -1081,65 +1148,7 @@ export default function TimelineScreen() {
 
       {/* DETAILS */}
 
-      <TaskDetailsModal
-        visible={Boolean(detailsTask)}
-        banner={banner}
-        onDismissBanner={dismissBanner}
-        mode={detailsMode}
-        initialValues={detailsTask}
-        onClose={() => {
-          setTaskError(null);
-          setDetailsTask(null);
-
-          if (detailsMode === 'create') {
-            setTargetSlotMinutes(null);
-          }
-        }}
-        onSave={async (changes) => {
-          setTaskError(null);
-          try {
-            detailsMode === 'create'
-              ? await taskService.createTask({
-                  ...changes,
-                  date:
-                    changes.date ||
-                    getDateKey(
-                      getCivilDateForTimelineSlot(
-                        selectedTimelineDate,
-                        timeToMinutes(
-                          changes.startTime,
-                          TIMELINE_START_MINUTES,
-                        ),
-                      ),
-                    ),
-                })
-              : await taskService.updateTask(detailsTask.id, changes);
-
-            setDetailsTask(null);
-
-            setTargetSlotMinutes(null);
-          } catch (error) {
-            console.error('Erro ao guardar tarefa:', error);
-
-            showTaskError('Não foi possível guardar a tarefa', error);
-
-            throw error;
-          }
-        }}
-        onDelete={
-          detailsMode === 'edit'
-            ? async () => {
-                setTaskError(null);
-                try {
-                  await taskService.deleteTask(detailsTask.id);
-                  setDetailsTask(null);
-                } catch (error) {
-                  showTaskError('Não foi possível apagar a tarefa', error);
-                }
-              }
-            : undefined
-        }
-      />
+      {!detailsFromQuick && detailsContent}
     </SafeAreaView>
   );
 }

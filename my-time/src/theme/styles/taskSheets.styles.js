@@ -1,5 +1,7 @@
 import { StyleSheet } from 'react-native';
 
+export const TASK_DETAILS_HEIGHT_RATIO = 0.78;
+
 // Shared presentation only. Each sheet keeps its own height and gesture logic.
 export const createTaskSheetStyles = (colors) => StyleSheet.create({
   overlay: { flex: 1 },

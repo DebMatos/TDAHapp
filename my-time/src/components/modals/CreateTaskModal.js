@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Animated,
+  useWindowDimensions,
   Keyboard,
   PanResponder,
   KeyboardAvoidingView,
@@ -20,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
-import { createTaskSheetStyles } from '../../theme/styles/taskSheets.styles';
+import { createTaskSheetStyles, TASK_DETAILS_HEIGHT_RATIO } from '../../theme/styles/taskSheets.styles';
 import { formatTimeFromMinutes } from '../../utils/time';
 import { TIMELINE_START_MINUTES } from '../../constants/timeline';
 import {
@@ -71,10 +72,13 @@ export default function CreateTaskModal({
   banner,
   onDismissBanner,
   onExpand,
+  expandedContent = null,
+  onExpandedClose,
   initialDate = null,
   initialMinutes = null,
 }) {
   const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
@@ -96,12 +100,16 @@ export default function CreateTaskModal({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isHandleActive, setIsHandleActive] = useState(false);
   const isBusy = isSaving || isTransitioning;
   const [dateValue, setDateValue] = useState(getTodayDateInput);
   const [dateEditorVisible, setDateEditorVisible] = useState(false);
   const isDateValid = isValidDateInput(dateValue);
   const translateY = useRef(new Animated.Value(0)).current;
   const sheetHeight = useRef(300);
+  const dragOriginHeight = useRef(300);
+  const animatedHeight = useRef(new Animated.Value(0)).current;
+  const gestureActions = useRef(null);
   const transitioned = useRef(false);
   const handleDragged = useRef(false);
 
@@ -130,6 +138,7 @@ export default function CreateTaskModal({
     transitioned.current = false;
     handleDragged.current = false;
     setIsTransitioning(false);
+    setIsHandleActive(false);
     translateY.setValue(0);
   }, [visible, initialDate, translateY]);
 
@@ -166,7 +175,10 @@ export default function CreateTaskModal({
   ------------------------------------------------------- */
 
   const resetDrag = () => {
-    Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
+      Animated.spring(animatedHeight, { toValue: dragOriginHeight.current, useNativeDriver: false }),
+    ]).start(({ finished }) => { if (finished) setIsHandleActive(false); });
   };
 
   const handleExpand = () => {
@@ -188,7 +200,13 @@ export default function CreateTaskModal({
     transitioned.current = true;
     setIsTransitioning(true);
     Keyboard.dismiss();
-    onExpand(draft);
+    if (!isHandleActive) animatedHeight.setValue(sheetHeight.current);
+    Animated.parallel([
+      Animated.timing(animatedHeight, {
+        toValue: Math.round(windowHeight * TASK_DETAILS_HEIGHT_RATIO), duration: 200, useNativeDriver: false,
+      }),
+      Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(({ finished }) => { if (finished) onExpand(draft); });
   };
 
   const closeFromDrag = () => {
@@ -201,23 +219,37 @@ export default function CreateTaskModal({
     }).start(({ finished }) => { if (finished) onClose(); });
   };
 
+  // Keep the responder stable while renders update draft and active-handle state.
+  gestureActions.current = { isBusy, expand: handleExpand, close: closeFromDrag, reset: resetDrag, windowHeight };
   const handlePanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => !isBusy &&
-      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onMoveShouldSetPanResponderCapture: (_, gesture) => !isBusy &&
-      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onPanResponderGrant: () => { handleDragged.current = true; },
+    onStartShouldSetPanResponder: () => !gestureActions.current.isBusy,
+    onStartShouldSetPanResponderCapture: () => !gestureActions.current.isBusy,
+    onMoveShouldSetPanResponder: () => !gestureActions.current.isBusy,
+    onMoveShouldSetPanResponderCapture: () => !gestureActions.current.isBusy,
+    onPanResponderGrant: () => {
+      handleDragged.current = true;
+      dragOriginHeight.current = sheetHeight.current;
+      animatedHeight.setValue(sheetHeight.current);
+      setIsHandleActive(true);
+      Keyboard.dismiss();
+    },
     onPanResponderMove: (_, gesture) => {
-      translateY.setValue(Math.max(-64, gesture.dy));
+      if (gesture.dy < 0) {
+        animatedHeight.setValue(Math.min(gestureActions.current.windowHeight * 0.94,
+          dragOriginHeight.current - gesture.dy));
+        translateY.setValue(0);
+      } else {
+        animatedHeight.setValue(dragOriginHeight.current);
+        translateY.setValue(gesture.dy);
+      }
     },
     onPanResponderRelease: (_, gesture) => {
-      if (gesture.dy < -45) handleExpand();
-      else if (gesture.dy > 55) closeFromDrag();
-      else resetDrag();
+      if (gesture.dy < -45 || Math.abs(gesture.dy) < 4 && Math.abs(gesture.dx) < 4) gestureActions.current.expand();
+      else if (gesture.dy > 55) gestureActions.current.close();
+      else gestureActions.current.reset();
     },
-    onPanResponderTerminate: resetDrag,
-  }), [isBusy, isDateValid, title, description, dateValue, duration, categoryId, priority, initialMinutes, onExpand, onClose, translateY]);
+    onPanResponderTerminate: () => gestureActions.current.reset(),
+  }), [animatedHeight, translateY]);
 
   const timeLabel = formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
   const dateLabel = isDateValid ? getDateDisplayLabel(dateValue) : 'Data inválida';
@@ -236,9 +268,10 @@ export default function CreateTaskModal({
         visible={visible}
         transparent
         animationType="fade"
-        onRequestClose={onClose}
+        statusBarTranslucent
+        onRequestClose={expandedContent ? onExpandedClose : onClose}
       >
-        <KeyboardAvoidingView
+        {expandedContent || <KeyboardAvoidingView
           style={styles.overlay}
           behavior="padding"
           keyboardVerticalOffset={0}
@@ -250,7 +283,8 @@ export default function CreateTaskModal({
 
           {/* SHEET */}
 
-          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}
+          <Animated.View testID="quick-task-sheet" style={[styles.sheet, { transform: [{ translateY }] },
+            (isHandleActive || isTransitioning) && { height: animatedHeight }]}
             onLayout={event => { sheetHeight.current = event.nativeEvent.layout.height; }}>
             <View style={styles.topBar}>
               <View {...handlePanResponder.panHandlers} style={styles.dragZone}>
@@ -265,7 +299,7 @@ export default function CreateTaskModal({
                   }}
                   onPressIn={() => { handleDragged.current = false; }}
                   onPress={() => { if (!handleDragged.current) handleExpand(); }}>
-                  <View style={styles.handle} />
+                  <View testID="task-sheet-handle" style={[styles.handle, isHandleActive && styles.handleActive]} />
                 </Pressable>
               </View>
             </View>
@@ -332,6 +366,7 @@ export default function CreateTaskModal({
 
             <View style={styles.actionsSection}>
               <ScrollView
+                style={styles.optionsScroll}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -405,36 +440,18 @@ export default function CreateTaskModal({
 
               </ScrollView>
 
-              {/* ----------------------------------------------
-                  CRIAR
-                  Só existe depois de escrever.
-              ---------------------------------------------- */}
-
-              {title.trim().length > 0 && (
-                <View style={styles.saveRow}>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: !title.trim() || !isDateValid || isBusy, busy: isSaving }}
-                    accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
-                    style={[
-                      styles.saveButton,
-                      (isBusy || !isDateValid) && styles.saveButtonDisabled,
-                    ]}
-                    activeOpacity={0.7}
-                    disabled={isBusy || !isDateValid}
-                    onPress={handleSave}
-                  >
-                    <Text style={styles.saveButtonText}>
-                      {isSaving ? 'A guardar…' : 'Criar'}
-                    </Text>
-
-                  </TouchableOpacity>
-                </View>
-              )}
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !title.trim() || !isDateValid || isBusy, busy: isSaving }}
+                accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
+                style={[styles.saveButton, (!title.trim() || isBusy || !isDateValid) && styles.saveButtonDisabled]}
+                activeOpacity={0.7} disabled={!title.trim() || isBusy || !isDateValid} onPress={handleSave}>
+                <Ionicons name={isSaving ? 'hourglass-outline' : 'arrow-forward'} size={22} color={colors.onAction} />
+              </TouchableOpacity>
             </View>
             </ScrollView>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </KeyboardAvoidingView>}
       </Modal>
 
       {/* ---------------------------------------------------
@@ -623,6 +640,7 @@ const createStyles = (colors) => {
   content: { ...sheetStyles.content, paddingBottom: 12 },
 
   handle: sheetStyles.handle,
+  handleActive: { width: 54, backgroundColor: colors.selectionText },
 
   /* ---------------------------------------------------
        INPUTS
@@ -669,9 +687,8 @@ const createStyles = (colors) => {
   dateShortcut: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
   dateShortcutText: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
 
-  actionsSection: {
-    marginTop: 8,
-  },
+  actionsSection: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  optionsScroll: { flex: 1 },
 
   actionsRow: {
     flexDirection: 'row',
@@ -720,14 +737,10 @@ const createStyles = (colors) => {
        CRIAR
     --------------------------------------------------- */
 
-  saveRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
   saveButton: {
     ...sheetStyles.button,
-    paddingHorizontal: 14,
+    width: 44,
+    flexShrink: 0,
     borderRadius: 10,
     backgroundColor: colors.selection,
   },
@@ -735,11 +748,7 @@ const createStyles = (colors) => {
   saveButtonDisabled: {
     opacity: 0.55,
   },
-  saveButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onAction,
-  },
+
 
   /* ---------------------------------------------------
        PICKERS

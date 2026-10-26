@@ -34,14 +34,19 @@ function setup() {
   const events = { expanded: [], closed: 0, saved: [], resets: 0, editor: false };
   const context = {
     title: ' Rascunho ', description: ' Notas sem perda ', duration: 45, categoryId: 'shopping', priority: 'high',
-    initialMinutes: 90, dateValue: '31/12/2026', isDateValid: true, isBusy: false,
-    transitioned: { current: false }, handleDragged: { current: false }, sheetHeight: { current: 280 }, translateY: { setValue() {} },
+    initialMinutes: 90, dateValue: '31/12/2026', isDateValid: true, isBusy: false, isHandleActive: false, windowHeight: 780, TASK_DETAILS_HEIGHT_RATIO: 0.78,
+    transitioned: { current: false }, handleDragged: { current: false }, sheetHeight: { current: 280 },
+    dragOriginHeight: { current: 280 }, animatedHeight: { setValue() {} }, translateY: { setValue() {} },
+    gestureActions: { current: null }, setIsHandleActive() {},
     ...dates, formatTimeFromMinutes: time.formatTimeFromMinutes, TIMELINE_START_MINUTES: 420,
     Keyboard: { dismiss() {} }, setIsTransitioning() {}, setIsSaving() {},
     setDateEditorVisible: value => { events.editor = value; }, resetDrag: () => { events.resets++; },
     onExpand: draft => events.expanded.push(draft), onClose: () => { events.closed++; },
     onSave: async task => events.saved.push(task),
-    Animated: { timing: () => ({ start: callback => callback({ finished: true }) }) },
+    Animated: {
+      timing: () => ({ start: callback => callback({ finished: true }) }),
+      parallel: () => ({ start: callback => callback({ finished: true }) }),
+    },
   };
   return { context, events };
 }
@@ -73,15 +78,19 @@ test('invalid date blocks both save and expand, opens correction field and reset
   assert.equal(context.transitioned.current, false);
 });
 
-test('handle accepts vertical gestures only, routes up/down and restores short/cancelled drags', () => {
+test('handle captures immediately, routes up/down and restores short/cancelled drags', () => {
   const { context, events } = setup();
   context.PanResponder = { create: callbacks => callbacks };
   context.useMemo = factory => factory();
   context.handleExpand = handler('handleExpand', context);
   context.closeFromDrag = handler('closeFromDrag', context);
+  context.gestureActions.current = {
+    isBusy: false, expand: context.handleExpand, close: context.closeFromDrag,
+    reset: context.resetDrag, windowHeight: 780,
+  };
   const pan = handler('handlePanResponder', context);
-  assert.equal(pan.onStartShouldSetPanResponder(), false);
-  assert.equal(pan.onMoveShouldSetPanResponder(null, { dx: 40, dy: 8 }), false);
+  assert.equal(pan.onStartShouldSetPanResponder(), true);
+  assert.equal(pan.onStartShouldSetPanResponderCapture(), true);
   assert.equal(pan.onMoveShouldSetPanResponder(null, { dx: 2, dy: -20 }), true);
   pan.onPanResponderGrant();
   assert.equal(context.handleDragged.current, true);
@@ -102,11 +111,11 @@ test('Home expansion opens create details using the draft without a repository c
     if (node.type === 'JSXAttribute' && node.name.name === 'onExpand') code = home.slice(node.value.expression.start, node.value.expression.end);
   });
   const events = {};
-  const expand = new Function('setTaskError', 'setDetailsMode', 'setDetailsTask', 'setModalVisible', `return ${code}`)(
-    value => { events.error = value; }, value => { events.mode = value; }, value => { events.task = value; }, value => { events.visible = value; });
+  const expand = new Function('setTaskError', 'setDetailsMode', 'setDetailsTask', 'setModalVisible', 'setDetailsFromQuick', `return ${code}`)(
+    value => { events.error = value; }, value => { events.mode = value; }, value => { events.task = value; }, value => { events.visible = value; }, value => { events.embedded = value; });
   const draft = { title: 'Raw draft', date: '2026-12-31', startTime: '01:30' };
   expand(draft);
-  assert.equal(events.mode, 'create'); assert.equal(events.task, draft); assert.equal(events.visible, false);
+  assert.equal(events.embedded, true); assert.equal(events.mode, 'create'); assert.equal(events.task, draft); assert.equal(events.visible, false);
 });
 
 test('date validation, shortcuts and conversion handle leap days and civil dates in different timezones', () => {
@@ -144,4 +153,47 @@ test('Home initial civil date follows the timeline slot across midnight and year
   const initial = new Function('getDateKey', 'getCivilDateForTimelineSlot', 'selectedTimelineDate', 'targetSlotMinutes', 'TIMELINE_START_MINUTES', `return ${code}`);
   assert.equal(initial(dateUtils.getDateKey, timeline.getCivilDateForTimelineSlot, new Date(2026, 11, 31), 90, 420), '2027-01-01');
   assert.equal(initial(dateUtils.getDateKey, timeline.getCivilDateForTimelineSlot, new Date(2026, 11, 31), 540, 420), '2026-12-31');
+});
+
+test('expansion animates to Details height before transferring the draft', () => {
+  const { context, events } = setup();
+  let finish;
+  const targets = [];
+  context.Animated.timing = (value, config) => { targets.push(config.toValue); return {}; };
+  context.Animated.parallel = () => ({ start: callback => { finish = callback; } });
+  handler('handleExpand', context)();
+  assert.equal(events.expanded.length, 0);
+  assert.equal(context.transitioned.current, true);
+  assert.ok(targets.includes(Math.round(780 * 0.78)));
+  finish({ finished: true });
+  assert.equal(events.expanded.length, 1);
+});
+
+test('stable handle responder reads latest actions and immediately grows the sheet with the finger', () => {
+  const { context } = setup();
+  let active, expanded = false, height;
+  context.setIsHandleActive = value => { active = value; };
+  context.animatedHeight.setValue = value => { height = value; };
+  context.PanResponder = { create: callbacks => callbacks };
+  context.useMemo = factory => factory();
+  context.gestureActions.current = { isBusy: false, windowHeight: 780, expand() {}, close() {}, reset() {} };
+  const pan = handler('handlePanResponder', context);
+  assert.equal(pan.onStartShouldSetPanResponderCapture(), true);
+  pan.onPanResponderGrant();
+  assert.equal(active, true);
+  pan.onPanResponderMove(null, { dy: -100 });
+  assert.equal(height, 380);
+  context.gestureActions.current = { ...context.gestureActions.current, expand: () => { expanded = true; } };
+  pan.onPanResponderRelease(null, { dy: -100, dx: 0 });
+  assert.equal(expanded, true);
+});
+
+test('Quick Create keeps the arrow submit button in the options row, without a text submit label', () => {
+  assert.ok(source.includes("'arrow-forward'"));
+  assert.equal(source.includes('saveRow'), false);
+  assert.equal(source.includes('saveButtonText'), false);
+  assert.ok(source.includes('expandedContent ||'));
+  const details = read('components/modals/TaskDetailsModal.js');
+  assert.ok(details.includes('if (embedded) return visible ? content : null'));
+  assert.ok(details.includes('autoFocus={!embedded}'));
 });

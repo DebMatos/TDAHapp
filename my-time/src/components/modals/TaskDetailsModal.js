@@ -1,5 +1,5 @@
 import TaskBanner from '../TaskBanner';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Animated,
@@ -20,7 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
-import { createTaskSheetStyles } from '../../theme/styles/taskSheets.styles';
+import { createTaskSheetStyles, TASK_DETAILS_HEIGHT_RATIO } from '../../theme/styles/taskSheets.styles';
 import {
   formatDateForInput, getTodayDateInput, formatDateInput, isValidDateInput,
   dateInputToStorageDate, addDaysToDateInput, getDateDisplayLabel,
@@ -30,7 +30,7 @@ const DAY_MINUTES = 24 * 60;
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const NORMAL_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.78);
+const NORMAL_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * TASK_DETAILS_HEIGHT_RATIO);
 
 const EXPANDED_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.94);
 
@@ -225,6 +225,7 @@ function StatusIcon({ type, selected }) {
 
 export default function TaskDetailsModal({
   visible,
+  embedded = false,
   mode = 'create',
   initialValues = null,
   onClose,
@@ -580,7 +581,7 @@ export default function TaskDetailsModal({
      RESET
   ------------------------------------------------------- */
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible) {
       return;
     }
@@ -608,7 +609,7 @@ export default function TaskDetailsModal({
      LOAD
   ------------------------------------------------------- */
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible) {
       return;
     }
@@ -1180,19 +1181,13 @@ const closeInlineEditor = () => {
     );
   };
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
+  const content = (
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
 
         <Animated.View
+          testID="task-details-sheet"
           style={[
             styles.sheet,
 
@@ -1299,7 +1294,7 @@ const closeInlineEditor = () => {
                 onChangeText={setTitle}
                 placeholder="O que vais fazer?"
                 placeholderTextColor={colors.textFaint}
-                autoFocus
+                autoFocus={!embedded}
               />
             )}
 
@@ -1661,6 +1656,11 @@ const closeInlineEditor = () => {
           </ScrollView>
         </Animated.View>
       </View>
+  );
+  if (embedded) return visible ? content : null;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      {content}
     </Modal>
   );
 }
