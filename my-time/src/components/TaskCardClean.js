@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { getCategory } from '../config/categories';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const CARD_LEFT = 58;
 const CARD_RIGHT = 16;
@@ -50,6 +50,8 @@ export default function TaskCardClean({
 
   layoutStyle,
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dragY = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -110,13 +112,13 @@ export default function TaskCardClean({
   ------------------------------------------------------- */
   const categoryId = task.categoryId ?? task.category ?? 'inbox';
 
-  const category = getCategory(categoryId);
+  const category = getCategory(categoryId, colors);
 
-  const cardBackground = isNeutralized ? '#F5F4F2' : category.surface;
-  const accentColor = isNeutralized ? '#C7BFB9' : category.color;
+  const cardBackground = isNeutralized ? colors.taskCardNeutral : category.surface;
+  const accentColor = isNeutralized ? colors.taskCardMuted : category.color;
 
-  const titleColor = isAbandoned ? '#AAA19B' : colors.text;
-  const metaColor = isAbandoned ? '#C7BFB9' : colors.textMuted;
+  const titleColor = isAbandoned ? colors.textFaint : colors.text;
+  const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
 
 
 const priorityColor =
@@ -250,11 +252,11 @@ const priorityColor =
 
   const renderStatusIcon = (size = 10) => {
     if (isCompleted) {
-      return <Ionicons name="checkmark" size={size} color="#7F9B87" />;
+      return <Ionicons name="checkmark" size={size} color={colors.success} />;
     }
 
     if (isAbandoned) {
-      return <Ionicons name="close" size={size + 1} color="#8F8983" />;
+      return <Ionicons name="close" size={size + 1} color={colors.completed} />;
     }
 
     return null;
@@ -510,14 +512,14 @@ const priorityColor =
    STYLES
 ------------------------------------------------------- */
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   /* NORMAL */
   taskNormal: {
     position: 'absolute',
     borderRadius: 3,
     borderWidth: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E7E3DF',
+    borderBottomColor: colors.taskCardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -559,12 +561,12 @@ const styles = StyleSheet.create({
 
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
-    color: '#8F8983',
+    color: colors.completed,
   },
 
   taskTitleAbandoned: {
     textDecorationLine: 'none',
-    color: '#AAA39D',
+    color: colors.textFaint,
   },
 
   taskMeta: {
@@ -586,8 +588,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     borderRadius: 4,
     borderWidth: 1.2,
-    borderColor: '#C7BFB9',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.taskCardMuted,
+    backgroundColor: colors.input,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [
@@ -598,8 +600,8 @@ const styles = StyleSheet.create({
   },
 
   abandonedCheckbox: {
-    borderColor: '#AAA39D',
-    backgroundColor: '#F7F5F3',
+    borderColor: colors.textFaint,
+    backgroundColor: colors.surfaceSoft,
   },
 
   /* COMPACT */
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     borderWidth: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E0DC',
+    borderBottomColor: colors.taskCardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -652,8 +654,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     borderWidth: 1,
 
-    borderColor: '#C7BFB9',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.taskCardMuted,
+    backgroundColor: colors.input,
 
     alignItems: 'center',
     justifyContent: 'center',
@@ -665,7 +667,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     borderWidth: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E0DC',
+    borderBottomColor: colors.taskCardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',

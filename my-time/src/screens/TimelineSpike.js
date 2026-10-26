@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/ThemeContext';
 
 const DAY_MINUTES = 24 * 60;
 const DAY_START_MINUTE = 7 * 60;
@@ -47,6 +48,8 @@ const getPinchDistance = (touches) => {
    TASK (Agora é 100% fluida e responsiva)
 ------------------------------------------------------- */
 function DraggableTask({ task, ppm, onChangeStart, onDragStateChange }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dragY = useRef(new Animated.Value(0)).current;
   const startRef = useRef(task.startMinute);
 
@@ -152,6 +155,8 @@ function DraggableTask({ task, ppm, onChangeStart, onDragStateChange }) {
    SCREEN
 ------------------------------------------------------- */
 export default function TimelineSpike() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scrollRef = useRef(null);
 
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -330,10 +335,10 @@ export default function TimelineSpike() {
 /* -------------------------------------------------------
    STYLES
 ------------------------------------------------------- */
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 14,
@@ -347,12 +352,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.text,
   },
   subheading: {
     fontSize: 12,
     marginTop: 4,
-    color: '#8A8A8A',
+    color: colors.textMuted,
   },
   timelineViewport: {
     flex: 1,
@@ -361,7 +366,7 @@ const styles = StyleSheet.create({
   },
   timelineCanvas: {
     position: 'relative',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   hourRow: {
     position: 'absolute',
@@ -376,26 +381,26 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     textAlign: 'right',
     fontSize: 11,
-    color: '#A0A0A0',
+    color: colors.textMuted,
   },
   hourTextOverview: {
     fontSize: 9,
-    color: '#C0C0C0',
+    color: colors.textFaint,
   },
   hourLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.border,
   },
   hourLineOverview: {
-    backgroundColor: '#F8F8F8', // Linhas mais suaves quando afastado
+    backgroundColor: colors.timelineGrid,
   },
   rail: {
     position: 'absolute',
     top: 0,
     left: AXIS_WIDTH,
     width: 2,
-    backgroundColor: '#EBEBEB',
+    backgroundColor: colors.border,
   },
   nowLine: {
     position: 'absolute',
@@ -403,7 +408,7 @@ const styles = StyleSheet.create({
     right: 6,
     height: 1,
     zIndex: 100,
-    backgroundColor: '#FF4D85',
+    backgroundColor: colors.now,
   },
   nowLineOverview: {
     opacity: 0.8,
@@ -415,7 +420,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#FF4D85',
+    backgroundColor: colors.now,
   },
   nowDotOverview: {
     width: 5,
@@ -431,8 +436,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     overflow: 'hidden',
-    backgroundColor: '#FF4D85',
-    color: '#FFFFFF',
+    backgroundColor: colors.now,
+    color: colors.onAction,
     fontSize: 9,
     fontWeight: '700',
   },
@@ -446,8 +451,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#EAF0FE',
-    backgroundColor: '#F5F8FF',
+    borderColor: colors.border,
+    backgroundColor: colors.categories.inbox.surface,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -455,7 +460,7 @@ const styles = StyleSheet.create({
   normalAccent: {
     width: 5,
     alignSelf: 'stretch',
-    backgroundColor: '#3B71F7',
+    backgroundColor: colors.categories.inbox.color,
   },
   taskText: {
     flex: 1,
@@ -465,12 +470,12 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   taskMeta: {
     marginTop: 4,
     fontSize: 11,
-    color: '#8A8A8A',
+    color: colors.textMuted,
   },
   checkbox: {
     width: 20,
@@ -478,15 +483,15 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: '#C0C0C0',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.checkboxBorder,
+    backgroundColor: colors.input,
   },
   taskOverview: {
     position: 'absolute',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#EAF0FE',
-    backgroundColor: '#F5F8FF',
+    borderColor: colors.border,
+    backgroundColor: colors.categories.inbox.surface,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -494,14 +499,14 @@ const styles = StyleSheet.create({
   overviewAccent: {
     width: 3,
     alignSelf: 'stretch',
-    backgroundColor: '#3B71F7',
+    backgroundColor: colors.categories.inbox.color,
   },
   overviewTaskTitle: {
     flex: 1,
     paddingHorizontal: 6,
     fontSize: 9,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   overviewCheckbox: {
     width: 10,
@@ -509,7 +514,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#C0C0C0',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.checkboxBorder,
+    backgroundColor: colors.input,
   },
 });

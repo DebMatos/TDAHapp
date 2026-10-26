@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function TodoScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
@@ -15,10 +18,10 @@ export default function TodoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFDF9' },
-  header: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EFE6E1' },
-  title: { fontSize: 20, fontWeight: '700', color: '#2C2521' },
+const createStyles = (colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  title: { fontSize: 20, fontWeight: '700', color: colors.text },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  placeholderText: { fontSize: 14, color: '#8C827B' },
+  placeholderText: { fontSize: 14, color: colors.textMuted },
 });

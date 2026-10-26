@@ -8,13 +8,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StatusBar } from 'expo-status-bar';
 import AuthScreen from './src/screens/AuthScreen';
 import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/HomeScreen';
 import TimelineSpike from './src/screens/TimelineSpike';
-import colors from './src/theme/colors';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { syncPendingTasks } from './src/data/taskRepository';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
@@ -24,13 +25,14 @@ const Tab = createBottomTabNavigator();
 // 1. Componente separado para poder ler as margens do ecrã
 function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.selectionText, // #6F765D ou cores.selection (#8A9273)
-        tabBarInactiveTintColor: colors.textFaint,    // #AAA19B
+        tabBarActiveTintColor: colors.selectionText,
+        tabBarInactiveTintColor: colors.textFaint,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
@@ -38,11 +40,8 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.borderSoft,
-
-
           paddingBottom: Math.max(insets.bottom, 10) + (Platform.OS === 'ios' ? 0 : 8),
           paddingTop: 8,
-          // Definimos uma altura mínima para garantir que o conteúdo cabe sempre
           minHeight: 60 + Math.max(insets.bottom, 0),
         },
         tabBarIcon: ({ focused, color }) => {
@@ -62,7 +61,8 @@ function MainTabs() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { colors, isDark } = useTheme();
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
     ...MaterialCommunityIcons.font,
@@ -132,6 +132,7 @@ export default function App() {
       </View>
     );
   }
+  const navigationTheme = isDark ? DarkTheme : DefaultTheme;
 
   const RootContainer =
     Platform.OS === 'web'
@@ -142,13 +143,35 @@ export default function App() {
     <RootContainer style={{ flex: 1 }}>
       <SafeAreaProvider>
         {session ? (
-          <NavigationContainer>
+          <NavigationContainer
+            theme={{
+              ...navigationTheme,
+              colors: {
+                ...navigationTheme.colors,
+                primary: colors.selection,
+                background: colors.background,
+                card: colors.surface,
+                text: colors.text,
+                border: colors.borderSoft,
+                notification: colors.danger,
+              },
+            }}
+          >
             <MainTabs />
           </NavigationContainer>
         ) : (
           <AuthScreen />
         )}
       </SafeAreaProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </RootContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function TaskBanner({ notice, onDismiss, placement = 'bottom' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const dismiss = useRef(onDismiss);
@@ -64,7 +66,7 @@ export default function TaskBanner({ notice, onDismiss, placement = 'bottom' }) 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   host: { position: 'absolute', left: 12, right: 12, zIndex: 100, alignItems: 'center' },
   banner: { width: '100%', maxWidth: 420, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border, borderLeftWidth: 3, borderLeftColor: colors.selection,

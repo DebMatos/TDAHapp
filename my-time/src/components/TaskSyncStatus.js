@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Animated, Easing, Modal, Pressable, ScrollView,
   StyleSheet, Text, View, useWindowDimensions,
@@ -8,7 +8,7 @@ import {
   getTaskSyncMessage, getTaskSyncState, subscribeTaskSyncStatus,
 } from '../data/taskSyncStatus';
 import { pullRemoteTasks, syncPendingTasks } from '../data/taskRepository';
-import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const presentations = {
   syncing: { icon: 'autorenew', title: 'A sincronizar', message: 'Existem operações de envio ou recuperação em curso.' },
@@ -20,6 +20,8 @@ const presentations = {
 };
 
 export default function TaskSyncStatus() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [status, setStatus] = useState({});
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState(null);
@@ -121,7 +123,7 @@ export default function TaskSyncStatus() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   trigger: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
   overlay: { flex: 1 },
   panel: { position: 'absolute', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 16, elevation: 5, shadowColor: colors.text, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
