@@ -998,22 +998,6 @@ export default function TaskDetailsModal({
     if (!isBusy && canConfirmField) closeInlineEditor();
   };
 
-  const renderInlineConfirmation = (label) => (
-    <TouchableOpacity
-      disabled={isBusy || !canConfirmField}
-      accessibilityRole="button"
-      accessibilityLabel={`Confirmar ${label}`}
-      accessibilityHint={!canConfirmField ? 'Introduz um valor válido para confirmar.' : undefined}
-      accessibilityState={{ disabled: isBusy || !canConfirmField }}
-      style={styles.inlineConfirm}
-      activeOpacity={0.7}
-      onPress={confirmInlineEditor}
-    >
-      <Ionicons name="checkmark" size={22}
-        color={canConfirmField ? colors.selectionText : colors.textFaint} />
-    </TouchableOpacity>
-  );
-
   /* -------------------------------------------------------
      SCHEDULE RENDER
   ------------------------------------------------------- */
@@ -1029,6 +1013,7 @@ export default function TaskDetailsModal({
           value={dateValue}
           onChangeText={updateDate}
           keyboardType="number-pad"
+          onBlur={() => setActiveField((field) => field === 'date' ? null : field)}
           maxLength={10}
         />
       ) : (
@@ -1041,7 +1026,6 @@ export default function TaskDetailsModal({
           accessibilityLabel="Editar data"
           onPress={() => openInlineEditor('date')}
         >
-          <Text style={styles.propertyLabel}>Data</Text>
           <Text style={styles.inlineDateText}>
             {getDateDisplayLabel(dateValue)}
           </Text>
@@ -1057,6 +1041,11 @@ export default function TaskDetailsModal({
             ref={startInputRef}
             style={styles.inlineTimeInput}
             value={startTime}
+            onBlur={() => requestAnimationFrame(() => {
+              if (!TextInput.State.currentlyFocusedInput()) {
+                setActiveField((field) => field === 'time' ? null : field);
+              }
+            })}
             onChangeText={updateStartTime}
             keyboardType="number-pad"
             maxLength={5}
@@ -1069,6 +1058,11 @@ export default function TaskDetailsModal({
             accessibilityLabel="Hora de fim"
             style={styles.inlineTimeInput}
             value={endTime}
+            onBlur={() => requestAnimationFrame(() => {
+              if (!TextInput.State.currentlyFocusedInput()) {
+                setActiveField((field) => field === 'time' ? null : field);
+              }
+            })}
             onChangeText={updateEndTime}
             keyboardType="number-pad"
             maxLength={5}
@@ -1085,7 +1079,6 @@ export default function TaskDetailsModal({
           accessibilityLabel="Editar horário"
           onPress={() => openInlineEditor('time')}
         >
-          <Text style={styles.propertyLabel}>Horário</Text>
           <Text style={styles.inlineTimeText}>
             {startTime}
             {'  →  '}
@@ -1133,6 +1126,7 @@ export default function TaskDetailsModal({
               accessibilityLabel="Duração em minutos"
               style={styles.inlineCustomDurationInput}
               value={customDuration}
+              onBlur={() => setActiveField((field) => field === 'duration' ? null : field)}
               onChangeText={handleCustomDuration}
               keyboardType="number-pad"
               maxLength={4}
@@ -1154,7 +1148,6 @@ export default function TaskDetailsModal({
           accessibilityLabel="Editar duração"
           onPress={() => openInlineEditor('duration')}
         >
-          <Text style={styles.propertyLabel}>Duração</Text>
           <Text style={styles.inlineDurationText}>
             {formatDuration(duration)}
           </Text>
@@ -1162,27 +1155,18 @@ export default function TaskDetailsModal({
       );
 
     return (
-      <View style={styles.scheduleBlock}>
+      <ScrollView horizontal contentContainerStyle={styles.scheduleLine} keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false}>
         {[
-          { field: 'date', label: 'Data', icon: 'calendar-outline', content: dateContent },
-          { field: 'time', label: 'Horário', icon: 'time-outline', content: timeContent },
-          { field: 'duration', label: 'Duração', icon: 'timer-outline', content: durationContent },
-        ].map(({ field, label, icon, content }) => (
-          <View key={field} style={styles.propertyRow}>
-            <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.propertyIcon} />
-            <View style={styles.propertyContent}>
-              {activeField === field && <Text style={styles.propertyLabel}>{label}</Text>}
-              {content}
-              {activeField === field && !canConfirmField && (
-                <Text style={styles.propertyLabel} accessibilityLiveRegion="polite">
-                  {field === 'date' ? 'Usa uma data válida: DD/MM/AAAA.' : 'Usa horas válidas: HH:MM.'}
-                </Text>
-              )}
-            </View>
-            {activeField === field && renderInlineConfirmation(label.toLowerCase())}
+          { field: 'date', icon: 'calendar-outline', content: dateContent },
+          { field: 'time', icon: 'time-outline', content: timeContent },
+          { field: 'duration', icon: 'timer-outline', content: durationContent },
+        ].map(({ field, icon, content }) => (
+          <View key={field} style={styles.scheduleItem}>
+            <Ionicons name={icon} size={16} color={colors.textMuted} />
+            {content}
           </View>
         ))}
-      </View>
+      </ScrollView>
     );
   };
 
@@ -1231,18 +1215,9 @@ export default function TaskDetailsModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            ref={scrollRef}
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            onScrollBeginDrag={closeInlineEditor}
-          >
             {/* TITLE */}
 
-            <View style={styles.titleRow}>
+            <View style={[styles.titleRow, styles.stickyTitle]}>
               <Ionicons
                 name={selectedCategory.icon}
                 size={24}
@@ -1260,6 +1235,7 @@ export default function TaskDetailsModal({
                   onChangeText={setTitle}
                   autoFocus={!embedded}
                   returnKeyType="done"
+                  onBlur={() => setActiveField((field) => field === 'title' ? null : field)}
                   onSubmitEditing={confirmInlineEditor}
                   placeholder="O que vais fazer?"
                   placeholderTextColor={colors.textFaint}
@@ -1289,9 +1265,17 @@ export default function TaskDetailsModal({
                   </Text>
                 </TouchableOpacity>
               )}
-              {isEditingTitle && renderInlineConfirmation('título')}
             </View>
 
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={closeInlineEditor}
+          >
             {/* POSTPONE */}
 
             {isEdit && (
@@ -1675,6 +1659,7 @@ export default function TaskDetailsModal({
                     accessibilityLabel="Notas"
                     style={styles.notesInput}
                     value={notes}
+                    onBlur={() => setActiveField((field) => field === 'notes' ? null : field)}
                     onChangeText={setNotes}
                     multiline
                     autoFocus
@@ -1683,7 +1668,6 @@ export default function TaskDetailsModal({
                     textAlignVertical="top"
                   />
                 </View>
-                {renderInlineConfirmation('notas')}
               </View>
             )}
 
@@ -1781,7 +1765,9 @@ const createStyles = (colors) => {
   propertyText: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: colors.text },
   neutralText: { color: colors.textMuted, fontWeight: '400' },
   propertyTouch: { minHeight: 44, justifyContent: 'center' },
-  inlineConfirm: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  stickyTitle: { paddingHorizontal: 18 },
+  scheduleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scheduleItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
 
   /* TITLE */
 
@@ -1855,9 +1841,6 @@ const createStyles = (colors) => {
     justifyContent: 'center',
   },
 
-  scheduleBlock: {
-    gap: 0,
-  },
 
   inlineDateText: {
     fontSize: 14,
