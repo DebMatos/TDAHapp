@@ -86,19 +86,19 @@ const getPriorityOptions = (colors) => [
     id: 'low',
     label: 'Baixa',
     icon: 'flag-outline',
-    color: colors.categories.exercise.color,
+    color: colors.priority.low,
   },
   {
     id: 'medium',
     label: 'Média',
     icon: 'flag-outline',
-    color: colors.categories.personal.color,
+    color: colors.priority.medium,
   },
   {
     id: 'high',
     label: 'Alta',
     icon: 'flag-outline',
-    color: colors.categories.work.color,
+    color: colors.priority.high,
   },
 ];
 
@@ -427,7 +427,7 @@ export default function TaskDetailsModal({
   const saveIconColor = !canSave
     ? colors.textFaint
     : isDirty
-      ? colors.categories.work.color
+      ? colors.saveAction
       : colors.textMuted;
 
   /* -------------------------------------------------------

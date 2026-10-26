@@ -87,7 +87,7 @@ export function DrawerNavContent(props) {
                         ? colors.surfaceSoft
                         : colors.surfaceMuted
                       : 'transparent',
-                    borderColor: isSelected ? colors.now : 'transparent',
+                    borderColor: isSelected ? colors.selectionIndicator : 'transparent',
                   },
                 ]}
                 onPress={() => handleThemeChange(option.value)}
@@ -116,7 +116,7 @@ export function DrawerNavContent(props) {
                 </View>
 
                 {isSelected && (
-                  <Ionicons name="checkmark" size={18} color={colors.now} />
+                  <Ionicons name="checkmark" size={18} color={colors.selectionIndicator} />
                 )}
               </TouchableOpacity>
             );

@@ -123,11 +123,11 @@ export default function TaskCardClean({
 
 const priorityColor =
   task.priority === 'high'
-    ? colors.categories.work.color
+    ? colors.priority.high
     : task.priority === 'medium'
-      ? colors.categories.personal.color
+      ? colors.priority.medium
       : task.priority === 'low'
-        ? colors.categories.exercise.color
+        ? colors.priority.low
         : null;
 
   /* -------------------------------------------------------

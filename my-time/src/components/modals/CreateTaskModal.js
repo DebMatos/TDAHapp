@@ -27,9 +27,9 @@ const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 const getPriorityOptions = (colors) => [
   { id: null, label: 'Sem prioridade', color: colors.textMuted },
-  { id: 'low', label: 'Baixa', color: colors.categories.exercise.color },
-  { id: 'medium', label: 'Média', color: colors.categories.personal.color },
-  { id: 'high', label: 'Alta', color: colors.categories.work.color },
+  { id: 'low', label: 'Baixa', color: colors.priority.low },
+  { id: 'medium', label: 'Média', color: colors.priority.medium },
+  { id: 'high', label: 'Alta', color: colors.priority.high },
 ];
 
 /* -------------------------------------------------------

@@ -12,6 +12,13 @@ and distinguish a failed local write from a pending remote operation.
 textSecondary and selectionText roles for task feedback; do not change the palette
 for error handling. Errors must be explained in text, not color alone.
 
+Functional colors are independent from category colors: `priority.low/medium/high`
+identify priority, `saveAction` identifies unsaved editable work, and
+`selectionIndicator` identifies the selected appearance option. Their initial
+values preserve the existing light/dark visuals. They must not reference category
+objects, even when their current hex values coincide. Category colors and surfaces
+remain responsible for task identity; `now` remains responsible for current time.
+
 ## Typography
 
 Retain the application’s platform font and existing task-sheet hierarchy.
