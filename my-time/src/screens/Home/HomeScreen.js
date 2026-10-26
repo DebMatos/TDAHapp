@@ -22,37 +22,39 @@ import {
   TIMELINE_START_MINUTES,
   MAX_PPM,
   DEFAULT_PPM,
-} from '../constants/timeline';
+} from '../../constants/timeline';
 
 import {
   formatTimeFromMinutes,
   timeToMinutes,
   snapMinutes,
-} from '../utils/time';
+} from '../../utils/time';
 
-import { getDateKey, isSameDay, addDays } from '../utils/date';
-import * as taskService from '../services/taskService';
+import { getDateKey, isSameDay, addDays } from '../../utils/date';
+import * as taskService from '../../services/taskService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import TaskDetailsModal from '../components/modals/TaskDetailsModal';
-import TaskCardClean from '../components/TaskCardClean';
-import Header from '../components/Header';
-import TaskBanner from '../components/TaskBanner';
-import { subscribeTaskSyncStatus } from '../data/taskSyncStatus';
-import { createTaskSyncNoticeTracker } from '../data/taskSyncNotices';
-import CreateTaskModal from '../components/modals/CreateTaskModal';
-import { useTheme } from '../theme/ThemeContext';
+import TaskDetailsModal from '../../components/modals/TaskDetailsModal';
+import TaskCardClean from '../../components/TaskCardClean';
+import Header from '../../components/Header';
+import TaskBanner from '../../components/TaskBanner';
+import { subscribeTaskSyncStatus } from '../../data/taskSyncStatus';
+import { createTaskSyncNoticeTracker } from '../../data/taskSyncNotices';
+import CreateTaskModal from '../../components/modals/CreateTaskModal';
+import { useTheme } from '../../theme/ThemeContext';
 import NetInfo from '@react-native-community/netinfo';
 import {
   loadTasksSnapshot,
   subscribeTasks,
   pullRemoteTasks,
-} from '../data/taskRepository';
-import { supabase } from '../lib/supabase';
+} from '../../data/taskRepository';
+import { supabase } from '../../lib/supabase';
 import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
-} from '../utils/timelineDate';
+} from '../../utils/timelineDate';
+import { getHomeScreenStyles } from './HomeScreen.styles';
+import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
 /* -------------------------------------------------------
    TIMELINE
@@ -235,8 +237,11 @@ const calculateOverlapColumns = (tasks) => {
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
+  const { isDark } = useTheme();
+
   const { colors, themeMode, setThemeMode } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = getHomeScreenStyles(isDark);
+  const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
   const [appearanceVisible, setAppearanceVisible] = useState(false);
   const [taskError, setTaskError] = useState(null);
@@ -1077,7 +1082,7 @@ export default function TimelineScreen() {
                 <View style={styles.nowDot} />
 
                 <Image
-                  source={require('../../assets/abelha.png')}
+                  source={require('../../../assets/abelha.png')}
                   style={styles.nowBeeImage}
                 />
               </View>
@@ -1088,11 +1093,12 @@ export default function TimelineScreen() {
           accessibilityRole="button"
           accessibilityLabel="Ir para agora"
           onPress={handleGoToNow}
-          style={styles.goToNowButton}
+          style={buttonStyles.floatingButton}
+          activeOpacity={0.8}
         >
           <Image
-            style={styles.bee}
-            source={require('../../assets/abelha.png')}
+            style={buttonStyles.icon}
+            source={require('../../../assets/abelha.png')}
           />
         </TouchableOpacity>
       </View>
@@ -1199,203 +1205,3 @@ export default function TimelineScreen() {
 /* -------------------------------------------------------
    STYLES
 ------------------------------------------------------- */
-
-const createStyles = (colors) =>
-  StyleSheet.create({
-    appearanceOverlay: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.backdrop,
-      padding: 24,
-    },
-    appearanceCard: {
-      width: '100%',
-      maxWidth: 360,
-      padding: 20,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
-    appearanceTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    appearanceDescription: {
-      marginTop: 4,
-      marginBottom: 8,
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    appearanceOption: {
-      minHeight: 48,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSoft,
-    },
-    appearanceOptionText: {
-      fontSize: 15,
-      color: colors.text,
-    },
-    appearanceSelected: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.selectionText,
-    },
-    appearanceSignOut: {
-      minHeight: 48,
-      justifyContent: 'center',
-      marginTop: 8,
-    },
-    appearanceSignOutText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.danger,
-    },
-    safe: {
-      flex: 1,
-      backgroundColor: colors.surface,
-    },
-
-    timelineViewport: {
-      flex: 1,
-      position: 'relative',
-      marginTop: 2,
-    },
-
-    timelineCanvas: {
-      position: 'relative',
-      backgroundColor: colors.surface,
-    },
-
-    hourRow: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      height: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-
-    hourText: {
-      width: AXIS_WIDTH,
-      paddingRight: 10,
-      textAlign: 'right',
-      fontSize: 12,
-      fontWeight: '400',
-      color: colors.textMuted,
-    },
-
-    hourTextOverview: {
-      fontSize: 9,
-      color: colors.textFaint,
-    },
-
-    railContainer: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      left: AXIS_WIDTH - 0.5,
-      width: 1,
-      zIndex: 2,
-    },
-
-    railSegment: {
-      position: 'absolute',
-      left: 0,
-      width: 1,
-    },
-
-    hourDot: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      marginLeft: -2,
-      marginRight: -2,
-      zIndex: 3,
-    },
-
-    /* Estilo da linha horizontal de cada hora na grelha */
-    hourLine: {
-      position: 'absolute',
-      left: 50,
-      right: 20,
-      height: 1,
-      backgroundColor: colors.borderSoft,
-    },
-
-    hourLineOverview: {
-      backgroundColor: colors.timelineGrid,
-    },
-
-    halfHourLine: {
-      backgroundColor: 'transparent',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.timelineGrid,
-      borderStyle: 'dashed',
-    },
-
-    nowLine: {
-      position: 'absolute',
-      left: AXIS_WIDTH,
-      right: 20,
-      height: 1.5,
-      zIndex: 90,
-      backgroundColor: colors.now,
-    },
-
-    nowDot: {
-      position: 'absolute',
-      left: -3,
-      top: -2.5,
-      width: 6.5,
-      height: 6.5,
-      borderRadius: 4,
-      backgroundColor: colors.now,
-    },
-
-    nowBeeImage: {
-      position: 'absolute',
-      right: -6,
-      top: -10,
-      width: 20,
-      height: 20,
-      resizeMode: 'contain',
-      transform: [
-        {
-          rotate: '90deg',
-        },
-      ],
-    },
-
-    goToNowButton: {
-      position: 'absolute',
-      right: 16,
-      bottom: 20,
-      zIndex: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 24,
-      backgroundColor: colors.surfaceElevated,
-      elevation: 5,
-    },
-    bee: {
-      resizeMode: 'contain',
-      width: 20,
-      height: 20,
-    },
-    goToNowText: {
-      color: colors.onAction,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-  });
-
-  

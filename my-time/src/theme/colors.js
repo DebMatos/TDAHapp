@@ -48,6 +48,13 @@ export const lightColors = {
   taskCardNeutral: '#F5F4F2',
   taskCardMuted: '#C7BFB9',
   taskCardBorder: '#E7E3DF',
+
+  floatingButton: {
+  background: '#FFFDFC',
+  border: '#E3DDD7',
+  shadow: '#000000',
+  shadowOpacity: 0.15,
+},
 };
 
 export const darkColors = {
@@ -92,6 +99,13 @@ export const darkColors = {
   taskCardNeutral: '#302D29',
   taskCardMuted: '#827A73',
   taskCardBorder: '#403B36',
+
+  floatingButton: {
+  background: '#302D29',
+  border: '#57514A',
+  shadow: '#000000',
+  shadowOpacity: 0.3,
+},
 };
 
 export default lightColors;

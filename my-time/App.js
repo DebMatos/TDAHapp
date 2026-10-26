@@ -13,7 +13,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import AuthScreen from './src/screens/AuthScreen';
 import { supabase } from './src/lib/supabase';
-import HomeScreen from './src/screens/HomeScreen';
+import HomeScreen from './src/screens/Home/HomeScreen';
 import TimelineSpike from './src/screens/TimelineSpike';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { syncPendingTasks } from './src/data/taskRepository';
