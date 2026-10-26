@@ -791,13 +791,13 @@ export default function TaskDetailsModal({
 
         categoryId: initialCategory,
 
+        priority: initialPriority,
+
         status: initialStatus,
 
         repeat: initialRepeat,
 
         notes: initialNotes.trim(),
-
-        priority: initialPriority,
       }),
     );
   }, [visible, initialValues]);

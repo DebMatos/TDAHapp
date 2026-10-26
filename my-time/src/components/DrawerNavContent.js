@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TaskBanner from './TaskBanner';
 export function DrawerNavContent(props) {
   const { colors, themeMode, setThemeMode, isDark } = useTheme();
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const themeOptions = [
     { label: 'Automático (Sistema)', value: 'system', icon: 'hardware-chip-outline' },
@@ -21,11 +24,36 @@ export function DrawerNavContent(props) {
     { label: 'Modo Escuro', value: 'dark', icon: 'moon-outline' },
   ];
 
-  const handleSignOut = async () => {
+  const handleThemeChange = async (mode) => {
+    if (busy) return;
+    setNotice(null);
+    setBusy(true);
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn('[Auth] Falha ao terminar sessão:', error);
+      await setThemeMode(mode);
+    } catch {
+      setNotice({
+        title: 'A preferência de tema não ficou guardada',
+        message: 'O tema foi aplicado nesta sessão, mas pode não ser mantido ao reabrir a aplicação. Tenta selecionar o tema novamente.',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (busy) return;
+    setNotice(null);
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch {
+      setNotice({
+        title: 'Não foi possível terminar sessão',
+        message: 'A saída não foi confirmada. Verifica a ligação e tenta novamente. Os dados locais não foram apagados.',
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -62,7 +90,10 @@ export function DrawerNavContent(props) {
                     borderColor: isSelected ? colors.now : 'transparent',
                   },
                 ]}
-                onPress={() => setThemeMode(option.value)}
+                onPress={() => handleThemeChange(option.value)}
+                disabled={busy}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected, disabled: busy }}
                 activeOpacity={0.7}
               >
                 <View style={styles.optionLeft}>
@@ -98,6 +129,9 @@ export function DrawerNavContent(props) {
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={handleSignOut}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy }}
           activeOpacity={0.7}
         >
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
@@ -106,6 +140,7 @@ export function DrawerNavContent(props) {
           </Text>
         </TouchableOpacity>
       </View>
+      <TaskBanner notice={notice} onDismiss={() => setNotice(null)} placement="top" />
     </SafeAreaView>
   );
 }
