@@ -1,11 +1,12 @@
 import TaskBanner from '../TaskBanner';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  Image,
+  Animated,
+  Keyboard,
+  PanResponder,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,10 +16,17 @@ import {
   View,
 } from 'react-native';
 
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
+import { createTaskSheetStyles } from '../../theme/styles/taskSheets.styles';
+import { formatTimeFromMinutes } from '../../utils/time';
+import { TIMELINE_START_MINUTES } from '../../constants/timeline';
+import {
+  formatDateForInput, getTodayDateInput, formatDateInput, isValidDateInput,
+  dateInputToStorageDate, addDaysToDateInput, getDateDisplayLabel,
+} from '../../utils/taskDateInput';
 /* -------------------------------------------------------
    OPÇÕES
 ------------------------------------------------------- */
@@ -35,16 +43,6 @@ const getPriorityOptions = (colors) => [
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
-
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-
-  const hours = Math.floor(normalized / 60);
-
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
 
 const formatDuration = (minutes) => {
   if (minutes < 60) {
@@ -72,7 +70,8 @@ export default function CreateTaskModal({
   onSave,
   banner,
   onDismissBanner,
-  onMoreOptions,
+  onExpand,
+  initialDate = null,
   initialMinutes = null,
 }) {
   const { colors } = useTheme();
@@ -96,6 +95,15 @@ export default function CreateTaskModal({
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const isBusy = isSaving || isTransitioning;
+  const [dateValue, setDateValue] = useState(getTodayDateInput);
+  const [dateEditorVisible, setDateEditorVisible] = useState(false);
+  const isDateValid = isValidDateInput(dateValue);
+  const translateY = useRef(new Animated.Value(0)).current;
+  const sheetHeight = useRef(300);
+  const transitioned = useRef(false);
+  const handleDragged = useRef(false);
 
   const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
 
@@ -114,14 +122,23 @@ export default function CreateTaskModal({
     setDuration(30);
     setPriority(null);
     setCategoryId('inbox');
-  }, [visible]);
+    setDateValue(initialDate ? formatDateForInput(initialDate) : getTodayDateInput());
+    setDateEditorVisible(false);
+    setDurationPickerVisible(false);
+    setPriorityPickerVisible(false);
+    setCategoryPickerVisible(false);
+    transitioned.current = false;
+    handleDragged.current = false;
+    setIsTransitioning(false);
+    translateY.setValue(0);
+  }, [visible, initialDate, translateY]);
 
   /* -------------------------------------------------------
      GUARDAR
   ------------------------------------------------------- */
 
   const handleSave = async () => {
-    if (!title.trim() || isSaving) {
+    if (!title.trim() || !isDateValid || isBusy || transitioned.current) {
       return;
     }
 
@@ -134,6 +151,8 @@ export default function CreateTaskModal({
         durationMinutes: duration,
         categoryId,
         priority,
+        date: dateInputToStorageDate(dateValue),
+        startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
       });
     } catch {
       // The parent presents the local error; keep this draft open.
@@ -143,29 +162,65 @@ export default function CreateTaskModal({
   };
 
   /* -------------------------------------------------------
-     MAIS OPÇÕES
+     EXPANSÃO PELO HANDLE
   ------------------------------------------------------- */
 
-  const handleMoreOptions = () => {
-    if (isSaving) return;
-    onMoreOptions?.({
-      title: title.trim(),
-      notes: description.trim(),
-      startTime:
-        initialMinutes != null
-          ? formatTimeFromMinutes(initialMinutes)
-          : '07:00',
+  const resetDrag = () => {
+    Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+  };
+
+  const handleExpand = () => {
+    if (isBusy || transitioned.current || !onExpand) return;
+    if (!isDateValid) {
+      setDateEditorVisible(true);
+      resetDrag();
+      return;
+    }
+    const draft = {
+      title,
+      notes: description,
+      date: dateInputToStorageDate(dateValue),
+      startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
       durationMinutes: duration,
       categoryId,
       priority,
-    });
+    };
+    transitioned.current = true;
+    setIsTransitioning(true);
+    Keyboard.dismiss();
+    onExpand(draft);
   };
-  /* -------------------------------------------------------
-     LABEL DA HORA
-  ------------------------------------------------------- */
 
-  const timeLabel =
-    initialMinutes == null ? '--:--' : formatTimeFromMinutes(initialMinutes);
+  const closeFromDrag = () => {
+    if (isBusy || transitioned.current) return;
+    transitioned.current = true;
+    setIsTransitioning(true);
+    Keyboard.dismiss();
+    Animated.timing(translateY, {
+      toValue: sheetHeight.current, duration: 160, useNativeDriver: true,
+    }).start(({ finished }) => { if (finished) onClose(); });
+  };
+
+  const handlePanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => !isBusy &&
+      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onMoveShouldSetPanResponderCapture: (_, gesture) => !isBusy &&
+      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderGrant: () => { handleDragged.current = true; },
+    onPanResponderMove: (_, gesture) => {
+      translateY.setValue(Math.max(-64, gesture.dy));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy < -45) handleExpand();
+      else if (gesture.dy > 55) closeFromDrag();
+      else resetDrag();
+    },
+    onPanResponderTerminate: resetDrag,
+  }), [isBusy, isDateValid, title, description, dateValue, duration, categoryId, priority, initialMinutes, onExpand, onClose, translateY]);
+
+  const timeLabel = formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
+  const dateLabel = isDateValid ? getDateDisplayLabel(dateValue) : 'Data inválida';
 
   /* -------------------------------------------------------
      RENDER
@@ -195,15 +250,32 @@ export default function CreateTaskModal({
 
           {/* SHEET */}
 
-          <View style={styles.sheet}>
-            {/* HANDLE */}
+          <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}
+            onLayout={event => { sheetHeight.current = event.nativeEvent.layout.height; }}>
+            <View style={styles.topBar}>
+              <View {...handlePanResponder.panHandlers} style={styles.dragZone}>
+                <Pressable style={styles.expandHandle}
+                  disabled={isBusy} accessibilityRole="button"
+                  accessibilityLabel="Expandir detalhes da tarefa"
+                  accessibilityHint="Arrasta para cima para abrir detalhes ou para baixo para fechar"
+                  accessibilityState={{ disabled: isBusy }}
+                  accessibilityActions={[{ name: 'activate', label: 'Abrir detalhes' }]}
+                  onAccessibilityAction={event => {
+                    if (event.nativeEvent.actionName === 'activate') handleExpand();
+                  }}
+                  onPressIn={() => { handleDragged.current = false; }}
+                  onPress={() => { if (!handleDragged.current) handleExpand(); }}>
+                  <View style={styles.handle} />
+                </Pressable>
+              </View>
+            </View>
 
-            <View style={styles.handle} />
-
+            <ScrollView style={styles.contentScroll} contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled" nestedScrollEnabled>
             {/* TÍTULO */}
 
             <TextInput
-              editable={!isSaving}
+              editable={!isBusy}
               accessibilityLabel="Título da tarefa"
               style={styles.titleInput}
               value={title}
@@ -218,7 +290,7 @@ export default function CreateTaskModal({
             {/* DESCRIÇÃO */}
 
             <TextInput
-              editable={!isSaving}
+              editable={!isBusy}
               accessibilityLabel="Descrição"
               style={styles.descriptionInput}
               value={description}
@@ -227,6 +299,32 @@ export default function CreateTaskModal({
               placeholderTextColor={colors.placeholder}
               multiline
             />
+
+            {dateEditorVisible && (
+              <View style={styles.dateEditor}>
+                <Text style={styles.dateLabel}>Data da tarefa</Text>
+                <TextInput accessibilityLabel="Data da tarefa, dia mês e ano"
+                  editable={!isBusy} value={dateValue}
+                  onChangeText={value => setDateValue(formatDateInput(value))}
+                  keyboardType="number-pad" maxLength={10} placeholder="DD/MM/AAAA"
+                  placeholderTextColor={colors.placeholder} style={styles.dateInput} />
+                {!isDateValid && <Text accessibilityRole="alert" style={styles.dateError}>
+                  Introduz uma data válida no formato DD/MM/AAAA.
+                </Text>}
+                <View style={styles.dateShortcuts}>
+                  <TouchableOpacity disabled={isBusy} accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy, selected: dateValue === getTodayDateInput() }}
+                    onPress={() => setDateValue(getTodayDateInput())} style={styles.dateShortcut} activeOpacity={0.7}>
+                    <Text style={styles.dateShortcutText}>Hoje</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity disabled={isBusy} accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy, selected: dateValue === addDaysToDateInput(getTodayDateInput(), 1) }}
+                    onPress={() => setDateValue(addDaysToDateInput(getTodayDateInput(), 1))} style={styles.dateShortcut} activeOpacity={0.7}>
+                    <Text style={styles.dateShortcutText}>Amanhã</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* ------------------------------------------------
                 AÇÕES
@@ -241,18 +339,22 @@ export default function CreateTaskModal({
               >
                 {/* HORA */}
 
-                <View style={styles.actionPill}>
+                <TouchableOpacity style={styles.actionPill} activeOpacity={0.7}
+                  disabled={isBusy} accessibilityRole="button"
+                  accessibilityLabel={`Data: ${dateLabel}. Hora: ${timeLabel}`}
+                  accessibilityState={{ disabled: isBusy, expanded: dateEditorVisible }}
+                  onPress={() => setDateEditorVisible(value => !value || !isDateValid)}>
                   <Ionicons name="calendar-outline" size={17} color={colors.textSecondary} />
 
-                  <Text style={styles.actionText}>Hoje, {timeLabel}</Text>
-                </View>
+                  <Text style={styles.actionText}>{dateLabel}, {timeLabel}</Text>
+                </TouchableOpacity>
 
                 {/* DURAÇÃO */}
 
                 <TouchableOpacity
-                  disabled={isSaving}
+                  disabled={isBusy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityState={{ disabled: isBusy }}
                   accessibilityLabel={`Duração: ${formatDuration(duration)}`}
                   style={styles.actionPill}
                   activeOpacity={0.7}
@@ -268,9 +370,9 @@ export default function CreateTaskModal({
                 {/* CATEGORIA */}
 
                 <TouchableOpacity
-                  disabled={isSaving}
+                  disabled={isBusy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityState={{ disabled: isBusy }}
                   accessibilityLabel={`Categoria: ${selectedCategory.label}`}
                   style={styles.iconButton}
                   activeOpacity={0.7}
@@ -286,9 +388,9 @@ export default function CreateTaskModal({
                 {/* PRIORIDADE */}
 
                 <TouchableOpacity
-                  disabled={isSaving}
+                  disabled={isBusy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving }}
+                  accessibilityState={{ disabled: isBusy }}
                   accessibilityLabel={`Prioridade: ${selectedPriority.label}`}
                   style={styles.iconButton}
                   activeOpacity={0.7}
@@ -301,21 +403,6 @@ export default function CreateTaskModal({
                   />
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  disabled={isSaving}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving }}
-                  accessibilityLabel="Mais opções da tarefa"
-                  style={styles.iconButton}
-                  activeOpacity={0.7}
-                  onPress={handleMoreOptions}
-                >
-                  <MaterialCommunityIcons
-                    name="dots-horizontal"
-                    size={22}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
               </ScrollView>
 
               {/* ----------------------------------------------
@@ -327,31 +414,26 @@ export default function CreateTaskModal({
                 <View style={styles.saveRow}>
                   <TouchableOpacity
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: !title.trim() || isSaving, busy: isSaving }}
+                    accessibilityState={{ disabled: !title.trim() || !isDateValid || isBusy, busy: isSaving }}
                     accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
                     style={[
                       styles.saveButton,
-                      isSaving && styles.saveButtonDisabled,
+                      (isBusy || !isDateValid) && styles.saveButtonDisabled,
                     ]}
                     activeOpacity={0.7}
-                    disabled={isSaving}
+                    disabled={isBusy || !isDateValid}
                     onPress={handleSave}
                   >
                     <Text style={styles.saveButtonText}>
                       {isSaving ? 'A guardar…' : 'Criar'}
                     </Text>
 
-                    {!isSaving && (
-                      <Image
-                        source={require('../../../assets/abelha.png')}
-                        style={styles.saveBee}
-                      />
-                    )}
                   </TouchableOpacity>
                 </View>
               )}
             </View>
-          </View>
+            </ScrollView>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -378,9 +460,9 @@ export default function CreateTaskModal({
             >
               {DURATION_OPTIONS.map((item) => (
                 <TouchableOpacity
-                  disabled={isSaving}
+                  disabled={isBusy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving, selected: item === duration }}
+                  accessibilityState={{ disabled: isBusy, selected: item === duration }}
                   key={item}
                   style={styles.pickerRow}
                   activeOpacity={0.7}
@@ -429,9 +511,9 @@ export default function CreateTaskModal({
 
             {priorityOptions.map((item) => (
               <TouchableOpacity
-                disabled={isSaving}
+                disabled={isBusy}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: isSaving, selected: item.id === priority }}
+                accessibilityState={{ disabled: isBusy, selected: item.id === priority }}
                 key={item.id ?? 'none'}
                 style={styles.pickerRow}
                 activeOpacity={0.7}
@@ -475,14 +557,14 @@ export default function CreateTaskModal({
           style={styles.pickerOverlay}
           onPress={() => setCategoryPickerVisible(false)}
         >
-          <View style={styles.categoryCard}>
+          <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Categoria</Text>
 
             {categoryOptions.map((item) => (
               <TouchableOpacity
-                disabled={isSaving}
+                disabled={isBusy}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: isSaving, selected: item.id === categoryId }}
+                accessibilityState={{ disabled: isBusy, selected: item.id === categoryId }}
                 key={item.id}
                 style={styles.categoryRow}
                 activeOpacity={0.7}
@@ -522,52 +604,25 @@ export default function CreateTaskModal({
    STYLES
 ------------------------------------------------------- */
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors) => {
+  const sheetStyles = createTaskSheetStyles(colors);
+  return StyleSheet.create({
   /* ---------------------------------------------------
        MODAL
     --------------------------------------------------- */
 
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
+  overlay: { ...sheetStyles.overlay, justifyContent: 'flex-end' },
 
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
+  backdrop: sheetStyles.backdrop,
 
-    backgroundColor: colors.backdrop,
-  },
+  sheet: { ...sheetStyles.surface, maxHeight: '100%' },
+  topBar: sheetStyles.topBar,
+  dragZone: { ...sheetStyles.dragZone, height: 44 },
+  expandHandle: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  contentScroll: { flexGrow: 0, flexShrink: 1 },
+  content: { ...sheetStyles.content, paddingBottom: 12 },
 
-  sheet: {
-    backgroundColor: colors.surface,
-
-    paddingHorizontal: 16,
-    paddingTop: 10,
-
-    paddingBottom: Platform.OS === 'ios' ? 18 : 12,
-
-    borderTopLeftRadius: 22,
-
-    borderTopRightRadius: 22,
-
-    borderWidth: 1,
-    borderBottomWidth: 0,
-
-    borderColor: colors.border,
-  },
-
-  handle: {
-    alignSelf: 'center',
-
-    width: 42,
-    height: 4,
-
-    borderRadius: 2,
-
-    backgroundColor: colors.taskCardMuted,
-
-    marginBottom: 14,
-  },
+  handle: sheetStyles.handle,
 
   /* ---------------------------------------------------
        INPUTS
@@ -604,6 +659,15 @@ const createStyles = (colors) => StyleSheet.create({
   /* ---------------------------------------------------
        AÇÕES
     --------------------------------------------------- */
+
+  dateEditor: { marginTop: 8, marginBottom: 4 },
+  dateLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 6 },
+  dateInput: { minHeight: 44, color: colors.text, backgroundColor: colors.input,
+    borderRadius: 10, paddingHorizontal: 12, fontSize: 15 },
+  dateError: { color: colors.danger, fontSize: 12, marginTop: 6 },
+  dateShortcuts: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  dateShortcut: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  dateShortcutText: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
 
   actionsSection: {
     marginTop: 8,
@@ -662,19 +726,9 @@ const createStyles = (colors) => StyleSheet.create({
     marginTop: 8,
   },
   saveButton: {
-    height: 44,
-
+    ...sheetStyles.button,
     paddingHorizontal: 14,
-
-    flexDirection: 'row',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    gap: 7,
-
     borderRadius: 10,
-
     backgroundColor: colors.selection,
   },
 
@@ -685,19 +739,6 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.onAction,
-  },
-
-  saveBee: {
-    width: 21,
-    height: 21,
-
-    resizeMode: 'contain',
-
-    transform: [
-      {
-        rotate: '90deg',
-      },
-    ],
   },
 
   /* ---------------------------------------------------
@@ -725,18 +766,7 @@ const createStyles = (colors) => StyleSheet.create({
     paddingBottom: 24,
   },
 
-  categoryCard: {
-    backgroundColor: colors.surface,
 
-    borderTopLeftRadius: 20,
-
-    borderTopRightRadius: 20,
-
-    paddingHorizontal: 18,
-
-    paddingTop: 18,
-    paddingBottom: 24,
-  },
 
   pickerTitle: {
     fontSize: 17,
@@ -811,4 +841,5 @@ const createStyles = (colors) => StyleSheet.create({
 
     color: colors.text,
   },
-});
+  });
+};

@@ -88,6 +88,20 @@ time and duration even when visual text is hidden. Android status-bar icons foll
 the resolved app theme through the existing `expo-status-bar` dependency; no native
 navigation-bar styling or system-theme configuration is changed in this step.
 
+Task sheets share only presentation through `theme/styles/taskSheets.styles.js`:
+surface, backdrop, top corners (22 px), handle (42 × 4), content inset (18 px), and
+44-pixel buttons. Quick Create has no bee image or ellipsis action. Its handle
+alone owns vertical drag gestures: up transfers the unsaved draft into create
+details, down closes, and short/cancelled drags spring back. Tapping the labelled
+handle provides an accessible expansion alternative. Fields and horizontal options
+do not own the sheet gesture. Details keeps its existing expansion/close behavior.
+
+Quick Create date editing is inline with Today/Tomorrow shortcuts and a validated
+DD/MM/YYYY field. The initial civil date comes from the selected timeline slot,
+including slots after midnight. Save and expand carry the chosen civil date and
+slot time explicitly. Expansion preserves raw title/notes and never persists a
+task. Shared date-input helpers interpret stored dates without UTC conversion.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.

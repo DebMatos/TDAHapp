@@ -132,15 +132,18 @@ function formHandler(file, name, context) {
   return new Function('context', `with (context) { return ${expression}; }`)(context);
 }
 
-test('Quick Create handles rejected saves and keeps draft; more options blocked while saving', async () => {
-  const context = { title: ' Draft ', description: ' Notes ', duration: 30, categoryId: 'work', priority: 'high', isSaving: false,
+test('Quick Create handles rejected saves and keeps draft; expansion blocked while saving', async () => {
+  const context = { title: ' Draft ', description: ' Notes ', duration: 30, categoryId: 'work', priority: 'high', isSaving: false, isDateValid: true, transitioned: { current: false },
+    dateValue: '26/10/2026', dateInputToStorageDate: () => '2026-10-26', initialMinutes: 540,
+    formatTimeFromMinutes: () => '09:00', TIMELINE_START_MINUTES: 420,
+    get isBusy() { return this.isSaving; },
     setIsSaving: value => { context.isSaving = value; }, onSave: async () => { throw Error('storage'); } };
   await formHandler('CreateTaskModal', 'handleSave', context)();
   assert.equal(context.isSaving, false);
   assert.equal(context.title, ' Draft ');
   context.isSaving = true;
-  context.onMoreOptions = () => assert.fail('should not leave saving form');
-  formHandler('CreateTaskModal', 'handleMoreOptions', context)();
+  context.onExpand = () => assert.fail('should not leave saving form');
+  formHandler('CreateTaskModal', 'handleExpand', context)();
 });
 
 test('Details cannot save during delete and cannot delete during save', async () => {

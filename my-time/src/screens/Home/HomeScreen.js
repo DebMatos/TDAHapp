@@ -596,24 +596,20 @@ export default function TimelineScreen() {
     durationMinutes,
     categoryId,
     priority,
+    date,
+    startTime,
   }) => {
     setTaskError(null);
     try {
-      const startMins = targetSlotMinutes ?? TIMELINE_START_MINUTES;
-
-      const taskDate = getDateKey(
-        getCivilDateForTimelineSlot(selectedTimelineDate, startMins),
-      );
-
       await taskService.createTask({
         title,
         notes,
         categoryId: categoryId || 'inbox',
         priority,
 
-        date: taskDate,
+        date,
 
-        startTime: formatTimeFromMinutes(startMins),
+        startTime,
 
         durationMinutes,
       });
@@ -1065,6 +1061,9 @@ export default function TimelineScreen() {
         banner={banner}
         onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
+        initialDate={getDateKey(getCivilDateForTimelineSlot(
+          selectedTimelineDate, targetSlotMinutes ?? TIMELINE_START_MINUTES,
+        ))}
         onClose={() => {
           setTaskError(null);
           setModalVisible(false);
@@ -1072,22 +1071,10 @@ export default function TimelineScreen() {
           setTargetSlotMinutes(null);
         }}
         onSave={handleSaveTask}
-        onMoreOptions={(draft) => {
-          const startMinutes =
-            targetSlotMinutes ??
-            timeToMinutes(draft?.startTime, TIMELINE_START_MINUTES);
-
+        onExpand={(draft) => {
+          setTaskError(null);
           setDetailsMode('create');
-
-          setDetailsTask({
-            ...draft,
-            date:
-              draft?.date ||
-              getDateKey(
-                getCivilDateForTimelineSlot(selectedTimelineDate, startMinutes),
-              ),
-          });
-
+          setDetailsTask(draft);
           setModalVisible(false);
         }}
       />

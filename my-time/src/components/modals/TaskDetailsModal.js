@@ -20,6 +20,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
+import { createTaskSheetStyles } from '../../theme/styles/taskSheets.styles';
+import {
+  formatDateForInput, getTodayDateInput, formatDateInput, isValidDateInput,
+  dateInputToStorageDate, addDaysToDateInput, getDateDisplayLabel,
+} from '../../utils/taskDateInput';
 
 const DAY_MINUTES = 24 * 60;
 
@@ -186,99 +191,6 @@ const isValidTime = (value) => {
    DATE
 ------------------------------------------------------- */
 
-const formatDateForInput = (date) => {
-  const d = date instanceof Date ? date : new Date(date);
-
-  if (Number.isNaN(d.getTime())) {
-    return '';
-  }
-
-  const day = String(d.getDate()).padStart(2, '0');
-
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-
-  const year = d.getFullYear();
-
-  return `${day}/${month}/${year}`;
-};
-
-const getTodayDateInput = () => formatDateForInput(new Date());
-
-const formatDateInput = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-
-  if (digits.length <= 2) {
-    return digits;
-  }
-
-  if (digits.length <= 4) {
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  }
-
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-};
-
-const isValidDateInput = (value) => {
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-    return false;
-  }
-
-  const [day, month, year] = value.split('/').map(Number);
-
-  const date = new Date(year, month - 1, day);
-
-  return (
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day
-  );
-};
-
-const parseDateInput = (value) => {
-  if (!isValidDateInput(value)) {
-    return null;
-  }
-
-  const [day, month, year] = value.split('/').map(Number);
-
-  return new Date(year, month - 1, day);
-};
-
-const dateInputToStorageDate = (value) => {
-  if (!isValidDateInput(value)) {
-    return null;
-  }
-
-  const [day, month, year] = value.split('/');
-
-  return `${year}-${month}-${day}`;
-};
-const addDaysToDateInput = (value, days) => {
-  const date = parseDateInput(value);
-
-  if (!date) {
-    return value;
-  }
-
-  date.setDate(date.getDate() + days);
-
-  return formatDateForInput(date);
-};
-
-const getDateDisplayLabel = (value) => {
-  if (value === getTodayDateInput()) {
-    return 'Hoje';
-  }
-
-  const tomorrow = addDaysToDateInput(getTodayDateInput(), 1);
-
-  if (value === tomorrow) {
-    return 'Amanhã';
-  }
-
-  return value;
-};
-
 /* -------------------------------------------------------
    STATUS ICON
 ------------------------------------------------------- */
@@ -354,7 +266,7 @@ export default function TaskDetailsModal({
   const [status, setStatus] = useState('pending');
 
   const [priority, setPriority] = useState(null);
- 
+
   const [isEditingPriority, setIsEditingPriority] = useState(false);
 
   const [repeat, setRepeat] = useState('never');
@@ -1757,59 +1669,23 @@ const closeInlineEditor = () => {
    STYLES
 ------------------------------------------------------- */
 
-const createStyles = (colors) => StyleSheet.create({
-  overlay: {
-    flex: 1,
-  },
+const createStyles = (colors) => {
+  const sheetStyles = createTaskSheetStyles(colors);
+  return StyleSheet.create({
+  overlay: sheetStyles.overlay,
 
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
+  backdrop: sheetStyles.backdrop,
 
-    backgroundColor: colors.backdrop,
-  },
+  sheet: { ...sheetStyles.surface, position: 'absolute', left: 0, right: 0 },
 
-  sheet: {
-    position: 'absolute',
+  topBar: sheetStyles.topBar,
 
-    left: 0,
-    right: 0,
+  dragZone: sheetStyles.dragZone,
 
-    backgroundColor: colors.surface,
-
-    borderTopLeftRadius: 22,
-
-    borderTopRightRadius: 22,
-
-    overflow: 'hidden',
-  },
-
-  topBar: {
-    height: 44,
-
-    position: 'relative',
-
-    justifyContent: 'center',
-  },
-
-  dragZone: {
-    height: 38,
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-  },
-
-  handle: {
-    width: 42,
-
-    height: 4,
-
-    borderRadius: 2,
-
-    backgroundColor: colors.taskCardMuted,
-  },
+  handle: sheetStyles.handle,
 
   saveIconButton: {
+    ...sheetStyles.button,
     position: 'absolute',
 
     right: 14,
@@ -1817,12 +1693,6 @@ const createStyles = (colors) => StyleSheet.create({
     top: 0,
 
     width: 44,
-
-    height: 44,
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
 
     borderRadius: 17,
   },
@@ -1836,7 +1706,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 18,
+    ...sheetStyles.content,
 
     paddingTop: 2,
 
@@ -2383,7 +2253,7 @@ const createStyles = (colors) => StyleSheet.create({
     fontWeight: '600',
 
     color: colors.danger,
-  },  
+  },
 
   /* PRIORITY */
 
@@ -2408,5 +2278,5 @@ const createStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     gap: 18,
   },
-
-});
+  });
+};
