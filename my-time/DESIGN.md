@@ -80,6 +80,14 @@ The existing modal dismissal and drag gestures are unchanged. Failed writes leav
 the draft open; error banners remain owned by the parent. Delete has its own busy
 state and cannot run alongside save. No new confirmation or navigation is added.
 
+Task cards keep their category accent in every status and zoom variant. Completed
+and abandoned cards retain neutral surfaces and their existing text/status marks.
+Card dimensions and gesture thresholds remain unchanged; tiny cards do not receive
+overlapping enlarged hit regions. Screen-reader labels include category, status,
+time and duration even when visual text is hidden. Android status-bar icons follow
+the resolved app theme through the existing `expo-status-bar` dependency; no native
+navigation-bar styling or system-theme configuration is changed in this step.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.

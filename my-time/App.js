@@ -15,7 +15,13 @@ import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { DrawerNavContent } from './src/components/DrawerNavContent';
+import { StatusBar } from 'expo-status-bar';
 const Drawer = createDrawerNavigator();
+
+function ThemeStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
 
 function AppContent() {
   const { colors, isDark } = useTheme();
@@ -128,6 +134,7 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
+      <ThemeStatusBar />
       <AppContent />
     </ThemeProvider>
   );

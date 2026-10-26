@@ -115,7 +115,7 @@ export default function TaskCardClean({
   const category = getCategory(categoryId, colors);
 
   const cardBackground = isNeutralized ? colors.taskCardNeutral : category.surface;
-  const accentColor = isNeutralized ? colors.taskCardMuted : category.color;
+  const accentColor = category.color;
 
   const titleColor = isAbandoned ? colors.textFaint : colors.text;
   const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
@@ -245,6 +245,7 @@ const priorityColor =
   const startTimeStr = formatTimeFromMinutes(startMinutes);
   const endTimeStr = formatTimeFromMinutes(startMinutes + duration);
   const durationStr = formatDuration(duration);
+  const statusLabel = isCompleted ? 'Concluída' : isAbandoned ? 'Abandonada' : 'Pendente';
 
   /* -------------------------------------------------------
      ÍCONE DE ESTADO
@@ -290,6 +291,8 @@ const priorityColor =
         />
 
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
           style={StyleSheet.absoluteFill}
           onPress={() => {
             if (!isDragActive.current) {
@@ -327,6 +330,8 @@ const priorityColor =
         <View style={[styles.taskTinyBar, { backgroundColor: accentColor }]} />
 
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
           style={styles.tinyClickArea}
           onPress={() => {
             if (!isDragActive.current) {
@@ -379,6 +384,8 @@ const priorityColor =
         />
 
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
           style={styles.compactClickArea}
           onPress={() => {
             if (!isDragActive.current) {
@@ -402,6 +409,9 @@ const priorityColor =
 
         {showCheckbox && (
           <TouchableOpacity
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isCompleted }}
+            accessibilityLabel={`Conclusão de ${task.title}. Estado: ${statusLabel}.`}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => onToggle(task.id)}
             style={[
@@ -441,6 +451,8 @@ const priorityColor =
       <View style={[styles.taskAccentBar, { backgroundColor: accentColor }]} />
 
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
         style={styles.taskBody}
         onPress={() => {
           if (!isDragActive.current) {
@@ -494,6 +506,9 @@ const priorityColor =
 
       {showCheckbox && (
         <TouchableOpacity
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isCompleted }}
+          accessibilityLabel={`Conclusão de ${task.title}. Estado: ${statusLabel}.`}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           onPress={() => onToggle(task.id)}
           style={[
