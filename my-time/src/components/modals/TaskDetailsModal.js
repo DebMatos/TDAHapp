@@ -18,8 +18,8 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { categoryOptions, getCategory } from '../../config/categories';
-import colors from '../../theme/colors';
+import { getCategory, getCategoryOptions } from '../../config/categories';
+import { useTheme } from '../../theme/ThemeContext';
 
 const DAY_MINUTES = 24 * 60;
 
@@ -75,7 +75,7 @@ const STATUS_OPTIONS = [
   },
 ];
 
-const PRIORITY_OPTIONS = [
+const getPriorityOptions = (colors) => [
   {
     id: null,
     label: 'Sem prioridade',
@@ -102,13 +102,12 @@ const PRIORITY_OPTIONS = [
   },
 ];
 
-const getPriorityLabel = (priority) =>
-  PRIORITY_OPTIONS.find((item) => item.id === priority)?.label ??
+const getPriorityLabel = (priority, options) =>
+  options.find((item) => item.id === priority)?.label ??
   'Sem prioridade';
 
-const getPriorityColor = (priority) =>
-  PRIORITY_OPTIONS.find((item) => item.id === priority)?.color ??
-  colors.textMuted;
+const getPriorityColor = (priority, options, colors) =>
+  options.find((item) => item.id === priority)?.color ?? colors.textMuted;
 
 /* -------------------------------------------------------
    HELPERS
@@ -285,6 +284,8 @@ const getDateDisplayLabel = (value) => {
 ------------------------------------------------------- */
 
 function StatusIcon({ type, selected }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const iconColor = selected ? colors.selectionText : colors.textMuted;
 
   return (
@@ -320,6 +321,10 @@ export default function TaskDetailsModal({
   onDismissBanner,
   onDelete,
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
+  const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const isEdit = mode === 'edit';
 
   const [isSaving, setIsSaving] = useState(false);
@@ -381,7 +386,7 @@ export default function TaskDetailsModal({
   const sheetBottom = useRef(new Animated.Value(0)).current;
 
   const dragStartHeightRef = useRef(NORMAL_SHEET_HEIGHT);
-  const selectedCategory = useMemo(() => getCategory(categoryId), [categoryId]);
+  const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
 
   const currentSnapshot = useMemo(
     () =>
@@ -1475,16 +1480,16 @@ const closeInlineEditor = () => {
                 <Ionicons
                   name="flag-outline"
                   size={20}
-                  color={getPriorityColor(priority)}
+                  color={getPriorityColor(priority, priorityOptions, colors)}
                 />
 
                 <Text style={styles.priorityRestText}>
-                  {getPriorityLabel(priority)}
+                  {getPriorityLabel(priority, priorityOptions)}
                 </Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.priorityOptionsRow}>
-                {PRIORITY_OPTIONS.map((item) => {
+                {priorityOptions.map((item) => {
                   const selected = item.id === priority;
 
                   return (
@@ -1675,7 +1680,7 @@ const closeInlineEditor = () => {
    STYLES
 ------------------------------------------------------- */
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   overlay: {
     flex: 1,
   },
@@ -1683,7 +1688,7 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
 
-    backgroundColor: 'rgba(32, 28, 25, 0.30)',
+    backgroundColor: colors.backdrop,
   },
 
   sheet: {
@@ -1724,7 +1729,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 2,
 
-    backgroundColor: '#C8C2BE',
+    backgroundColor: colors.taskCardMuted,
   },
 
   saveIconButton: {
@@ -2042,9 +2047,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#EAE6E2',
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#D8D1CC',
+    borderColor: colors.border,
   },
 
   postponeButtonSelected: {

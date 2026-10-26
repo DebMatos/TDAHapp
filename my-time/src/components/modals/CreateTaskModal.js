@@ -17,15 +17,15 @@ import {
 
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { categoryOptions, getCategory } from '../../config/categories';
-import colors from '../../theme/colors';
+import { getCategory, getCategoryOptions } from '../../config/categories';
+import { useTheme } from '../../theme/ThemeContext';
 /* -------------------------------------------------------
    OPÇÕES
 ------------------------------------------------------- */
 
 const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
-const PRIORITY_OPTIONS = [
+const getPriorityOptions = (colors) => [
   { id: null, label: 'Sem prioridade', color: colors.textMuted },
   { id: 'low', label: 'Baixa', color: colors.categories.exercise.color },
   { id: 'medium', label: 'Média', color: colors.categories.personal.color },
@@ -75,6 +75,10 @@ export default function CreateTaskModal({
   onMoreOptions,
   initialMinutes = null,
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
+  const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const [title, setTitle] = useState('');
 
   const [description, setDescription] = useState('');
@@ -93,9 +97,9 @@ export default function CreateTaskModal({
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const selectedCategory = useMemo(() => getCategory(categoryId), [categoryId]);
+  const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
 
-  const selectedPriority = PRIORITY_OPTIONS.find((item) => item.id === priority);
+  const selectedPriority = priorityOptions.find((item) => item.id === priority);
   /* -------------------------------------------------------
      RESET AO ABRIR
   ------------------------------------------------------- */
@@ -200,7 +204,7 @@ export default function CreateTaskModal({
               value={title}
               onChangeText={setTitle}
               placeholder="O que vais fazer?"
-              placeholderTextColor="#A79F99"
+              placeholderTextColor={colors.placeholder}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={handleSave}
@@ -213,7 +217,7 @@ export default function CreateTaskModal({
               value={description}
               onChangeText={setDescription}
               placeholder="Descrição (opcional)"
-              placeholderTextColor="#A79F99"
+              placeholderTextColor={colors.placeholder}
               multiline
             />
 
@@ -231,7 +235,7 @@ export default function CreateTaskModal({
                 {/* HORA */}
 
                 <View style={styles.actionPill}>
-                  <Ionicons name="calendar-outline" size={17} color="#4E4844" />
+                  <Ionicons name="calendar-outline" size={17} color={colors.textSecondary} />
 
                   <Text style={styles.actionText}>Hoje, {timeLabel}</Text>
                 </View>
@@ -243,7 +247,7 @@ export default function CreateTaskModal({
                   activeOpacity={0.75}
                   onPress={() => setDurationPickerVisible(true)}
                 >
-                  <Ionicons name="timer-outline" size={17} color="#4E4844" />
+                  <Ionicons name="timer-outline" size={17} color={colors.textSecondary} />
 
                   <Text style={styles.actionText}>
                     {formatDuration(duration)}
@@ -286,7 +290,7 @@ export default function CreateTaskModal({
                   <MaterialCommunityIcons
                     name="dots-horizontal"
                     size={22}
-                    color="#57504B"
+                    color={colors.textSecondary}
                   />
                 </TouchableOpacity>
               </ScrollView>
@@ -368,7 +372,7 @@ export default function CreateTaskModal({
                   </Text>
 
                   {item === duration && (
-                    <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                    <Ionicons name="checkmark" size={20} color={colors.selectionText} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -394,7 +398,7 @@ export default function CreateTaskModal({
           <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Prioridade</Text>
 
-            {PRIORITY_OPTIONS.map((item) => (
+            {priorityOptions.map((item) => (
               <TouchableOpacity
                 key={item.id ?? 'none'}
                 style={styles.pickerRow}
@@ -417,7 +421,7 @@ export default function CreateTaskModal({
                 </View>
 
                 {item.id === priority && (
-                  <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                  <Ionicons name="checkmark" size={20} color={colors.selectionText} />
                 )}
               </TouchableOpacity>
             ))}
@@ -468,7 +472,7 @@ export default function CreateTaskModal({
                 </View>
 
                 {item.id === categoryId && (
-                  <Ionicons name="checkmark" size={20} color="#4F75E2" />
+                  <Ionicons name="checkmark" size={20} color={colors.selectionText} />
                 )}
               </TouchableOpacity>
             ))}
@@ -483,7 +487,7 @@ export default function CreateTaskModal({
    STYLES
 ------------------------------------------------------- */
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   /* ---------------------------------------------------
        MODAL
     --------------------------------------------------- */
@@ -496,11 +500,11 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
 
-    backgroundColor: 'rgba(32, 28, 25, 0.34)',
+    backgroundColor: colors.backdrop,
   },
 
   sheet: {
-    backgroundColor: '#FFFDFC',
+    backgroundColor: colors.surface,
 
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -514,7 +518,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderBottomWidth: 0,
 
-    borderColor: '#EEE8E4',
+    borderColor: colors.border,
   },
 
   handle: {
@@ -525,7 +529,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 2,
 
-    backgroundColor: '#C8C2BE',
+    backgroundColor: colors.taskCardMuted,
 
     marginBottom: 14,
   },
@@ -539,14 +543,14 @@ const styles = StyleSheet.create({
 
     borderRadius: 12,
 
-    backgroundColor: '#F7F4F2',
+    backgroundColor: colors.surfaceSoft,
 
     paddingHorizontal: 12,
 
     fontSize: 17,
     fontWeight: '500',
 
-    color: '#2F2A27',
+    color: colors.text,
 
     marginBottom: 4,
   },
@@ -559,7 +563,7 @@ const styles = StyleSheet.create({
 
     fontSize: 14,
 
-    color: '#5B544F',
+    color: colors.textSecondary,
   },
 
   /* ---------------------------------------------------
@@ -586,7 +590,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 10,
 
-    backgroundColor: '#F4F1EF',
+    backgroundColor: colors.surfaceSoft,
 
     flexDirection: 'row',
     alignItems: 'center',
@@ -598,7 +602,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
 
-    color: '#4E4844',
+    color: colors.textSecondary,
   },
 
   iconButton: {
@@ -610,7 +614,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
 
-    backgroundColor: '#F4F1EF',
+    backgroundColor: colors.surfaceSoft,
   },
 
   /* ---------------------------------------------------
@@ -636,7 +640,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 10,
 
-    backgroundColor: '#F4F1EF',
+    backgroundColor: colors.selection,
   },
 
   saveButtonDisabled: {
@@ -645,7 +649,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#403B37',
+    color: colors.onAction,
   },
 
   saveBee: {
@@ -670,11 +674,11 @@ const styles = StyleSheet.create({
 
     justifyContent: 'flex-end',
 
-    backgroundColor: 'rgba(32, 28, 25, 0.28)',
+    backgroundColor: colors.backdrop,
   },
 
   pickerCard: {
-    backgroundColor: '#FFFDFC',
+    backgroundColor: colors.surface,
 
     borderTopLeftRadius: 20,
 
@@ -687,7 +691,7 @@ const styles = StyleSheet.create({
   },
 
   categoryCard: {
-    backgroundColor: '#FFFDFC',
+    backgroundColor: colors.surface,
 
     borderTopLeftRadius: 20,
 
@@ -704,7 +708,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '700',
 
-    color: '#2F2A27',
+    color: colors.text,
 
     marginBottom: 10,
   },
@@ -724,19 +728,19 @@ const styles = StyleSheet.create({
 
     borderBottomWidth: StyleSheet.hairlineWidth,
 
-    borderBottomColor: '#E8E2DE',
+    borderBottomColor: colors.borderSoft,
   },
 
   pickerRowText: {
     fontSize: 15,
 
-    color: '#625A55',
+    color: colors.textSecondary,
   },
 
   pickerRowTextActive: {
     fontWeight: '700',
 
-    color: '#2F2A27',
+    color: colors.text,
   },
 
   categoryRow: {
@@ -750,7 +754,7 @@ const styles = StyleSheet.create({
 
     borderBottomWidth: StyleSheet.hairlineWidth,
 
-    borderBottomColor: '#E8E2DE',
+    borderBottomColor: colors.borderSoft,
   },
 
   categoryLeft: {
@@ -764,12 +768,12 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 15,
 
-    color: '#625A55',
+    color: colors.textSecondary,
   },
 
   categoryTextActive: {
     fontWeight: '700',
 
-    color: '#2F2A27',
+    color: colors.text,
   },
 });

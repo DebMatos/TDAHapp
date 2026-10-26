@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function AuthScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,7 +74,7 @@ export default function AuthScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="Email"
-          placeholderTextColor="#A0958E"
+          placeholderTextColor={colors.placeholder}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
@@ -82,7 +85,7 @@ export default function AuthScreen() {
           value={password}
           onChangeText={setPassword}
           placeholder="Password"
-          placeholderTextColor="#A0958E"
+          placeholderTextColor={colors.placeholder}
           secureTextEntry
           autoCapitalize="none"
           autoComplete="password"
@@ -95,7 +98,7 @@ export default function AuthScreen() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.onAction} />
           ) : (
             <Text style={styles.primaryButtonText}>
               Iniciar sessão
@@ -117,12 +120,12 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#FFFDF9',
+    backgroundColor: colors.background,
   },
 
   card: {
@@ -132,24 +135,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '700',
-    color: '#403B37',
+    color: colors.text,
   },
 
   subtitle: {
     marginBottom: 16,
     fontSize: 15,
     lineHeight: 21,
-    color: '#8A827C',
+    color: colors.textMuted,
   },
 
   input: {
     height: 50,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#E7E3DF',
+    borderColor: colors.border,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    color: '#403B37',
+    backgroundColor: colors.input,
+    color: colors.text,
   },
 
   primaryButton: {
@@ -158,13 +161,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    backgroundColor: '#3A9BB7',
+    backgroundColor: colors.action,
   },
 
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onAction,
   },
 
   secondaryButton: {
@@ -176,6 +179,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#3A9BB7',
+    color: colors.action,
   },
 });
