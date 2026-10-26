@@ -62,8 +62,6 @@ import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
 const VERTICAL_PADDING = 20;
 
-const AXIS_WIDTH = 45;
-
 const TASK_CARD_LEFT = 56;
 
 const TASK_CARD_RIGHT = 22;
