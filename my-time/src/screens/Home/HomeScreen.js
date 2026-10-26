@@ -8,10 +8,8 @@ import React, {
 
 import {
   Image,
-  Modal,
   PanResponder,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   Alert,
@@ -29,6 +27,8 @@ import {
   timeToMinutes,
   snapMinutes,
 } from '../../utils/time';
+
+import {useNavigation} from '@react-navigation/native';
 
 import { getDateKey, isSameDay, addDays } from '../../utils/date';
 import * as taskService from '../../services/taskService';
@@ -238,7 +238,11 @@ const calculateOverlapColumns = (tasks) => {
 
 export default function TimelineScreen() {
   const { isDark } = useTheme();
+  const navigation = useNavigation();
+  const handleMenuPress = () => {
+        navigation.openDrawer();
 
+  };
   const { colors, themeMode, setThemeMode } = useTheme();
   const styles = getHomeScreenStyles(isDark);
   const buttonStyles = getFloatingButtonStyles(isDark);
@@ -269,9 +273,7 @@ export default function TimelineScreen() {
     });
   };
 
-  const handleMenuPress = () => {
-    setAppearanceVisible(true);
-  };
+
   const selectTheme = async (mode) => {
     try {
       await setThemeMode(mode);
@@ -847,7 +849,7 @@ export default function TimelineScreen() {
      RENDER
   ------------------------------------------------------- */
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <Header
         onMenuPress={handleMenuPress}
         selectedDate={selectedTimelineDate}
@@ -856,52 +858,7 @@ export default function TimelineScreen() {
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
-      <Modal
-        visible={appearanceVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAppearanceVisible(false)}
-      >
-        <View style={styles.appearanceOverlay}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Fechar opções de aparência"
-            style={StyleSheet.absoluteFill}
-            onPress={() => setAppearanceVisible(false)}
-          />
-          <View style={styles.appearanceCard}>
-            <Text style={styles.appearanceTitle}>Aparência</Text>
-            <Text style={styles.appearanceDescription}>
-              Escolhe como queres ver a app.
-            </Text>
-            {[
-              { mode: 'system', label: 'Seguir dispositivo' },
-              { mode: 'light', label: 'Claro' },
-              { mode: 'dark', label: 'Escuro' },
-            ].map(({ mode, label }) => (
-              <TouchableOpacity
-                key={mode}
-                accessibilityRole="button"
-                accessibilityState={{ selected: themeMode === mode }}
-                onPress={() => selectTheme(mode)}
-                style={styles.appearanceOption}
-              >
-                <Text style={styles.appearanceOptionText}>{label}</Text>
-                {themeMode === mode && (
-                  <Text style={styles.appearanceSelected}>Selecionado</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={confirmSignOut}
-              style={styles.appearanceSignOut}
-            >
-              <Text style={styles.appearanceSignOutText}>Terminar sessão</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+     
       <TaskBanner
         notice={!modalVisible && !detailsTask ? banner : null}
         onDismiss={dismissBanner}
@@ -1201,7 +1158,3 @@ export default function TimelineScreen() {
     </SafeAreaView>
   );
 }
-
-/* -------------------------------------------------------
-   STYLES
-------------------------------------------------------- */
