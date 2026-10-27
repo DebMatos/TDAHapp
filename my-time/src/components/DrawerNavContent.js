@@ -13,13 +13,14 @@ import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TaskBanner from './TaskBanner';
+import { CustomThemeToggle } from './ThemeToggle';
+
 export function DrawerNavContent(props) {
   const { colors, themeMode, setThemeMode, isDark } = useTheme();
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const themeOptions = [
-    { label: 'Automático (Sistema)', value: 'system', icon: 'hardware-chip-outline' },
     { label: 'Modo Claro', value: 'light', icon: 'sunny-outline' },
     { label: 'Modo Escuro', value: 'dark', icon: 'moon-outline' },
   ];
@@ -68,62 +69,18 @@ export function DrawerNavContent(props) {
           <Text style={[styles.appTitle, { color: colors.text }]}>My Time</Text>
         </View>
 
-        {/* Secção de Aparência / Tema */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-            APARÊNCIA
-          </Text>
+      <View style={styles.body}>
+        
+      
+      </View> 
+         <View style={styles.appearanceRow}>
+           <Text style={[styles.sectionTitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
+             Tema
+           </Text>
+           <CustomThemeToggle />
+         </View>
 
-          {themeOptions.map((option) => {
-            const isSelected = themeMode === option.value;
-            return (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.optionRow,
-                  {
-                    backgroundColor: isSelected
-                      ? isDark
-                        ? colors.surfaceSoft
-                        : colors.surfaceMuted
-                      : 'transparent',
-                    borderColor: isSelected ? colors.selectionIndicator : 'transparent',
-                  },
-                ]}
-                onPress={() => handleThemeChange(option.value)}
-                disabled={busy}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected, disabled: busy }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.optionLeft}>
-                  <Ionicons
-                    name={option.icon}
-                    size={20}
-                    color={isSelected ? colors.text : colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      {
-                        color: colors.text,
-                        fontWeight: isSelected ? '600' : '400',
-                      },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </View>
-
-                {isSelected && (
-                  <Ionicons name="checkmark" size={18} color={colors.selectionIndicator} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </DrawerContentScrollView>
-
       {/* Rodapé do Menu (Terminar Sessão) */}
       <View style={[styles.footer, { borderTopColor: colors.borderSoft }]}>
         <TouchableOpacity
@@ -207,5 +164,30 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  appearanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginVertical: 8,
+    gap: 12,
+
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  textMutedLight: {
+    color: '#64748b',
+  },
+  textMutedDark: {
+    color: '#a1a1aa',
   },
 });
