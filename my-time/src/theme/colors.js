@@ -52,6 +52,16 @@ export const lightColors = {
   taskCardMuted: '#C7BFB9',
   taskCardBorder: '#E7E3DF',
 
+  themeToggle: {
+    track: '#F4F4F5',
+    border: '#E4E4E7',
+    label: '#A1A1AA',
+    thumb: '#EFECE6',
+    thumbBorder: '#EAB308',
+    icon: '#EAB308',
+    shadow: '#000000',
+  },
+
   floatingButton: {
   background: '#FFFDFC',
   border: '#E3DDD7',
@@ -105,6 +115,16 @@ export const darkColors = {
   taskCardNeutral: '#302D29',
   taskCardMuted: '#827A73',
   taskCardBorder: '#403B36',
+
+  themeToggle: {
+    track: '#18181B',
+    border: '#27272A',
+    label: '#A1A1AA',
+    thumb: '#1C1C1E',
+    thumbBorder: '#EAB308',
+    icon: '#FACC15',
+    shadow: '#EAB308',
+  },
 
   floatingButton: {
   background: '#302D29',

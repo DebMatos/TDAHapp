@@ -16,30 +16,9 @@ import TaskBanner from './TaskBanner';
 import { CustomThemeToggle } from './ThemeToggle';
 
 export function DrawerNavContent(props) {
-  const { colors, themeMode, setThemeMode, isDark } = useTheme();
+  const { colors } = useTheme();
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
-
-  const themeOptions = [
-    { label: 'Modo Claro', value: 'light', icon: 'sunny-outline' },
-    { label: 'Modo Escuro', value: 'dark', icon: 'moon-outline' },
-  ];
-
-  const handleThemeChange = async (mode) => {
-    if (busy) return;
-    setNotice(null);
-    setBusy(true);
-    try {
-      await setThemeMode(mode);
-    } catch {
-      setNotice({
-        title: 'A preferência de tema não ficou guardada',
-        message: 'O tema foi aplicado nesta sessão, mas pode não ser mantido ao reabrir a aplicação. Tenta selecionar o tema novamente.',
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handleSignOut = async () => {
     if (busy) return;
@@ -69,16 +48,18 @@ export function DrawerNavContent(props) {
           <Text style={[styles.appTitle, { color: colors.text }]}>My Time</Text>
         </View>
 
-      <View style={styles.body}>
-        
-      
-      </View> 
-         <View style={styles.appearanceRow}>
-           <Text style={[styles.sectionTitle, isDark ? styles.textMutedDark : styles.textMutedLight]}>
-             Tema
-           </Text>
-           <CustomThemeToggle />
-         </View>
+        <View style={styles.appearanceRow}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            Tema
+          </Text>
+          <CustomThemeToggle
+            disabled={busy}
+            onSaveError={() => setNotice({
+              title: 'A preferência de tema não ficou guardada',
+              message: 'O tema foi aplicado nesta sessão, mas pode não ser mantido ao reabrir a aplicação. Tenta selecionar o tema novamente.',
+            })}
+          />
+        </View>
 
       </DrawerContentScrollView>
       {/* Rodapé do Menu (Terminar Sessão) */}
@@ -119,38 +100,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  appSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 4,
-    borderWidth: 1,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  optionLabel: {
-    fontSize: 14,
-  },
   footer: {
     padding: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -164,10 +113,6 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  container: {
-    flex: 1,
-    padding: 16,
   },
   appearanceRow: {
     flexDirection: 'row',
@@ -183,11 +128,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
-  },
-  textMutedLight: {
-    color: '#64748b',
-  },
-  textMutedDark: {
-    color: '#a1a1aa',
   },
 });

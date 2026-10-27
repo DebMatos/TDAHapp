@@ -1,26 +1,31 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
 import { darkColors, lightColors } from './colors';
 
 const THEME_STORAGE_KEY = '@tdahapp/theme-mode';
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const systemMode = useColorScheme();
-  const [themeMode, setThemeModeState] = useState('system');
+  const [themeMode, setThemeModeState] = useState('dark');
   const didSetThemeRef = useRef(false);
 
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(THEME_STORAGE_KEY)
-      .then((storedMode) => {
+      .then(async (storedMode) => {
         if (!active || didSetThemeRef.current) return;
         if (storedMode === null) return;
-        if (['system', 'light', 'dark'].includes(storedMode)) {
+        if (storedMode === 'system') {
+          setThemeModeState('light');
+          try {
+            await AsyncStorage.setItem(THEME_STORAGE_KEY, 'light');
+          } catch (error) {
+            console.warn('[Theme] Falha ao migrar preferência:', error);
+          }
+        } else if (['light', 'dark'].includes(storedMode)) {
           setThemeModeState(storedMode);
         } else {
-          console.warn('[Theme] Preferência de tema inválida; a usar o tema do dispositivo.');
+          console.warn('[Theme] Preferência de tema inválida; a usar o tema escuro.');
         }
       })
       .catch((error) => {
@@ -32,7 +37,7 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const setThemeMode = useCallback(async (nextMode) => {
-    if (!['system', 'light', 'dark'].includes(nextMode)) {
+    if (!['light', 'dark'].includes(nextMode)) {
       throw new Error(`Modo de tema inválido: ${nextMode}`);
     }
     didSetThemeRef.current = true;
@@ -45,7 +50,7 @@ export function ThemeProvider({ children }) {
     }
   }, []);
 
-  const isDark = themeMode === 'dark' || (themeMode === 'system' && systemMode === 'dark');
+  const isDark = themeMode === 'dark';
   const colors = isDark ? darkColors : lightColors;
   const value = useMemo(
     () => ({ colors, themeMode, setThemeMode, isDark }),

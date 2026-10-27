@@ -1,58 +1,73 @@
-import React, { useEffect, useRef } from 'react';
-import { Pressable, View, Text, StyleSheet, Animated, Image } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Pressable, View, Text, StyleSheet, Animated } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import Icon from 'react-native-vector-icons/Feather';
-import { lightColors, darkColors } from '../theme/colors';
+import { Feather } from '@expo/vector-icons';
 
 const TOGGLE_METRICS = {
   trackWidth: 89, // Largura total do toggle
   trackHeight: 35, // Altura total
   thumbSize: 30, // Tamanho da bola
+  borderWidth: 1,
   padding: 2, // Espaçamento da bola às bordas
 };
 
-const getTranslateRange = ({ trackWidth, thumbSize, padding }) => {
-  const minX = padding;
-  const maxX = trackWidth - thumbSize - padding;
-  return [minX, maxX - 6];
-};
+// The thumb starts after the track border and padding in normal layout.
+const thumbTravel = TOGGLE_METRICS.trackWidth - TOGGLE_METRICS.thumbSize
+  - 2 * (TOGGLE_METRICS.padding + TOGGLE_METRICS.borderWidth);
 
-export const CustomThemeToggle = () => {
-  const { isDark, setThemeMode } = useTheme();
-  const theme = isDark ? darkColors : lightColors;
+export const CustomThemeToggle = ({ disabled = false, onSaveError }) => {
+  const { colors, isDark, setThemeMode } = useTheme();
+  const theme = colors.themeToggle;
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // 0 = Claro, 1 = Escuro
   const animValue = useRef(new Animated.Value(isDark ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(animValue, {
+    const animation = Animated.timing(animValue, {
       toValue: isDark ? 1 : 0,
       duration: 220,
-      useNativeDriver: false,
-    }).start();
-  }, [isDark]);
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [animValue, isDark]);
 
-  const handlePress = () => {
-    const nextTheme = isDark ? 'light' : 'dark';
-    setThemeMode(nextTheme);
+  const handlePress = async () => {
+    if (disabled || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await setThemeMode(isDark ? 'light' : 'dark');
+    } catch {
+      onSaveError?.();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
-  const [minX, maxX] = getTranslateRange(TOGGLE_METRICS);
 
   const translateX = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [minX, maxX],
+    outputRange: [0, thumbTravel],
   });
 
   return (
     <Pressable
       onPress={handlePress}
-      style={[styles.track, isDark ? styles.trackDark : styles.trackLight]}
+      disabled={disabled || saving}
+      accessibilityRole="switch"
+      accessibilityLabel="Tema escuro"
+      accessibilityHint="Alterna entre os temas claro e escuro"
+      accessibilityState={{ checked: isDark, disabled: disabled || saving, busy: saving }}
+      style={[styles.track, { backgroundColor: theme.track, borderColor: theme.border }]}
     >
       {/* Texto no fundo da cápsula */}
-      <View style={styles.labelsContainer}>
-        <Text style={[styles.labelText, isDark ? styles.textVisible : styles.textHidden]}>
+      <View style={styles.labelsContainer} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text style={[styles.labelText, { color: theme.label }, isDark ? styles.textVisible : styles.textHidden]}>
           Escuro
         </Text>
-        <Text style={[styles.labelText, !isDark ? styles.textVisible : styles.textHidden]}>
+        <Text style={[styles.labelText, { color: theme.label }, !isDark ? styles.textVisible : styles.textHidden]}>
           Claro
         </Text>
       </View>
@@ -62,10 +77,11 @@ export const CustomThemeToggle = () => {
         style={[
           styles.thumb,
           isDark ? styles.thumbDark : styles.thumbLight,
+          { backgroundColor: theme.thumb, borderColor: theme.thumbBorder, shadowColor: theme.shadow },
           { transform: [{ translateX }] },
         ]}
       >
-        <Icon name={isDark ? 'moon' : 'sun'} size={14} color={isDark ? '#FACC15' : '#EAB308'} />
+        <Feather name={isDark ? 'moon' : 'sun'} size={14} color={theme.icon} />
       </Animated.View>
     </Pressable>
   );
@@ -80,27 +96,14 @@ const styles = StyleSheet.create({
     padding: TOGGLE_METRICS.padding,
     justifyContent: 'center',
     position: 'relative',
-    borderWidth: 1,
+    borderWidth: TOGGLE_METRICS.borderWidth,
   },
-  // 1. Cápsula no modo claro: Fundo neutro com borda suave
-  trackLight: {
-    backgroundColor: '#F4F4F5', // Um cinza quente/neutro (Zinc-100)
-    borderColor: '#E4E4E7', // Borda subtil
-  },
-
   thumbLight: {
-    backgroundColor: lightColors.surfaceMuted, // Branco puro',
     borderWidth: 1.5,
-    borderColor: '#EAB308', 
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-  },
-  trackDark: {
-    backgroundColor: '#18181b',
-    borderColor: '#27272a',
   },
 
   // Alinhamento do texto "Claro" / "Escuro"
@@ -120,7 +123,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   textVisible: {
-    color: '#a1a1aa',
     opacity: 1,
   },
   textHidden: {
@@ -136,10 +138,7 @@ const styles = StyleSheet.create({
   },
 
   thumbDark: {
-    backgroundColor: '#1c1c1e',
     borderWidth: 1.5,
-    borderColor: '#eab308', 
-    shadowColor: '#eab308',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 3,

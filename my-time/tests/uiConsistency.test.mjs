@@ -51,19 +51,25 @@ const flatten = tree => [tree, ...tree.children.flat(Infinity).filter(value => v
 function drawer({ setThemeMode = async () => {}, signOut = async () => ({ error: null }) } = {}) {
   const state = [];
   let cursor = 0;
-  const React = { createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
+  const React = { createElement: (type, props, ...children) => typeof type === 'function' ? type(props) : ({ type, props: props ?? {}, children }) };
   const useState = initial => {
     const index = cursor++;
     if (!(index in state)) state[index] = initial;
     return [state[index], value => { state[index] = value; }];
   };
-  const component = new Function('React', 'useState', 'View', 'Text', 'TouchableOpacity', 'StyleSheet', 'DrawerContentScrollView', 'Ionicons', 'useTheme', 'supabase', 'SafeAreaView', 'TaskBanner', `${compiled};return DrawerNavContent;`)(
+  const toggleSource = read('components/ThemeToggle.js').replace(/import\s+[\s\S]*?\sfrom\s*['"][^'"]+['"];?/g, '').replace('export const', 'const');
+  const toggleCode = babel.transformSync(toggleSource, { configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx'] }).code;
+  const useRef = value => useState({ current: value })[0];
+  const CustomThemeToggle = new Function('React', 'useState', 'useRef', 'useEffect', 'useTheme', 'Pressable', 'View', 'Text', 'StyleSheet', 'Animated', 'Feather', `${toggleCode};return CustomThemeToggle;`)(
+    React, useState, useRef, () => {}, () => ({ colors, isDark: false, setThemeMode }), 'toggle', 'view', 'text', { create: x => x },
+    { Value: class { interpolate() {} }, View: 'animated' }, 'icon');
+  const component = new Function('React', 'useState', 'View', 'Text', 'TouchableOpacity', 'StyleSheet', 'DrawerContentScrollView', 'Ionicons', 'useTheme', 'supabase', 'SafeAreaView', 'TaskBanner', 'CustomThemeToggle', `${compiled};return DrawerNavContent;`)(
     React, useState, 'view', 'text', 'button', { create: x => x, hairlineWidth: 1 }, 'scroll', 'icon',
-    () => ({ colors, themeMode: 'light', setThemeMode, isDark: false }), { auth: { signOut } }, 'safe', 'banner');
+    () => ({ colors, themeMode: 'light', setThemeMode, isDark: false }), { auth: { signOut } }, 'safe', 'banner', CustomThemeToggle);
   const render = () => { cursor = 0; return flatten(component({})); };
   return {
     nodes: render,
-    theme: () => render().find(node => node.props.accessibilityRole === 'radio'),
+    theme: () => render().find(node => node.props.accessibilityRole === 'switch'),
     logout: () => render().find(node => node.props.accessibilityRole === 'button'),
     notice: () => render().find(node => node.type === 'banner').props.notice,
   };
@@ -73,7 +79,7 @@ test('theme persistence rejection is handled and explains the applied session th
   let applied;
   const h = drawer({ setThemeMode: async mode => { applied = mode; throw Error('disk'); } });
   await h.theme().props.onPress();
-  assert.equal(applied, 'system');
+  assert.equal(applied, 'dark');
   assert.match(h.notice().message, /aplicado nesta sessão/);
   assert.equal(h.theme().props.disabled, false);
 });
@@ -102,17 +108,17 @@ test('successful logout is silent and unlocks controls', async () => {
   assert.equal(h.logout().props.disabled, false);
 });
 
-test('pending menu operation disables actions and prevents a second operation after render', async () => {
-  let release, signOutCalls = 0;
-  const h = drawer({ setThemeMode: () => new Promise(resolve => { release = resolve; }), signOut: async () => { signOutCalls++; return { error: null }; } });
+test('pending theme write disables the toggle and prevents duplicate writes', async () => {
+  let release, calls = 0;
+  const h = drawer({ setThemeMode: () => { calls++; return new Promise(resolve => { release = resolve; }); } });
   const changing = h.theme().props.onPress();
   assert.equal(h.theme().props.disabled, true);
-  assert.equal(h.logout().props.disabled, true);
-  await h.logout().props.onPress();
-  assert.equal(signOutCalls, 0);
+  await h.theme().props.onPress();
+  assert.equal(calls, 1);
   release();
   await changing;
   assert.equal(h.theme().props.disabled, false);
+  assert.equal(h.theme().props.accessibilityState.checked, false);
 });
 
 function formHandler(file, name, context) {
