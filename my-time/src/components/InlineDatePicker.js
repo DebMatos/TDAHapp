@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { createTaskSheetStyles } from '../theme/styles/taskSheets.styles';
 import { formatDateForInput, getTodayDateInput, isValidDateInput } from '../utils/taskDateInput';
@@ -12,14 +11,12 @@ const WEEKDAYS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
 
 export default function InlineDatePicker({ value, onSelect, onClose, disabled = false }) {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [month, setMonth] = useState(() => {
     const [, monthNumber, year] = (isValidDateInput(value) ? value : getTodayDateInput()).split('/').map(Number);
     return new Date(year, monthNumber - 1, 1);
   });
   const offset = useRef(new Animated.Value(48)).current;
-  const scrollRef = useRef(null);
 
   useEffect(() => {
     // Only this panel's translation moves; sheet geometry remains JS-owned.
@@ -36,13 +33,12 @@ export default function InlineDatePicker({ value, onSelect, onClose, disabled = 
 
   const moveMonth = (delta) => {
     setMonth(new Date(year, monthIndex + delta, 1));
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   return (
     <Animated.View
       testID="inline-date-picker"
-      style={[styles.panel, { paddingBottom: insets.bottom + 8, transform: [{ translateY: offset }] }]}
+      style={[styles.panel, { transform: [{ translateY: offset }] }]}
     >
       <View style={styles.header}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Mês anterior"
@@ -64,8 +60,6 @@ export default function InlineDatePicker({ value, onSelect, onClose, disabled = 
           <Ionicons name="close" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
-      <ScrollView ref={scrollRef} style={styles.daysScroll} keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled>
         <View style={styles.grid}>
           {WEEKDAYS.map((day, index) => (
             <View key={`weekday-${index}`} style={styles.weekday} accessible={false}>
@@ -86,7 +80,6 @@ export default function InlineDatePicker({ value, onSelect, onClose, disabled = 
             );
           })}
         </View>
-      </ScrollView>
     </Animated.View>
   );
 }
@@ -96,7 +89,6 @@ const createStyles = (colors) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   control: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   month: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600', textAlign: 'center' },
-  daysScroll: { flexShrink: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, height: 28, alignItems: 'center', justifyContent: 'center' },
   weekdayText: { color: colors.textMuted, fontSize: 12 },

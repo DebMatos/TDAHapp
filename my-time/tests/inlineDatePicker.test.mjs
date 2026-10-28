@@ -81,18 +81,17 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
   });
 }
 
-test('entry translates only the picker, cleanup cancels it and navigation keeps safe-area space', () => {
+test('entry translates only the inline calendar without a separate surface or nested scroll', () => {
   const h = harness(darkColors, '01/01/2027');
   const animation = h.animations[0];
   assert.equal(animation.started, true);
   assert.equal(animation.config.useNativeDriver, true);
   assert.equal(animation.config.toValue, 0);
   const panel = h.render()[0];
-  assert.equal(panel.props.style[0].maxHeight, '55%');
-  assert.equal(panel.props.style[0].flexShrink, 1);
-  assert.equal(panel.props.style[1].paddingBottom, 32);
+  assert.equal(panel.props.style[0].maxHeight, undefined);
+  assert.equal(panel.props.style[0].backgroundColor, undefined);
   assert.deepEqual(Object.keys(panel.props.style[1].transform[0]), ['translateY']);
-  assert.equal(h.render().find(n => n.type === 'scroll').props.nestedScrollEnabled, true);
+  assert.equal(h.render().some(n => n.type === 'scroll'), false);
   h.cleanup(); assert.equal(animation.stopped, true);
 });
 

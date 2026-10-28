@@ -14,7 +14,7 @@ const compiled = babel.transformSync(clean(read('components/modals/TaskDetailsMo
 const nodes = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...tree.children.flat(Infinity).flatMap(nodes)];
 function harness(colors = lightColors, overrides = {}) {
   const slots = []; let cursor = 0;
-  const layouts = [], effects = [], listeners = {};
+  const layouts = [], effects = [], listeners = {}, geometry = [];
   const useState = initial => {
     const key = cursor++;
     if (!(key in slots)) slots[key] = typeof initial === 'function' ? initial() : initial;
@@ -30,9 +30,9 @@ function harness(colors = lightColors, overrides = {}) {
     React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect: fn => effects.push(fn),
     requestAnimationFrame: fn => fn(),
     useLayoutEffect: fn => layouts.push(fn),
-    useTheme: () => ({ colors }), ...dates, ...categories,
-    Animated: { Value: class { setValue() {} }, View: 'animated', spring: () => ({}),
-      parallel: () => ({ start() {}, stop() {} }) },
+    useTheme: () => ({ colors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates, ...categories,
+    Animated: { Value: class { setValue() {} }, View: 'animated', spring: (value, config) => ({ value, config }),
+      parallel: children => { geometry.push(children); return { start() {}, stop() {} }; } },
     Dimensions: { get: () => ({ height: 780 }) }, Keyboard: { dismiss() {},
       addListener: (event, fn) => { listeners[event] = fn; return { remove() { delete listeners[event]; } }; } },
     PanResponder: { create: () => ({ panHandlers: {} }) }, Platform: { OS: 'android' },
@@ -65,7 +65,7 @@ function harness(colors = lightColors, overrides = {}) {
     listeners[event]({ endCoordinates: { height } });
     cleanup();
   };
-  return { render, button, input, saved, props, reload, keyboard };
+  return { render, button, input, saved, props, reload, keyboard, geometry };
 }
 for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
   test(`${theme}: details open in reading state and selectors close after selection without saving`, () => {
@@ -218,4 +218,21 @@ test('calendar waits for Android keyboard hide and switching editors cancels the
   h.keyboard('keyboardDidHide');
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
   assert.ok(h.input('Hora de início'));
+});
+
+test('calendar is between schedule and category in the form scroll and expands to usable screen height', () => {
+  const h = harness();
+  h.button('Editar data').props.onPress();
+  assert.equal(h.geometry.at(-1)[0].config.toValue, 756); // 780 screen minus 24 top inset.
+  assert.equal(h.geometry.at(-1)[0].config.useNativeDriver, false);
+  const form = h.render().find(n => n.type === 'scroll');
+  const children = form.children.flat(Infinity).filter(n => n && typeof n === 'object');
+  const calendarIndex = children.findIndex(n => n.type === 'calendar');
+  assert.ok(calendarIndex > 0);
+  assert.ok(nodes(children[calendarIndex - 1]).some(n => n.props.accessibilityLabel === 'Editar data'));
+  assert.equal(children[calendarIndex + 1].props.accessibilityLabel, 'Editar categoria');
+  const animationCount = h.geometry.length;
+  children[calendarIndex].props.onSelect('05/04/2028');
+  assert.equal(h.geometry.length, animationCount); // Selecting never collapses the expanded sheet.
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
 });

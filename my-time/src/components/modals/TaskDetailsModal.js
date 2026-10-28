@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
 import { createTaskSheetStyles, TASK_DETAILS_HEIGHT_RATIO } from '../../theme/styles/taskSheets.styles';
@@ -32,8 +33,6 @@ const DAY_MINUTES = 24 * 60;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const NORMAL_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * TASK_DETAILS_HEIGHT_RATIO);
-
-const EXPANDED_SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.94);
 
 const MIN_SHEET_HEIGHT = 260;
 
@@ -238,6 +237,8 @@ export default function TaskDetailsModal({
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const EXPANDED_SHEET_HEIGHT = Math.max(MIN_SHEET_HEIGHT, SCREEN_HEIGHT - insets.top);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const isEdit = mode === 'edit';
 
@@ -543,7 +544,7 @@ export default function TaskDetailsModal({
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
 
-      const baseHeight = isExpanded
+      const baseHeight = isExpanded || activeField === 'date'
         ? EXPANDED_SHEET_HEIGHT
         : NORMAL_SHEET_HEIGHT;
 
@@ -554,7 +555,7 @@ export default function TaskDetailsModal({
       showSub.remove();
       hideSub.remove();
     };
-  }, [visible, isExpanded, isEditingTitle]);
+  }, [visible, isExpanded, isEditingTitle, activeField, EXPANDED_SHEET_HEIGHT]);
 
   /* -------------------------------------------------------
      FOCUS
@@ -976,6 +977,11 @@ export default function TaskDetailsModal({
   const openInlineEditor = (field) => {
     Keyboard.dismiss();
     setActiveField(field);
+    if (field === 'date') {
+      // Let the keyboard's hide event own geometry until it has gone away.
+      if (keyboardHeight > 0) setIsExpanded(true);
+      else animateSheetTo(true);
+    }
   };
 
   const canConfirmField =
@@ -1249,8 +1255,8 @@ export default function TaskDetailsModal({
 
           <ScrollView
             ref={scrollRef}
-            style={[styles.scroll, activeField === 'date' && styles.scrollWithDatePicker]}
-            contentContainerStyle={styles.scrollContent}
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(56, insets.bottom + 12) }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -1339,6 +1345,18 @@ export default function TaskDetailsModal({
             {/* SCHEDULE */}
 
             <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+
+            {visible && activeField === 'date' && keyboardHeight === 0 && (
+              <InlineDatePicker
+                value={dateValue}
+                disabled={isBusy}
+                onSelect={(date) => {
+                  updateDate(date);
+                  closeInlineEditor();
+                }}
+                onClose={closeInlineEditor}
+              />
+            )}
 
             {/* CATEGORY */}
 
@@ -1673,17 +1691,6 @@ export default function TaskDetailsModal({
               </TouchableOpacity>
             )}
           </ScrollView>
-          {visible && activeField === 'date' && keyboardHeight === 0 && (
-            <InlineDatePicker
-              value={dateValue}
-              disabled={isBusy}
-              onSelect={(date) => {
-                updateDate(date);
-                closeInlineEditor();
-              }}
-              onClose={closeInlineEditor}
-            />
-          )}
         </Animated.View>
       </View>
   );
@@ -1734,7 +1741,6 @@ const createStyles = (colors) => {
   scroll: {
     flex: 1,
   },
-  scrollWithDatePicker: { minHeight: 48 },
 
   scrollContent: {
     ...sheetStyles.content,

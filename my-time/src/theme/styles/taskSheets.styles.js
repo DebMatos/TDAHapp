@@ -18,13 +18,7 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
   handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.taskCardMuted },
   button: { height: 44, alignItems: 'center', justifyContent: 'center' },
   pickerPanel: {
-    backgroundColor: colors.surfaceSoft,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: 12,
-    paddingTop: 6,
-    maxHeight: '55%',
-    flexShrink: 1,
+    paddingVertical: 8,
   },
   actionButton: {
     borderRadius: 26,

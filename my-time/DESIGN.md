@@ -129,13 +129,14 @@ The sheet save action still owns persistence. Postponement actions share a compa
 including the existing Tomorrow shortcut. Read rows have no added surfaces or
 borders, and category, priority and status colors retain their semantic roles.
 
-Details date editing uses `InlineDatePicker` inside the sheet, below the scrolling
-form, without a second modal or native dialog. It has a Monday-first calendar,
+Details date editing uses `InlineDatePicker` inside the form scroll, immediately
+after the date/time/duration line and before category, without a second modal or native dialog. It has a Monday-first calendar,
 Portuguese month/year heading, month navigation, and no past/future date limit.
-Selection uses `selectionSoft`/`selectionText`, never yellow. The panel reuses
-`surfaceSoft`, has no border, and occupies real layout space capped at 55% of the
-sheet; its grid scrolls on small screens while its month/close controls stay fixed.
-It includes the Android bottom safe-area inset. Opening dismisses the keyboard;
+Selection uses `selectionSoft`/`selectionText`, never yellow. The calendar has no
+separate surface, border, height cap or internal scroll. Opening expands the sheet
+to the screen's usable height; title, handle and save stay fixed, while the calendar
+and other fields share the form scroll. Closing the calendar leaves the sheet expanded.
+The form respects the Android bottom safe-area inset. Opening dismisses the keyboard;
 the panel mounts only once the keyboard height is zero. Its entry animates only
 translation, independent of the existing JS-driven sheet geometry. Form scrolling
 keeps the calendar open; tapping the date again, closing, selecting a day, or opening
