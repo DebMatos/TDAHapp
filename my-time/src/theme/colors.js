@@ -21,7 +21,7 @@ export const lightColors = {
   borderSoft: '#EFECE6',
   input: '#FFFFFF',
   placeholder: '#756B64',
-  backdrop: 'rgba(32, 28, 25, 0.34)',
+  backdrop: 'rgba(16, 16, 20, 0.74)',
 
   selection: '#66734F',
   selectionSoft: '#F2F4EE',
@@ -85,7 +85,7 @@ export const darkColors = {
   borderSoft: '#35312D',
   input: '#252321',
   placeholder: '#938A82',
-  backdrop: 'rgba(0, 0, 0, 0.64)',
+  backdrop: 'rgba(0, 0, 0, 0.77)',
 
   selection: '#9AA582',
   selectionSoft: '#30352B',

@@ -241,11 +241,11 @@ export default function TimelineScreen() {
         navigation.openDrawer();
 
   };
-  const { colors, themeMode, setThemeMode } = useTheme();
+  const { colors, setThemeMode } = useTheme();
   const styles = getHomeScreenStyles(isDark);
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
-  const [appearanceVisible, setAppearanceVisible] = useState(false);
+  const [ setAppearanceVisible] = useState(false);
   const [taskError, setTaskError] = useState(null);
   const [syncNotice, setSyncNotice] = useState(null);
   const banner = taskError ?? syncNotice;

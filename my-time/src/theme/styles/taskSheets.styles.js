@@ -17,4 +17,56 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
   dragZone: { height: 38, alignItems: 'center', justifyContent: 'center' },
   handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.taskCardMuted },
   button: { height: 44, alignItems: 'center', justifyContent: 'center' },
+
+
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: colors.input,      // Fundo limpo em descanso
+    borderColor: colors.border,         // Borda subtil em descanso
+  },
+  chipSelected: {
+    backgroundColor: colors.selectionSoft || colors.surfaceSoft,
+    borderColor: colors.now,            // Anel amarelado/dourado idêntico ao mascote/toggle
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  chipTextSelected: {
+    fontWeight: '600',
+    color: colors.selectionText || colors.text,
+  },
+
+  // --- BOTÃO DE AÇÃO (GUARDA / SETA) ---
+  submitButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  submitButtonDisabled: {
+    backgroundColor: colors.surfaceMuted, // Fundo subtil desativado
+    borderColor: 'transparent',
+    elevation: 0,
+  },
+  submitButtonEnabled: {
+    backgroundColor: colors.action,       // Azul-petróleo ativo
+    borderColor: colors.now,              // Anel dourado em redor
+    elevation: 3,
+    shadowColor: colors.action,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
 });
+
