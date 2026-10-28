@@ -122,13 +122,25 @@ including slots after midnight. Save and expand carry the chosen civil date and
 slot time explicitly. Expansion preserves raw title/notes and never persists a
 task. Shared date-input helpers interpret stored dates without UTC conversion.
 
-Task Details presents properties as icon-and-label rows in both create and edit.
-Only one inline editor is open at a time. Existing selectors close on selection;
-text, date, time and custom duration use an explicit confirmation. Notes keep
-multiline input. Confirming a property changes the draft; the sheet save action
-still owns persistence. Postponement actions share a compact horizontal bar,
+Task Details keeps its title fixed and its date/time/duration in a compact
+horizontal line. Only one inline editor is open at a time. Text editors close on
+blur or switching fields; selectors close on selection. Notes keep multiline input.
+The sheet save action still owns persistence. Postponement actions share a compact horizontal bar,
 including the existing Tomorrow shortcut. Read rows have no added surfaces or
 borders, and category, priority and status colors retain their semantic roles.
+
+Details date editing uses `InlineDatePicker` inside the sheet, below the scrolling
+form, without a second modal or native dialog. It has a Monday-first calendar,
+Portuguese month/year heading, month navigation, and no past/future date limit.
+Selection uses `selectionSoft`/`selectionText`, never yellow. The panel reuses
+`surfaceSoft`, has no border, and occupies real layout space capped at 55% of the
+sheet; its grid scrolls on small screens while its month/close controls stay fixed.
+It includes the Android bottom safe-area inset. Opening dismisses the keyboard;
+the panel mounts only once the keyboard height is zero. Its entry animates only
+translation, independent of the existing JS-driven sheet geometry. Form scrolling
+keeps the calendar open; tapping the date again, closing, selecting a day, or opening
+another editor closes it. Remounting starts at the selected month. The existing
+date updater owns the postponement base and storage conversion remains unchanged.
 
 ## Do's and Don'ts
 

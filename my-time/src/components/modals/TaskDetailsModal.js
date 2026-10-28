@@ -1,4 +1,5 @@
 import TaskBanner from '../TaskBanner';
+import InlineDatePicker from '../InlineDatePicker';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -281,8 +282,6 @@ export default function TaskDetailsModal({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const titleInputRef = useRef(null);
-
-  const dateInputRef = useRef(null);
 
   const startInputRef = useRef(null);
 
@@ -580,14 +579,6 @@ export default function TaskDetailsModal({
   }, [visible, isEditingTitle]);
 
   useEffect(() => {
-    if (activeField === 'date') {
-      const timer = setTimeout(() => {
-        dateInputRef.current?.focus();
-      }, 60);
-
-      return () => clearTimeout(timer);
-    }
-
     if (activeField === 'time') {
       const timer = setTimeout(() => {
         startInputRef.current?.focus();
@@ -1001,28 +992,15 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   const renderScheduleLine = () => {
-    const dateContent =
-      activeField === 'date' ? (
-        <TextInput
-          editable={!isBusy}
-          accessibilityLabel="Data, dia mês e ano"
-          ref={dateInputRef}
-          style={styles.inlineDateInput}
-          value={dateValue}
-          onChangeText={updateDate}
-          keyboardType="number-pad"
-          onBlur={() => setActiveField((field) => field === 'date' ? null : field)}
-          maxLength={10}
-        />
-      ) : (
+    const dateContent = (
         <TouchableOpacity
           disabled={isBusy}
           accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
+          accessibilityState={{ disabled: isBusy, expanded: activeField === 'date' }}
           activeOpacity={0.7}
           style={styles.propertyTouch}
           accessibilityLabel="Editar data"
-          onPress={() => openInlineEditor('date')}
+          onPress={() => activeField === 'date' ? closeInlineEditor() : openInlineEditor('date')}
         >
           <Text style={styles.inlineDateText}>
             {getDateDisplayLabel(dateValue)}
@@ -1271,12 +1249,12 @@ export default function TaskDetailsModal({
 
           <ScrollView
             ref={scrollRef}
-            style={styles.scroll}
+            style={[styles.scroll, activeField === 'date' && styles.scrollWithDatePicker]}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            onScrollBeginDrag={closeInlineEditor}
+            onScrollBeginDrag={activeField === 'date' ? undefined : closeInlineEditor}
           >
             {/* POSTPONE */}
 
@@ -1695,6 +1673,17 @@ export default function TaskDetailsModal({
               </TouchableOpacity>
             )}
           </ScrollView>
+          {visible && activeField === 'date' && keyboardHeight === 0 && (
+            <InlineDatePicker
+              value={dateValue}
+              disabled={isBusy}
+              onSelect={(date) => {
+                updateDate(date);
+                closeInlineEditor();
+              }}
+              onClose={closeInlineEditor}
+            />
+          )}
         </Animated.View>
       </View>
   );
@@ -1745,6 +1734,7 @@ const createStyles = (colors) => {
   scroll: {
     flex: 1,
   },
+  scrollWithDatePicker: { minHeight: 48 },
 
   scrollContent: {
     ...sheetStyles.content,
@@ -1872,22 +1862,6 @@ const createStyles = (colors) => {
     fontWeight: '700',
 
     color: colors.selectionText,
-  },
-
-  inlineDateInput: {
-    width: 104,
-
-    minHeight: 44,
-
-    paddingHorizontal: 7,
-
-    paddingVertical: 4,
-
-    fontSize: 14,
-
-    fontWeight: '600',
-
-    color: colors.text,
   },
 
   inlineTimeEditor: {

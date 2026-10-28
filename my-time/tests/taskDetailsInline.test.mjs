@@ -14,7 +14,7 @@ const compiled = babel.transformSync(clean(read('components/modals/TaskDetailsMo
 const nodes = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...tree.children.flat(Infinity).flatMap(nodes)];
 function harness(colors = lightColors, overrides = {}) {
   const slots = []; let cursor = 0;
-  const layouts = [];
+  const layouts = [], effects = [], listeners = {};
   const useState = initial => {
     const key = cursor++;
     if (!(key in slots)) slots[key] = typeof initial === 'function' ? initial() : initial;
@@ -27,16 +27,19 @@ function harness(colors = lightColors, overrides = {}) {
   };
   const React = { createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
   const context = {
-    React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect() {},
+    React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect: fn => effects.push(fn),
+    requestAnimationFrame: fn => fn(),
     useLayoutEffect: fn => layouts.push(fn),
     useTheme: () => ({ colors }), ...dates, ...categories,
-    Animated: { Value: class { setValue() {} }, View: 'animated' },
-    Dimensions: { get: () => ({ height: 780 }) }, Keyboard: { dismiss() {} },
+    Animated: { Value: class { setValue() {} }, View: 'animated', spring: () => ({}),
+      parallel: () => ({ start() {}, stop() {} }) },
+    Dimensions: { get: () => ({ height: 780 }) }, Keyboard: { dismiss() {},
+      addListener: (event, fn) => { listeners[event] = fn; return { remove() { delete listeners[event]; } }; } },
     PanResponder: { create: () => ({ panHandlers: {} }) }, Platform: { OS: 'android' },
     StyleSheet: { create: x => x, hairlineWidth: 1 },
     createTaskSheetStyles: () => ({}), TASK_DETAILS_HEIGHT_RATIO: 0.78,
     Modal: 'modal', Pressable: 'pressable', ScrollView: 'scroll', Text: 'text',
-    TextInput: 'input', TouchableOpacity: 'button', View: 'view', Ionicons: 'icon', TaskBanner: 'banner',
+    TextInput: 'input', TouchableOpacity: 'button', View: 'view', Ionicons: 'icon', TaskBanner: 'banner', InlineDatePicker: 'calendar',
   };
   const component = new Function(...Object.keys(context), `${compiled}; return TaskDetailsModal;`)(...Object.values(context));
   const saved = [];
@@ -51,7 +54,18 @@ function harness(colors = lightColors, overrides = {}) {
     const result = render().find(n => n.type === 'input' && n.props.accessibilityLabel === label);
     assert.ok(result, `Missing input: ${label}`); return result;
   };
-  return { render, button, input, saved, props };
+  const reload = () => {
+    layouts.length = 0;
+    render();
+    layouts.splice(0).forEach(fn => fn());
+  };
+  const keyboard = (event, height = 0) => {
+    effects.length = 0; render();
+    const cleanup = effects.find(fn => fn.toString().includes('Keyboard.addListener'))();
+    listeners[event]({ endCoordinates: { height } });
+    cleanup();
+  };
+  return { render, button, input, saved, props, reload, keyboard };
 }
 for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
   test(`${theme}: details open in reading state and selectors close after selection without saving`, () => {
@@ -70,7 +84,7 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
     assert.equal(h.saved.length, 0);
   });
 }
-test('title and multiline notes confirm to labels; opening another field closes previous editor', async () => {
+test('title and multiline notes blur to labels; opening another field closes previous editor', async () => {
   const h = harness();
   h.button('Editar título da tarefa').props.onPress();
   h.input('Título da tarefa').props.onChangeText('Novo título');
@@ -79,7 +93,7 @@ test('title and multiline notes confirm to labels; opening another field closes 
   h.button('Editar notas').props.onPress();
   h.input('Notas').props.onChangeText('Linha 1\nLinha 2');
   assert.equal(h.input('Notas').props.multiline, true);
-  h.button('Confirmar notas').props.onPress();
+  h.input('Notas').props.onBlur();
   assert.equal(h.render().some(n => n.type === 'input'), false);
   h.button('Editar notas').props.onPress();
   h.button('Editar horário').props.onPress();
@@ -87,7 +101,7 @@ test('title and multiline notes confirm to labels; opening another field closes 
   h.input('Hora de início').props.onChangeText('1030');
   assert.equal(h.input('Hora de fim').props.value, '11:00');
   h.input('Hora de fim').props.onChangeText('1115');
-  h.button('Confirmar horário').props.onPress();
+  h.input('Hora de fim').props.onSubmitEditing();
   await h.button('Guardar tarefa').props.onPress();
   assert.equal(h.saved.length, 1);
   assert.equal(h.saved[0].title, 'Novo título');
@@ -95,19 +109,26 @@ test('title and multiline notes confirm to labels; opening another field closes 
   assert.equal(h.saved[0].startTime, '10:30');
   assert.equal(h.saved[0].durationMinutes, 45);
 });
-test('date confirmation rejects incomplete dates, then returns to reading after a valid date', () => {
-  const h = harness(); h.button('Editar data').props.onPress();
-  h.input('Data, dia mês e ano').props.onChangeText('31022027');
-  assert.equal(h.button('Confirmar data').props.disabled, true);
-  h.button('Confirmar data').props.onPress();
-  assert.equal(h.input('Data, dia mês e ano').props.value, '31/02/2027');
-  h.input('Data, dia mês e ano').props.onChangeText('02012027');
-  h.button('Confirmar data').props.onPress();
-  assert.ok(h.button('Editar data')); assert.equal(h.saved.length, 0);
+test('calendar toggles, updates only the draft and saves the civil date with the existing schedule', async () => {
+  const h = harness();
+  for (let i = 0; i < 3; i++) {
+    h.button('Editar data').props.onPress();
+    assert.equal(h.render().filter(n => n.type === 'calendar').length, 1);
+    h.button('Editar data').props.onPress();
+    assert.equal(h.render().filter(n => n.type === 'calendar').length, 0);
+  }
+  h.button('Editar data').props.onPress();
+  h.render().find(n => n.type === 'calendar').props.onSelect('29/02/2024');
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  assert.equal(h.saved.length, 0);
+  await h.button('Guardar tarefa').props.onPress();
+  assert.equal(h.saved[0].date, '2024-02-29');
+  assert.equal(h.saved[0].startTime, '09:00');
+  assert.equal(h.saved[0].durationMinutes, 30);
 });
-test('create details start in reading state and scrolling closes the editor without losing notes', () => {
+test('create details start editing title and scrolling closes the editor without losing notes', () => {
   const h = harness(lightColors, { mode: 'create', embedded: true });
-  assert.equal(h.render().some(n => n.type === 'input'), false);
+  assert.equal(h.input('Título da tarefa').props.value, 'Teste');
   h.button('Editar notas').props.onPress();
   h.input('Notas').props.onChangeText('Rascunho');
   h.render().find(n => n.type === 'scroll').props.onScrollBeginDrag();
@@ -126,22 +147,75 @@ test('postponement remains relative to original schedule and toggles off without
   action('+30 min').props.onPress();
   h.button('Editar horário').props.onPress();
   assert.equal(h.input('Hora de início').props.value, '09:30');
-  h.button('Confirmar horário').props.onPress();
+  h.input('Hora de fim').props.onSubmitEditing();
   action('+30 min').props.onPress();
   assert.equal(action('+30 min').props.accessibilityState.selected, false);
   h.button('Editar horário').props.onPress();
   assert.equal(h.input('Hora de início').props.value, '09:00');
   assert.equal(h.saved.length, 0);
 });
-test('duration preset closes immediately and custom duration confirms with updated end time', () => {
+test('duration preset closes immediately and custom duration blurs with updated end time', () => {
   const h = harness();
   h.button('Editar duração').props.onPress();
   const preset = h.render().find(n => n.type === 'button' && nodes(n).some(child => child.children.includes('1 h')));
   assert.ok(preset); preset.props.onPress();
   h.button('Editar duração').props.onPress();
   h.input('Duração em minutos').props.onChangeText('75');
-  h.button('Confirmar duração').props.onPress();
+  h.input('Duração em minutos').props.onBlur();
   h.button('Editar horário').props.onPress();
   assert.equal(h.input('Hora de fim').props.value, '10:15');
   assert.equal(h.saved.length, 0);
+});
+
+test('calendar remains while scrolling the form, closes on another editor and resets on reopen', () => {
+  const h = harness();
+  h.button('Editar título da tarefa').props.onPress();
+  const title = h.input('Título da tarefa');
+  h.button('Editar data').props.onPress();
+  title.props.onBlur(); // A delayed keyboard blur must not close the new picker.
+  assert.equal(h.render().some(n => n.type === 'input'), false);
+  assert.ok(h.render().find(n => n.type === 'calendar'));
+  const scroll = h.render().find(n => n.type === 'scroll');
+  assert.equal(scroll.props.onScrollBeginDrag, undefined);
+  h.button('Editar horário').props.onPress();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.button('Editar data').props.onPress();
+  h.render().find(n => n.type === 'calendar').props.onClose();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.button('Editar data').props.onPress();
+  h.props.visible = false; h.reload();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.props.visible = true; h.reload();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  assert.ok(h.button('Editar data'));
+});
+
+test('selecting a calendar date resets postponement base without changing time or duration', () => {
+  const h = harness();
+  h.button('Editar data').props.onPress();
+  h.render().find(n => n.type === 'calendar').props.onSelect('31/12/2028');
+  const tomorrow = h.button('Amanhã');
+  tomorrow.props.onPress();
+  h.button('Editar data').props.onPress();
+  assert.equal(h.render().find(n => n.type === 'calendar').props.value, '01/01/2029');
+  h.button('Editar horário').props.onPress();
+  assert.equal(h.input('Hora de início').props.value, '09:00');
+  assert.equal(h.input('Hora de fim').props.value, '09:30');
+});
+
+test('calendar waits for Android keyboard hide and switching editors cancels the pending opening', () => {
+  const h = harness(lightColors, { mode: 'create' });
+  h.keyboard('keyboardDidShow', 280);
+  h.button('Editar data').props.onPress();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.keyboard('keyboardDidHide');
+  assert.equal(h.render().some(n => n.type === 'calendar'), true);
+  h.button('Editar notas').props.onPress();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.keyboard('keyboardDidShow', 280);
+  h.button('Editar data').props.onPress();
+  h.button('Editar horário').props.onPress();
+  h.keyboard('keyboardDidHide');
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  assert.ok(h.input('Hora de início'));
 });
