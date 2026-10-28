@@ -581,13 +581,13 @@ export default function CreateTaskModal({
                         busy: isSaving,
                       }}
                       accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
-                          style={buttonStyles.floatingButton}
+                      style={[buttonStyles.floatingButton, styles.sheetActionButton]}
 
                       // disabled={!title.trim() || isBusy || !isDateValid}
                       onPress={handleSave}
                     >
                       <Ionicons
-                        name={isSaving ? 'hourglass-outline' : 'arrow-forward'}
+                        name={isSaving ? 'hourglass-outline' : 'arrow-up'}
                         size={22}
                         color={colors.text}
                       />
@@ -846,8 +846,9 @@ const createStyles = (colors) => {
 
       borderRadius: 10,
 
-      backgroundColor: colors.surfaceSoft,
-    borderColor: colors.now,            // Anel amarelado/dourado idêntico ao mascote/toggle
+      backgroundColor: colors.taskSheet.chipBackground,
+      borderWidth: 1,
+      borderColor: colors.taskSheet.chipBorder,
 
       flexDirection: 'row',
       alignItems: 'center',
@@ -871,8 +872,12 @@ const createStyles = (colors) => {
       alignItems: 'center',
       justifyContent: 'center',
 
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.taskSheet.chipBackground,
+      borderWidth: 1,
+      borderColor: colors.taskSheet.chipBorder,
     },
+
+    sheetActionButton: { elevation: 0, shadowOpacity: 0, shadowRadius: 0 },
 
     /* ---------------------------------------------------
        CRIAR
@@ -901,11 +906,11 @@ const createStyles = (colors) => {
 
       justifyContent: 'flex-end',
 
-      backgroundColor: colors.backdrop,
+      backgroundColor: colors.taskSheet.backdrop,
     },
 
     pickerCard: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.taskSheet.surface,
 
       borderTopLeftRadius: 20,
 

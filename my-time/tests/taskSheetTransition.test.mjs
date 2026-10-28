@@ -192,7 +192,7 @@ test('stable handle responder reads latest actions and immediately grows the she
 });
 
 test('Quick Create keeps the arrow submit button in the options row, without a text submit label', () => {
-  assert.ok(source.includes("'arrow-forward'"));
+  assert.ok(source.includes("'arrow-up'"));
   assert.equal(source.includes('saveRow'), false);
   assert.equal(source.includes('saveButtonText'), false);
   assert.ok(source.includes('expandedContent ||'));

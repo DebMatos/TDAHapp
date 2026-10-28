@@ -90,7 +90,14 @@ navigation-bar styling or system-theme configuration is changed in this step.
 
 Task sheets share presentation through `theme/styles/taskSheets.styles.js`:
 surface, backdrop, top corners (22 px), handle (42 × 4), content inset (18 px), and
-44-pixel buttons. Quick Create has no bee image or ellipsis action. Its handle
+44-pixel buttons.
+Their scoped `colors.taskSheet` tokens keep the dark backdrop black at 48%,
+sheet surface `#302E2B`, and Quick Create chips `#252421` with a 1 px
+`#34322F` outline. Picker surfaces and backdrops use the same sheet tokens;
+picker layout stays unchanged. Text fields have no borders. The circular Quick
+Create action retains its existing ring and geometry, uses an upward arrow,
+and has no elevation or shadow. The Home bee button keeps its existing style.
+Quick Create has no bee image or ellipsis action. Its handle
 alone captures touch immediately: the active handle widens and uses selection
 text color. Up grows the sheet with the finger, then animates to Details height;
 down closes, and short/cancelled drags spring back. The responder remains stable

@@ -5,9 +5,9 @@ export const TASK_DETAILS_HEIGHT_RATIO = 0.78;
 // Shared presentation only. Each sheet keeps its own height and gesture logic.
 export const createTaskSheetStyles = (colors) => StyleSheet.create({
   overlay: { flex: 1 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.backdrop },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.taskSheet.backdrop },
   surface: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.taskSheet.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     overflow: 'hidden',
@@ -26,9 +26,9 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: colors.input,      // Fundo limpo em descanso
-    borderColor: colors.border,         // Borda subtil em descanso
+    borderWidth: 1,
+    backgroundColor: colors.taskSheet.chipBackground,
+    borderColor: colors.taskSheet.chipBorder,
   },
   chipSelected: {
     backgroundColor: colors.selectionSoft || colors.surfaceSoft,
@@ -62,11 +62,8 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
   submitButtonEnabled: {
     backgroundColor: colors.action,       // Azul-petróleo ativo
     borderColor: colors.now,              // Anel dourado em redor
-    elevation: 3,
-    shadowColor: colors.action,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
+    elevation: 0,
+    shadowOpacity: 0,
   },
 });
 

@@ -22,6 +22,12 @@ export const lightColors = {
   input: '#FFFFFF',
   placeholder: '#756B64',
   backdrop: 'rgba(16, 16, 20, 0.74)',
+  taskSheet: {
+    backdrop: 'rgba(16, 16, 20, 0.74)',
+    surface: '#FFFDFC',
+    chipBackground: '#F6F3EE',
+    chipBorder: '#E3DDD7',
+  },
 
   selection: '#66734F',
   selectionSoft: '#F2F4EE',
@@ -86,6 +92,12 @@ export const darkColors = {
   input: '#252321',
   placeholder: '#938A82',
   backdrop: 'rgba(0, 0, 0, 0.77)',
+  taskSheet: {
+    backdrop: 'rgba(0, 0, 0, 0.48)',
+    surface: '#302E2B',
+    chipBackground: '#252421',
+    chipBorder: '#34322F',
+  },
 
   selection: '#9AA582',
   selectionSoft: '#30352B',
