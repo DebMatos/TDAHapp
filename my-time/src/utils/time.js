@@ -40,3 +40,24 @@ export const formatDuration = (minutes) => {
 
 export const snapMinutes = (minutes, step = SNAP_MINUTES) =>
   Math.round(minutes / step) * step;
+
+
+export const formatTimeInput = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
+
+export const isValidTime = (value) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [hours, minutes] = value.split(':').map(Number);
+
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};

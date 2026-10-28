@@ -143,6 +143,19 @@ keeps the calendar open; tapping the date again, closing, selecting a day, or op
 another editor closes it. Remounting starts at the selected month. The existing
 date updater owns the postponement base and storage conversion remains unchanged.
 
+Details start/end times use the same `InlineTimePicker`, inline after the schedule
+line. Its independent hour (00–23) and minute (00–59) wheels snap to 44-pixel rows
+with two neighbours visible on either side. Repeated cycles recenter without
+animation after settling, enabling circular scrolling; nested Android scrolls
+stay inside each wheel. Tapping the selected time opens one numeric HH:MM field.
+Formatting and validation live in `utils/time.js` and are shared with Details.
+Incomplete/invalid typing stays local to the picker; applying a valid time updates
+the task draft and both wheels. Wheel changes use the same value and handlers.
+Only one date/time/editor is active; switching start/end remounts the picker and
+discards unconfirmed text. Date and time pickers enter from above (negative Y to
+zero), occupy real space, and push the following fields down. Start/end/duration,
+postponement and save calculations remain owned by Details.
+
 ## Do's and Don'ts
 
 - Publish state only after persistence succeeds.

@@ -16,7 +16,7 @@ export default function InlineDatePicker({ value, onSelect, onClose, disabled = 
     const [, monthNumber, year] = (isValidDateInput(value) ? value : getTodayDateInput()).split('/').map(Number);
     return new Date(year, monthNumber - 1, 1);
   });
-  const offset = useRef(new Animated.Value(48)).current;
+  const offset = useRef(new Animated.Value(-48)).current;
 
   useEffect(() => {
     // Only this panel's translation moves; sheet geometry remains JS-owned.

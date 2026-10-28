@@ -1,5 +1,7 @@
 import TaskBanner from '../TaskBanner';
 import InlineDatePicker from '../InlineDatePicker';
+import InlineTimePicker from '../InlineTimePicker';
+import { formatTimeInput, isValidTime } from '../../utils/time';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -167,26 +169,6 @@ const formatDuration = (minutes) => {
    TIME
 ------------------------------------------------------- */
 
-const formatTimeInput = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-
-  if (digits.length <= 2) {
-    return digits;
-  }
-
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-};
-
-const isValidTime = (value) => {
-  if (!/^\d{2}:\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [hours, minutes] = value.split(':').map(Number);
-
-  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
-};
-
 /* -------------------------------------------------------
    DATE
 ------------------------------------------------------- */
@@ -283,8 +265,6 @@ export default function TaskDetailsModal({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const titleInputRef = useRef(null);
-
-  const startInputRef = useRef(null);
 
   const scrollRef = useRef(null);
 
@@ -544,7 +524,7 @@ export default function TaskDetailsModal({
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
 
-      const baseHeight = isExpanded || activeField === 'date'
+      const baseHeight = isExpanded || ['date', 'startTime', 'endTime'].includes(activeField)
         ? EXPANDED_SHEET_HEIGHT
         : NORMAL_SHEET_HEIGHT;
 
@@ -578,18 +558,6 @@ export default function TaskDetailsModal({
 
     return () => clearTimeout(timer);
   }, [visible, isEditingTitle]);
-
-  useEffect(() => {
-    if (activeField === 'time') {
-      const timer = setTimeout(() => {
-        startInputRef.current?.focus();
-      }, 60);
-
-      return () => clearTimeout(timer);
-    }
-
-    return undefined;
-  }, [activeField]);
 
   /* -------------------------------------------------------
      RESET
@@ -977,7 +945,7 @@ export default function TaskDetailsModal({
   const openInlineEditor = (field) => {
     Keyboard.dismiss();
     setActiveField(field);
-    if (field === 'date') {
+    if (['date', 'startTime', 'endTime'].includes(field)) {
       // Let the keyboard's hide event own geometry until it has gone away.
       if (keyboardHeight > 0) setIsExpanded(true);
       else animateSheetTo(true);
@@ -987,7 +955,7 @@ export default function TaskDetailsModal({
   const canConfirmField =
     activeField === 'title' ? Boolean(title.trim()) :
     activeField === 'date' ? isValidDateInput(dateValue) :
-    activeField === 'time' ? isValidTime(startTime) && isValidTime(endTime) : true;
+    true;
 
   const confirmInlineEditor = () => {
     if (!isBusy && canConfirmField) closeInlineEditor();
@@ -1014,60 +982,26 @@ export default function TaskDetailsModal({
         </TouchableOpacity>
       );
 
-    const timeContent =
-      activeField === 'time' ? (
-        <View style={styles.inlineTimeEditor}>
-          <TextInput
-            editable={!isBusy}
-            accessibilityLabel="Hora de início"
-            ref={startInputRef}
-            style={styles.inlineTimeInput}
-            value={startTime}
-            onBlur={() => requestAnimationFrame(() => {
-              if (!TextInput.State.currentlyFocusedInput()) {
-                setActiveField((field) => field === 'time' ? null : field);
-              }
-            })}
-            onChangeText={updateStartTime}
-            keyboardType="number-pad"
-            maxLength={5}
-          />
-
-          <Text style={styles.inlineArrow}>→</Text>
-
-          <TextInput
-            editable={!isBusy}
-            accessibilityLabel="Hora de fim"
-            style={styles.inlineTimeInput}
-            value={endTime}
-            onBlur={() => requestAnimationFrame(() => {
-              if (!TextInput.State.currentlyFocusedInput()) {
-                setActiveField((field) => field === 'time' ? null : field);
-              }
-            })}
-            onChangeText={updateEndTime}
-            keyboardType="number-pad"
-            maxLength={5}
-            onSubmitEditing={confirmInlineEditor}
-          />
-        </View>
-      ) : (
-        <TouchableOpacity
-          disabled={isBusy}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
-          activeOpacity={0.7}
-          style={styles.propertyTouch}
-          accessibilityLabel="Editar horário"
-          onPress={() => openInlineEditor('time')}
-        >
-          <Text style={styles.inlineTimeText}>
-            {startTime}
-            {'  →  '}
-            {endTime}
-          </Text>
-        </TouchableOpacity>
-      );
+    const timeContent = (
+      <View style={styles.inlineTimeEditor}>
+        {['startTime', 'endTime'].map((field, index) => (
+          <React.Fragment key={field}>
+            {index === 1 && <Text style={styles.inlineArrow}>→</Text>}
+            <TouchableOpacity
+              disabled={isBusy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isBusy, expanded: activeField === field }}
+              accessibilityLabel={index === 0 ? 'Editar hora de início' : 'Editar hora de fim'}
+              activeOpacity={0.7}
+              style={styles.propertyTouch}
+              onPress={() => activeField === field ? closeInlineEditor() : openInlineEditor(field)}
+            >
+              <Text style={styles.inlineTimeText}>{index === 0 ? startTime : endTime}</Text>
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
+      </View>
+    );
 
     const durationContent =
       activeField === 'duration' ? (
@@ -1260,7 +1194,7 @@ export default function TaskDetailsModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            onScrollBeginDrag={activeField === 'date' ? undefined : closeInlineEditor}
+            onScrollBeginDrag={['date', 'startTime', 'endTime'].includes(activeField) ? undefined : closeInlineEditor}
           >
             {/* POSTPONE */}
 
@@ -1354,6 +1288,17 @@ export default function TaskDetailsModal({
                   updateDate(date);
                   closeInlineEditor();
                 }}
+                onClose={closeInlineEditor}
+              />
+            )}
+
+            {visible && ['startTime', 'endTime'].includes(activeField) && (
+              <InlineTimePicker
+                key={activeField}
+                value={activeField === 'startTime' ? startTime : endTime}
+                label={activeField === 'startTime' ? 'Hora de início' : 'Hora de fim'}
+                disabled={isBusy}
+                onChange={activeField === 'startTime' ? updateStartTime : updateEndTime}
                 onClose={closeInlineEditor}
               />
             )}

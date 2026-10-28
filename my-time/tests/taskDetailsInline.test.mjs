@@ -8,6 +8,7 @@ const read = path => fs.readFileSync(new URL(`../src/${path}`, import.meta.url),
 const fromSource = source => import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const { lightColors, darkColors } = await fromSource(read('theme/colors.js'));
 const dates = await fromSource(read('utils/taskDateInput.js'));
+const times = await fromSource(read('utils/time.js').replace(/import[^;]+;/, 'const DAY_MINUTES = 1440, SNAP_MINUTES = 5;'));
 const clean = source => source.replace(/import\s+[\s\S]*?\sfrom\s*['"][^'"]+['"];?/g, '').replace(/export const /g, 'const ').replace('export default function', 'function');
 const categories = new Function('lightColors', `${clean(read('config/categories.js'))}; return { getCategory, getCategoryOptions };`)(lightColors);
 const compiled = babel.transformSync(clean(read('components/modals/TaskDetailsModal.js')), { configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx'] }).code;
@@ -30,7 +31,8 @@ function harness(colors = lightColors, overrides = {}) {
     React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect: fn => effects.push(fn),
     requestAnimationFrame: fn => fn(),
     useLayoutEffect: fn => layouts.push(fn),
-    useTheme: () => ({ colors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates, ...categories,
+    useTheme: () => ({ colors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates,
+    formatTimeInput: times.formatTimeInput, isValidTime: times.isValidTime, ...categories,
     Animated: { Value: class { setValue() {} }, View: 'animated', spring: (value, config) => ({ value, config }),
       parallel: children => { geometry.push(children); return { start() {}, stop() {} }; } },
     Dimensions: { get: () => ({ height: 780 }) }, Keyboard: { dismiss() {},
@@ -39,7 +41,7 @@ function harness(colors = lightColors, overrides = {}) {
     StyleSheet: { create: x => x, hairlineWidth: 1 },
     createTaskSheetStyles: () => ({}), TASK_DETAILS_HEIGHT_RATIO: 0.78,
     Modal: 'modal', Pressable: 'pressable', ScrollView: 'scroll', Text: 'text',
-    TextInput: 'input', TouchableOpacity: 'button', View: 'view', Ionicons: 'icon', TaskBanner: 'banner', InlineDatePicker: 'calendar',
+    TextInput: 'input', TouchableOpacity: 'button', View: 'view', Ionicons: 'icon', TaskBanner: 'banner', InlineDatePicker: 'calendar', InlineTimePicker: 'timePicker',
   };
   const component = new Function(...Object.keys(context), `${compiled}; return TaskDetailsModal;`)(...Object.values(context));
   const saved = [];
@@ -65,7 +67,8 @@ function harness(colors = lightColors, overrides = {}) {
     listeners[event]({ endCoordinates: { height } });
     cleanup();
   };
-  return { render, button, input, saved, props, reload, keyboard, geometry };
+  const timePicker = () => render().find(n => n.type === 'timePicker');
+  return { render, button, input, saved, props, reload, keyboard, geometry, timePicker };
 }
 for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
   test(`${theme}: details open in reading state and selectors close after selection without saving`, () => {
@@ -96,12 +99,13 @@ test('title and multiline notes blur to labels; opening another field closes pre
   h.input('Notas').props.onBlur();
   assert.equal(h.render().some(n => n.type === 'input'), false);
   h.button('Editar notas').props.onPress();
-  h.button('Editar horário').props.onPress();
+  h.button('Editar hora de início').props.onPress();
   assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Notas'), false);
-  h.input('Hora de início').props.onChangeText('1030');
-  assert.equal(h.input('Hora de fim').props.value, '11:00');
-  h.input('Hora de fim').props.onChangeText('1115');
-  h.input('Hora de fim').props.onSubmitEditing();
+  h.timePicker().props.onChange('10:30');
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker().props.value, '11:00');
+  h.timePicker().props.onChange('11:15');
+  h.timePicker().props.onClose();
   await h.button('Guardar tarefa').props.onPress();
   assert.equal(h.saved.length, 1);
   assert.equal(h.saved[0].title, 'Novo título');
@@ -145,13 +149,13 @@ test('postponement remains relative to original schedule and toggles off without
   action('+15 min').props.onPress();
   assert.equal(action('+15 min').props.accessibilityState.selected, true);
   action('+30 min').props.onPress();
-  h.button('Editar horário').props.onPress();
-  assert.equal(h.input('Hora de início').props.value, '09:30');
-  h.input('Hora de fim').props.onSubmitEditing();
+  h.button('Editar hora de início').props.onPress();
+  assert.equal(h.timePicker().props.value, '09:30');
+  h.timePicker().props.onClose();
   action('+30 min').props.onPress();
   assert.equal(action('+30 min').props.accessibilityState.selected, false);
-  h.button('Editar horário').props.onPress();
-  assert.equal(h.input('Hora de início').props.value, '09:00');
+  h.button('Editar hora de início').props.onPress();
+  assert.equal(h.timePicker().props.value, '09:00');
   assert.equal(h.saved.length, 0);
 });
 test('duration preset closes immediately and custom duration blurs with updated end time', () => {
@@ -162,8 +166,9 @@ test('duration preset closes immediately and custom duration blurs with updated 
   h.button('Editar duração').props.onPress();
   h.input('Duração em minutos').props.onChangeText('75');
   h.input('Duração em minutos').props.onBlur();
-  h.button('Editar horário').props.onPress();
-  assert.equal(h.input('Hora de fim').props.value, '10:15');
+  h.button('Editar hora de início').props.onPress();
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker().props.value, '10:15');
   assert.equal(h.saved.length, 0);
 });
 
@@ -177,7 +182,7 @@ test('calendar remains while scrolling the form, closes on another editor and re
   assert.ok(h.render().find(n => n.type === 'calendar'));
   const scroll = h.render().find(n => n.type === 'scroll');
   assert.equal(scroll.props.onScrollBeginDrag, undefined);
-  h.button('Editar horário').props.onPress();
+  h.button('Editar hora de início').props.onPress();
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
   h.button('Editar data').props.onPress();
   h.render().find(n => n.type === 'calendar').props.onClose();
@@ -198,9 +203,10 @@ test('selecting a calendar date resets postponement base without changing time o
   tomorrow.props.onPress();
   h.button('Editar data').props.onPress();
   assert.equal(h.render().find(n => n.type === 'calendar').props.value, '01/01/2029');
-  h.button('Editar horário').props.onPress();
-  assert.equal(h.input('Hora de início').props.value, '09:00');
-  assert.equal(h.input('Hora de fim').props.value, '09:30');
+  h.button('Editar hora de início').props.onPress();
+  assert.equal(h.timePicker().props.value, '09:00');
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker().props.value, '09:30');
 });
 
 test('calendar waits for Android keyboard hide and switching editors cancels the pending opening', () => {
@@ -214,10 +220,10 @@ test('calendar waits for Android keyboard hide and switching editors cancels the
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
   h.keyboard('keyboardDidShow', 280);
   h.button('Editar data').props.onPress();
-  h.button('Editar horário').props.onPress();
+  h.button('Editar hora de início').props.onPress();
   h.keyboard('keyboardDidHide');
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
-  assert.ok(h.input('Hora de início'));
+  assert.ok(h.timePicker());
 });
 
 test('calendar is between schedule and category in the form scroll and expands to usable screen height', () => {
@@ -235,4 +241,37 @@ test('calendar is between schedule and category in the form scroll and expands t
   children[calendarIndex].props.onSelect('05/04/2028');
   assert.equal(h.geometry.length, animationCount); // Selecting never collapses the expanded sheet.
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
+});
+
+test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
+  const h = harness();
+  h.button('Editar hora de início').props.onPress();
+  assert.equal(h.timePicker().props.label, 'Hora de início');
+  h.timePicker().props.onChange('23:50');
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker().props.label, 'Hora de fim');
+  assert.equal(h.timePicker().props.value, '00:20');
+  h.timePicker().props.onChange('00:10');
+  assert.equal(h.saved.length, 0);
+  await h.button('Guardar tarefa').props.onPress();
+  assert.equal(h.saved[0].startTime, '23:50');
+  assert.equal(h.saved[0].durationMinutes, 20);
+  assert.equal(h.saved[0].date, '2027-01-01');
+});
+
+test('date, start, end and duration remain mutually exclusive and reset when reopening', () => {
+  const h = harness();
+  h.button('Editar hora de início').props.onPress();
+  assert.ok(h.timePicker());
+  h.button('Editar data').props.onPress();
+  assert.equal(h.timePicker(), undefined);
+  assert.ok(h.render().some(n => n.type === 'calendar'));
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.render().some(n => n.type === 'calendar'), false);
+  h.button('Editar duração').props.onPress();
+  assert.equal(h.timePicker(), undefined);
+  h.button('Editar hora de início').props.onPress();
+  h.props.visible = false; h.reload();
+  h.props.visible = true; h.reload();
+  assert.equal(h.timePicker(), undefined);
 });
