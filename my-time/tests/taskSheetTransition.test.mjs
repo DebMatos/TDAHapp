@@ -198,7 +198,9 @@ test('Quick Create keeps the arrow submit button in the options row, without a t
   assert.ok(source.includes('expandedContent ||'));
   const details = read('components/modals/TaskDetailsModal.js');
   assert.ok(details.includes('if (embedded) return visible ? content : null'));
-  assert.ok(details.includes('autoFocus={!embedded}'));
+  assert.ok(details.includes("setActiveField(isEdit ? null : 'title')"));
+  assert.ok(details.includes('if (!visible || !isEditingTitle)'));
+  assert.equal(details.includes('autoFocus={!embedded}'), false);
 });
 
 // Completion is manually controlled so cancellation and delayed callbacks are observable.

@@ -97,6 +97,12 @@ sheet surface `#302E2B`, and Quick Create chips `#252421` with a 1 px
 picker layout stays unchanged. Text fields have no borders. The circular Quick
 Create action retains its existing ring and geometry, uses an upward arrow,
 and has no elevation or shadow. The Home bee button keeps its existing style.
+Both sheets use the shared `actionButton` presentation with a yellow ring in
+light and dark themes. Details keeps its header action position, uses a right
+arrow, and retains its validation and busy states. Its fixed title starts editing
+with focus in create mode; edit mode starts with the readable title. The existing
+title focus effect is the sole owner of programmatic focus, including embedded
+create details.
 Quick Create has no bee image or ellipsis action. Its handle
 alone captures touch immediately: the active handle widens and uses selection
 text color. Up grows the sheet with the finger, then animates to Details height;

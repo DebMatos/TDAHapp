@@ -17,6 +17,15 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
   dragZone: { height: 38, alignItems: 'center', justifyContent: 'center' },
   handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.taskCardMuted },
   button: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  actionButton: {
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: colors.now,
+    backgroundColor: colors.floatingButton.background,
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+  },
 
 
   chip: {

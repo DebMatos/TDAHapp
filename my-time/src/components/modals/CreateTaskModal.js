@@ -877,7 +877,7 @@ const createStyles = (colors) => {
       borderColor: colors.taskSheet.chipBorder,
     },
 
-    sheetActionButton: { elevation: 0, shadowOpacity: 0, shadowRadius: 0 },
+    sheetActionButton: sheetStyles.actionButton,
 
     /* ---------------------------------------------------
        CRIAR

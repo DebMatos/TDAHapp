@@ -247,7 +247,7 @@ export default function TaskDetailsModal({
   const [title, setTitle] = useState('');
 
   // One inline editor at a time; task values remain in their existing state.
-  const [activeField, setActiveField] = useState(null);
+  const [activeField, setActiveField] = useState(isEdit ? null : 'title');
   const isEditingTitle = activeField === 'title';
   const isEditingPriority = activeField === 'priority';
   const isEditingRepeat = activeField === 'repeat';
@@ -562,7 +562,7 @@ export default function TaskDetailsModal({
   ------------------------------------------------------- */
 
   useEffect(() => {
-    if (!isEditingTitle) {
+    if (!visible || !isEditingTitle) {
       return;
     }
 
@@ -577,7 +577,7 @@ export default function TaskDetailsModal({
     }, 80);
 
     return () => clearTimeout(timer);
-  }, [isEditingTitle]);
+  }, [visible, isEditingTitle]);
 
   useEffect(() => {
     if (activeField === 'date') {
@@ -608,8 +608,6 @@ export default function TaskDetailsModal({
     if (!visible) {
       return;
     }
-
-    setActiveField(null);
 
     setPostponeSelection(null);
 
@@ -694,7 +692,7 @@ export default function TaskDetailsModal({
 
     setRepeat(initialRepeat);
 
-    setActiveField(null);
+    setActiveField(isEdit ? null : 'title');
 
     setNotes(initialNotes);
 
@@ -731,7 +729,7 @@ export default function TaskDetailsModal({
         notes: initialNotes.trim(),
       }),
     );
-  }, [visible, initialValues]);
+  }, [visible, initialValues, isEdit]);
 
   /* -------------------------------------------------------
      SCHEDULE EDIT
@@ -1213,7 +1211,7 @@ export default function TaskDetailsModal({
               onPress={handleSave}
             >
               <Ionicons
-                name={isSaving ? 'hourglass-outline' : 'save-outline'}
+                name={isSaving ? 'hourglass-outline' : 'arrow-forward'}
                 size={22}
                 color={isSaving ? colors.textFaint : saveIconColor}
               />
@@ -1238,7 +1236,6 @@ export default function TaskDetailsModal({
                   style={[styles.titleInput, styles.editTitleInput]}
                   value={title}
                   onChangeText={setTitle}
-                  autoFocus={!embedded}
                   returnKeyType="done"
                   onBlur={() => setActiveField((field) => field === 'title' ? null : field)}
                   onSubmitEditing={confirmInlineEditor}
@@ -1730,6 +1727,7 @@ const createStyles = (colors) => {
 
   saveIconButton: {
     ...sheetStyles.button,
+    ...sheetStyles.actionButton,
     position: 'absolute',
 
     right: 14,
@@ -1738,7 +1736,6 @@ const createStyles = (colors) => {
 
     width: 44,
 
-    borderRadius: 17,
   },
 
   saveIconButtonDisabled: {
