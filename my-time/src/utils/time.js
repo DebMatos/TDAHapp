@@ -61,3 +61,27 @@ export const isValidTime = (value) => {
 
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 };
+
+export const splitTimeInput = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  const hourLength = Number(digits[0]) >= 3 ||
+    (digits.length >= 2 && Number(digits.slice(0, 2)) > 23) ? 1 : 2;
+  const hourComplete = digits.length >= hourLength;
+  const hours = hourComplete ? digits.slice(0, hourLength).padStart(2, '0') : digits;
+  const minutes = digits.slice(hourLength);
+  const candidate = `${hours}:${minutes.padStart(2, '0')}`;
+  const time = hourComplete && minutes.length > 0 && minutes.length <= 2 && isValidTime(candidate)
+    ? candidate : null;
+  const complete = Boolean(time) && (minutes.length === 2 || Number(minutes) >= 6);
+  return { hours, minutes, hourComplete, time, complete };
+};
+
+export const formatCompactTimeInput = (value) => {
+  const { hours, minutes } = splitTimeInput(value);
+  return minutes ? `${hours}:${minutes}` : hours;
+};
+
+export const parseCompactTimeInput = (value, completeOnly = false) => {
+  const result = splitTimeInput(value);
+  return completeOnly && !result.complete ? null : result.time;
+};

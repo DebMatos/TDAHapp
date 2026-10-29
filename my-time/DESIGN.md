@@ -146,11 +146,19 @@ date updater owns the postponement base and storage conversion remains unchanged
 Details start/end times use the same `InlineTimePicker`, inline after the schedule
 line. Its independent hour (00–23) and minute (00–59) wheels snap to 44-pixel rows
 with two neighbours visible on either side. Repeated cycles recenter without
-animation after settling, enabling circular scrolling; nested Android scrolls
-stay inside each wheel. Tapping the selected time opens one numeric HH:MM field.
+animation only near an outer cycle, enabling circular scrolling without jumping
+after every selection. Taps and typed values align to the nearest copy with a
+scroll animation; the initial native offset stays fixed; nested Android scrolls
+stay inside each wheel. Long-pressing the selected time opens one numeric HH:MM
+pair of communicating inputs in the central wheel row, one in each original
+number column, while neighbours remain visible. No numeric input is placed in
+the header. Tapping an input selects its digits for replacement; automatic focus
+transfer keeps the cursor after any transferred minute prefix. A short tap only selects
+the wheel value.
 Formatting and validation live in `utils/time.js` and are shared with Details.
-Incomplete/invalid typing stays local to the picker; applying a valid time updates
-the task draft and both wheels. Wheel changes use the same value and handlers.
+Incomplete/invalid typing stays local to the picker. Completing a valid HH:MM
+automatically updates the task draft and both wheels, ends numeric editing and
+dismisses the keyboard; no apply button is needed. Wheel changes use the same value and handlers.
 Only one date/time/editor is active; switching start/end remounts the picker and
 discards unconfirmed text. Date and time pickers enter from above (negative Y to
 zero), occupy real space, and push the following fields down. Start/end/duration,
@@ -162,3 +170,12 @@ postponement and save calculations remain owned by Details.
 - Use accessible, labelled controls and polite status announcements.
 - Never roll back local work because remote synchronization failed.
 - Never clear storage or pending operations to recover from an error.
+
+Compact time entry reads hours from the first digit: 0–2 can accept a second hour
+digit; 3–9 complete a one-digit hour, padded with zero. If a second hour digit
+would exceed 23, it becomes the first minute digit: 241 → 02:41. Completed hours
+automatically focus minutes. Backspace in empty minutes returns to the hour prefix. Examples: 99 → 09:09, 086 → 08:06, 236 → 23:06.
+Minutes must stay within 00–59. A single minute digit 0–5 waits for a second
+minute digit; 6–9 applies immediately as 06–09 because no valid two-digit minute
+can start with it. Two minute digits apply immediately. There is no typing timer;
+keyboard submit can explicitly complete a short valid input.

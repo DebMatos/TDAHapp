@@ -3,48 +3,62 @@ import { Animated, ScrollView, Keyboard, StyleSheet, Text, TextInput, TouchableO
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { createTaskSheetStyles } from '../theme/styles/taskSheets.styles';
-import { formatTimeInput, isValidTime } from '../utils/time';
+import { isValidTime, splitTimeInput } from '../utils/time';
 
 const ROW_HEIGHT = 44;
 const CYCLES = 7;
 const pad = value => String(value).padStart(2, '0');
 
-function TimeWheel({ value, range, label, disabled, onChange, onEdit, styles }) {
+function TimeWheel({ value, range, label, disabled, editing = false, onChange, onEdit, styles }) {
   const list = useRef(null);
   const dragging = useRef(false);
   const endTimer = useRef(null);
+  const longPressed = useRef(false);
   const latest = useRef({ value, disabled, onChange });
   latest.current = { value, disabled, onChange };
   const center = Math.floor(CYCLES / 2) * range;
   const offset = useRef((center + value) * ROW_HEIGHT);
+  const initialOffset = useRef({ x: 0, y: offset.current });
   const data = useMemo(() => Array.from({ length: range * CYCLES }, (_, index) => index % range), [range]);
 
   const cancelEndTimer = () => { clearTimeout(endTimer.current); endTimer.current = null; };
   useEffect(() => () => clearTimeout(endTimer.current), []);
   useEffect(() => {
     if (!dragging.current) {
-      offset.current = (center + value) * ROW_HEIGHT;
-      list.current?.scrollTo({ y: offset.current, animated: false });
+      const currentRow = Math.round(offset.current / ROW_HEIGHT);
+      const nearestRow = Math.max(0, Math.min(data.length - 1,
+        Math.round((currentRow - value) / range) * range + value));
+      const target = nearestRow * ROW_HEIGHT;
+      if (Math.abs(target - offset.current) > 0.5) {
+        offset.current = target;
+        list.current?.scrollTo({ y: target, animated: true });
+      }
     }
-  }, [value, center]);
+  }, [value, range, data.length]);
 
   const settle = () => {
     cancelEndTimer();
     dragging.current = false;
     const selected = latest.current.disabled ? latest.current.value
       : ((Math.round(offset.current / ROW_HEIGHT) % range) + range) % range;
-    // Recenter without animation so neither end of the finite backing list is exposed.
-    offset.current = (center + selected) * ROW_HEIGHT;
-    list.current?.scrollTo({ y: offset.current, animated: false });
-    if (!latest.current.disabled) latest.current.onChange(selected);
+    const row = Math.round(offset.current / ROW_HEIGHT);
+    const nearEdge = row < range || row >= range * (CYCLES - 1);
+    const targetRow = nearEdge ? center + selected
+      : Math.round((row - selected) / range) * range + selected;
+    const target = targetRow * ROW_HEIGHT;
+    // Ordinary selection stays in the current cycle. Only recycle near an edge.
+    if (Math.abs(target - offset.current) > 0.5) {
+      offset.current = target;
+      list.current?.scrollTo({ y: target, animated: !nearEdge && !latest.current.disabled });
+    }
+    if (!latest.current.disabled && selected !== latest.current.value) latest.current.onChange(selected);
   };
 
   return (
     <View style={styles.column}>
-      <Text style={styles.columnLabel}>{label}</Text>
       <ScrollView
         ref={list}
-        contentOffset={{ x: 0, y: (center + value) * ROW_HEIGHT }}
+        contentOffset={initialOffset.current}
         removeClippedSubviews
         style={styles.wheel}
         contentContainerStyle={styles.wheelContent}
@@ -72,8 +86,18 @@ function TimeWheel({ value, range, label, disabled, onChange, onEdit, styles }) 
         {data.map((item, index) => (
           <Text key={index} accessibilityRole="button" accessibilityLabel={`${label}: ${pad(item)}`}
             accessibilityState={{ disabled, selected: item === value }}
-            style={[styles.row, styles.number, item === value && styles.selectedNumber]}
-            onPress={() => { if (!disabled) item === value ? onEdit() : onChange(item); }}>{pad(item)}</Text>
+            style={[styles.row, styles.number, item === value && styles.selectedNumber, editing && item === value && styles.hiddenNumber]}
+            accessibilityHint={item === value ? 'Mantém premido para escrever a hora' : undefined}
+            onPressIn={() => { longPressed.current = false; }}
+            onLongPress={() => {
+              if (!disabled && item === value) {
+                longPressed.current = true;
+                onEdit();
+              }
+            }}
+            onPress={() => {
+              if (!disabled && !longPressed.current && item !== value) onChange(item);
+            }}>{pad(item)}</Text>
         ))}
       </ScrollView>
     </View>
@@ -84,7 +108,12 @@ export default function InlineTimePicker({ value, label, disabled = false, onCha
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(() => ({ hours: value.slice(0, 2), minutes: value.slice(3) }));
+  const [focusTarget, setFocusTarget] = useState({ field: 'hours', selectAll: true });
+  const hoursInput = useRef(null);
+  const minutesInput = useRef(null);
+  const latestInput = useRef({ disabled, onChange });
+  latestInput.current = { disabled, onChange };
   const translateY = useRef(new Animated.Value(-48)).current;
   const [hours, minutes] = value.split(':').map(Number);
 
@@ -94,12 +123,38 @@ export default function InlineTimePicker({ value, label, disabled = false, onCha
     return () => animation.stop();
   }, [translateY]);
 
-  const edit = () => { setDraft(value); setEditing(true); };
-  const confirm = () => {
-    if (disabled || !isValidTime(draft)) return;
-    onChange(draft);
+  useEffect(() => {
+    if (editing) (focusTarget.field === 'hours' ? hoursInput : minutesInput).current?.focus();
+  }, [editing, focusTarget]);
+
+  const edit = (field) => {
+    setDraft({ hours: value.slice(0, 2), minutes: value.slice(3) });
+    setFocusTarget({ field, selectAll: true });
+    setEditing(true);
+  };
+  const applyTime = (next) => {
+    if (latestInput.current.disabled || !isValidTime(next)) return;
+    latestInput.current.onChange(next);
     setEditing(false);
     Keyboard.dismiss();
+  };
+  const confirm = () => {
+    if (!draft.hours || !draft.minutes) return;
+    applyTime(`${draft.hours.padStart(2, '0')}:${draft.minutes.padStart(2, '0')}`);
+  };
+  const changeHours = (text) => {
+    const result = splitTimeInput(text);
+    setDraft({ hours: result.hours, minutes: result.minutes });
+    setFocusTarget({ field: result.hourComplete ? 'minutes' : 'hours', selectAll: false });
+    if (result.complete) applyTime(result.time);
+  };
+  const changeMinutes = (text) => {
+    const next = text.replace(/\D/g, '').slice(0, 2);
+    setDraft(previous => ({ ...previous, minutes: next }));
+    setFocusTarget({ field: 'minutes', selectAll: false });
+    if (draft.hours && next && (next.length === 2 || Number(next) >= 6)) {
+      applyTime(`${draft.hours.padStart(2, '0')}:${next.padStart(2, '0')}`);
+    }
   };
   const changeWheel = (hour, minute) => {
     setEditing(false);
@@ -111,38 +166,63 @@ export default function InlineTimePicker({ value, label, disabled = false, onCha
     <Animated.View style={[styles.panel, { transform: [{ translateY }] }]} testID="inline-time-picker">
       <View style={styles.header}>
         <Text style={styles.label}>{label}</Text>
-        {editing ? (
-          <>
-            <TextInput accessibilityLabel="Hora completa, HH:MM" editable={!disabled}
-              style={styles.input} value={draft} onChangeText={text => setDraft(formatTimeInput(text))}
-              keyboardType="number-pad" maxLength={5} autoFocus selectTextOnFocus
-              onSubmitEditing={confirm} returnKeyType="done" />
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Aplicar hora"
-              accessibilityState={{ disabled: disabled || !isValidTime(draft) }}
-              disabled={disabled || !isValidTime(draft)} activeOpacity={0.7} style={styles.control} onPress={confirm}>
-              <Text style={[styles.apply, !isValidTime(draft) && styles.muted]}>Aplicar</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Editar hora completa"
-            accessibilityState={{ disabled }} disabled={disabled} activeOpacity={0.7} style={styles.control} onPress={edit}>
-            <Text style={styles.selectedNumber}>{value}</Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Fechar seletor de hora"
-          accessibilityState={{ disabled }} disabled={disabled} activeOpacity={0.7} style={styles.control} onPress={onClose}>
+          accessibilityState={{ disabled }} disabled={disabled} activeOpacity={0.7} style={styles.control}
+          onPress={onClose}>
           <Ionicons name="close" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
-      {editing && !isValidTime(draft) && (
+      {editing && !isValidTime(`${draft.hours}:${draft.minutes}`) && (
         <Text style={styles.muted} accessibilityLiveRegion="polite">Introduz uma hora entre 00:00 e 23:59.</Text>
       )}
+      <View style={styles.wheelLabels}>
+        <Text style={styles.columnLabel}>Horas</Text>
+        <View style={styles.separatorSpace} />
+        <Text style={styles.columnLabel}>Minutos</Text>
+      </View>
       <View style={styles.wheels}>
-        <TimeWheel value={hours} range={24} label="Horas" disabled={disabled} styles={styles}
-          onEdit={edit} onChange={hour => changeWheel(hour, minutes)} />
+        <TimeWheel value={hours} range={24} label="Horas" styles={styles}
+          disabled={disabled || editing} editing={editing}
+          onEdit={() => edit('hours')} onChange={hour => changeWheel(hour, minutes)} />
         <Text style={styles.separator}>:</Text>
-        <TimeWheel value={minutes} range={60} label="Minutos" disabled={disabled} styles={styles}
-          onEdit={edit} onChange={minute => changeWheel(hours, minute)} />
+        <TimeWheel value={minutes} range={60} label="Minutos" styles={styles}
+          disabled={disabled || editing} editing={editing}
+          onEdit={() => edit('minutes')} onChange={minute => changeWheel(hours, minute)} />
+        {editing && (
+          <View style={styles.centerEditor} pointerEvents="box-none">
+            {['hours', 'minutes'].map((field, index) => (
+              <React.Fragment key={field}>
+                {index === 1 && <View style={styles.separatorSpace} pointerEvents="none" />}
+                <TextInput
+                  ref={index === 0 ? hoursInput : minutesInput}
+                  accessibilityLabel={index === 0 ? 'Editar horas' : 'Editar minutos'}
+                  editable={!disabled}
+                  style={styles.input}
+                  value={draft[field]}
+                  selection={focusTarget.field === field ? {
+                    start: focusTarget.selectAll ? 0 : draft[field].length, end: draft[field].length,
+                  } : undefined}
+                  onFocus={() => {
+                    if (focusTarget.field !== field) setFocusTarget({ field, selectAll: true });
+                  }}
+                  onPressOut={() => setFocusTarget({ field, selectAll: true })}
+                  onChangeText={index === 0 ? changeHours : changeMinutes}
+                  onKeyPress={event => {
+                    if (field === 'minutes' && event.nativeEvent.key === 'Backspace' && !draft.minutes) {
+                      setDraft(previous => ({ hours: previous.hours.slice(0, -1), minutes: '' }));
+                      setFocusTarget({ field: 'hours', selectAll: false });
+                    }
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={index === 0 ? 4 : 2}
+                  onSubmitEditing={index === 0
+                    ? () => setFocusTarget({ field: 'minutes', selectAll: true }) : confirm}
+                  returnKeyType={index === 0 ? 'next' : 'done'}
+                />
+              </React.Fragment>
+            ))}
+          </View>
+        )}
       </View>
     </Animated.View>
   );
@@ -153,16 +233,19 @@ const createStyles = colors => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   label: { flex: 1, color: colors.textSecondary, fontSize: 14 },
   control: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
-  input: { width: 76, minHeight: 44, color: colors.text, fontSize: 20, textAlign: 'center', padding: 0 },
-  apply: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
+  input: { width: 96, height: ROW_HEIGHT, color: colors.selectionText, fontSize: 24, fontWeight: '700', textAlign: 'center', padding: 0 },
   muted: { color: colors.textMuted, fontSize: 12 },
-  wheels: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  wheels: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', width: 256 },
   column: { width: 96, alignItems: 'center' },
-  columnLabel: { color: colors.textMuted, fontSize: 12, marginBottom: 4 },
-  wheel: { height: ROW_HEIGHT * 5, flexGrow: 0, width: '100%' },
-  wheelContent: { paddingVertical: ROW_HEIGHT * 2 },
+  columnLabel: { width: 96, textAlign: 'center', color: colors.textMuted, fontSize: 12, marginBottom: 4 },
+  wheel: { height: ROW_HEIGHT * 3, flexGrow: 0, width: '100%' },
+  wheelContent: { paddingVertical: ROW_HEIGHT },
   row: { height: ROW_HEIGHT, textAlign: 'center', textAlignVertical: 'center' },
   number: { color: colors.textMuted, fontSize: 20 },
   selectedNumber: { color: colors.selectionText, fontSize: 24, fontWeight: '700' },
-  separator: { color: colors.textSecondary, fontSize: 24, marginHorizontal: 16 },
+  separator: { width: 64, textAlign: 'center', color: colors.textSecondary, fontSize: 24 },
+  separatorSpace: { width: 64 },
+  wheelLabels: { flexDirection: 'row', alignSelf: 'center' },
+  centerEditor: { flexDirection: 'row', position: 'absolute', top: ROW_HEIGHT, left: 0, right: 0, height: ROW_HEIGHT },
+  hiddenNumber: { opacity: 0 },
 });
