@@ -68,7 +68,7 @@ const TASK_CARD_RIGHT = 22;
 
 const OVERLAP_GAP = 4;
 
-const CREATE_LONG_PRESS_MS = 400;
+const CREATE_LONG_PRESS_MS = 300;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL

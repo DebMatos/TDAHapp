@@ -90,6 +90,7 @@ export default function CreateTaskModal({
   const { colors, isDark } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const buttonStyles = getFloatingButtonStyles(isDark);
   const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const [title, setTitle] = useState('');
@@ -115,6 +116,7 @@ export default function CreateTaskModal({
   const [dateValue, setDateValue] = useState(getTodayDateInput);
   const [dateEditorVisible, setDateEditorVisible] = useState(false);
   const isDateValid = isValidDateInput(dateValue);
+  const isFormValid = Boolean(title.trim()) && isDateValid;
   const translateY = useRef(new Animated.Value(0)).current;
   const sheetHeight = useRef(300);
   const dragOriginHeight = useRef(300);
@@ -123,7 +125,6 @@ export default function CreateTaskModal({
   const transitioned = useRef(false);
   const handleDragged = useRef(false);
   const activeAnimation = useRef(null);
-  const buttonStyles = getFloatingButtonStyles(isDark);
 
   const stopSheetAnimation = useCallback(() => {
     const animation = activeAnimation.current;
@@ -574,16 +575,16 @@ export default function CreateTaskModal({
                       </TouchableOpacity>
                     </ScrollView>
 
-                    <TouchableOpacity
+                    {isFormValid && <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityState={{
-                        disabled: !title.trim() || !isDateValid || isBusy,
+                        disabled: isBusy,
                         busy: isSaving,
                       }}
                       accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
                       style={[buttonStyles.floatingButton, styles.sheetActionButton]}
 
-                      // disabled={!title.trim() || isBusy || !isDateValid}
+                      disabled={isBusy}
                       onPress={handleSave}
                     >
                       <Ionicons
@@ -591,7 +592,7 @@ export default function CreateTaskModal({
                         size={22}
                         color={colors.text}
                       />
-                    </TouchableOpacity>
+                    </TouchableOpacity>}
                   </View>
                 </ScrollView>
               </Animated.View>

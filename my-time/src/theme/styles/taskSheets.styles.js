@@ -21,13 +21,19 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
     paddingVertical: 8,
   },
   actionButton: {
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: colors.now,
-    backgroundColor: colors.floatingButton.background,
+    position: 'relative',
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     elevation: 0,
     shadowOpacity: 0,
     shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
 
@@ -56,11 +62,12 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
     color: colors.selectionText || colors.text,
   },
 
-  // --- BOTÃO DE AÇÃO (GUARDA / SETA) ---
   submitButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
+        position: 'absolute', right: 16, bottom: 20, zIndex: 0,
+
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
@@ -71,11 +78,5 @@ export const createTaskSheetStyles = (colors) => StyleSheet.create({
     borderColor: 'transparent',
     elevation: 0,
   },
-  submitButtonEnabled: {
-    backgroundColor: colors.action,       // Azul-petróleo ativo
-    borderColor: colors.now,              // Anel dourado em redor
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-});
 
+});

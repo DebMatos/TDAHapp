@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { createTaskSheetStyles } from '../theme/styles/taskSheets.styles';
 import { isValidTime, splitTimeInput } from '../utils/time';
@@ -104,7 +103,7 @@ function TimeWheel({ value, range, label, disabled, editing = false, onChange, o
   );
 }
 
-export default function InlineTimePicker({ value, label, disabled = false, onChange, onClose }) {
+export default function InlineTimePicker({ value, disabled = false, onChange }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [editing, setEditing] = useState(false);
@@ -164,22 +163,9 @@ export default function InlineTimePicker({ value, label, disabled = false, onCha
 
   return (
     <Animated.View style={[styles.panel, { transform: [{ translateY }] }]} testID="inline-time-picker">
-      <View style={styles.header}>
-        <Text style={styles.label}>{label}</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Fechar seletor de hora"
-          accessibilityState={{ disabled }} disabled={disabled} activeOpacity={0.7} style={styles.control}
-          onPress={onClose}>
-          <Ionicons name="close" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
       {editing && !isValidTime(`${draft.hours}:${draft.minutes}`) && (
         <Text style={styles.muted} accessibilityLiveRegion="polite">Introduz uma hora entre 00:00 e 23:59.</Text>
       )}
-      <View style={styles.wheelLabels}>
-        <Text style={styles.columnLabel}>Horas</Text>
-        <View style={styles.separatorSpace} />
-        <Text style={styles.columnLabel}>Minutos</Text>
-      </View>
       <View style={styles.wheels}>
         <TimeWheel value={hours} range={24} label="Horas" styles={styles}
           disabled={disabled || editing} editing={editing}
@@ -230,14 +216,10 @@ export default function InlineTimePicker({ value, label, disabled = false, onCha
 
 const createStyles = colors => StyleSheet.create({
   panel: createTaskSheetStyles(colors).pickerPanel,
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { flex: 1, color: colors.textSecondary, fontSize: 14 },
-  control: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   input: { width: 96, height: ROW_HEIGHT, color: colors.selectionText, fontSize: 24, fontWeight: '700', textAlign: 'center', padding: 0 },
   muted: { color: colors.textMuted, fontSize: 12 },
   wheels: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', width: 256 },
   column: { width: 96, alignItems: 'center' },
-  columnLabel: { width: 96, textAlign: 'center', color: colors.textMuted, fontSize: 12, marginBottom: 4 },
   wheel: { height: ROW_HEIGHT * 3, flexGrow: 0, width: '100%' },
   wheelContent: { paddingVertical: ROW_HEIGHT },
   row: { height: ROW_HEIGHT, textAlign: 'center', textAlignVertical: 'center' },
@@ -245,7 +227,6 @@ const createStyles = colors => StyleSheet.create({
   selectedNumber: { color: colors.selectionText, fontSize: 24, fontWeight: '700' },
   separator: { width: 64, textAlign: 'center', color: colors.textSecondary, fontSize: 24 },
   separatorSpace: { width: 64 },
-  wheelLabels: { flexDirection: 'row', alignSelf: 'center' },
   centerEditor: { flexDirection: 'row', position: 'absolute', top: ROW_HEIGHT, left: 0, right: 0, height: ROW_HEIGHT },
   hiddenNumber: { opacity: 0 },
 });

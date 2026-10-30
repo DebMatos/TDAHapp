@@ -531,8 +531,9 @@ const createStyles = (colors) => StyleSheet.create({
   /* NORMAL */
   taskNormal: {
     position: 'absolute',
-    borderRadius: 3,
+    borderRadius: 8,
     borderWidth: 0,
+    paddingLateral: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.taskCardBorder,
     flexDirection: 'row',

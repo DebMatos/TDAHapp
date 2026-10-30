@@ -990,13 +990,22 @@ export default function TaskDetailsModal({
             <TouchableOpacity
               disabled={isBusy}
               accessibilityRole="button"
-              accessibilityState={{ disabled: isBusy, expanded: activeField === field }}
+              accessibilityState={{
+                disabled: isBusy,
+                expanded: activeField === field,
+                selected: activeField === field,
+              }}
               accessibilityLabel={index === 0 ? 'Editar hora de início' : 'Editar hora de fim'}
               activeOpacity={0.7}
-              style={styles.propertyTouch}
+              style={[styles.propertyTouch, activeField === field && styles.activeTimeTouch]}
               onPress={() => activeField === field ? closeInlineEditor() : openInlineEditor(field)}
             >
-              <Text style={styles.inlineTimeText}>{index === 0 ? startTime : endTime}</Text>
+              <Text style={[
+                styles.inlineTimeText,
+                activeField === field && styles.activeInlineTimeText,
+              ]}>
+                {index === 0 ? startTime : endTime}
+              </Text>
             </TouchableOpacity>
           </React.Fragment>
         ))}
@@ -1296,10 +1305,8 @@ export default function TaskDetailsModal({
               <InlineTimePicker
                 key={activeField}
                 value={activeField === 'startTime' ? startTime : endTime}
-                label={activeField === 'startTime' ? 'Hora de início' : 'Hora de fim'}
                 disabled={isBusy}
                 onChange={activeField === 'startTime' ? updateStartTime : updateEndTime}
-                onClose={closeInlineEditor}
               />
             )}
 
@@ -1797,12 +1804,17 @@ const createStyles = (colors) => {
 
   inlineTimeText: {
     fontSize: 14,
-
     lineHeight: 20,
-
     fontWeight: '600',
-
     color: colors.text,
+  },
+  activeInlineTimeText: {
+    color: colors.selectionText,
+  },
+  activeTimeTouch: {
+    backgroundColor: colors.selectionSoft,
+    borderRadius: 8,
+    paddingHorizontal: 8,
   },
 
   inlineDurationText: {
