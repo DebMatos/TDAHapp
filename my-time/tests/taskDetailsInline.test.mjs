@@ -31,7 +31,8 @@ function harness(colors = lightColors, overrides = {}) {
     React, useState, useRef, useCallback: fn => fn, useMemo: fn => fn(), useEffect: fn => effects.push(fn),
     requestAnimationFrame: fn => fn(),
     useLayoutEffect: fn => layouts.push(fn),
-    useTheme: () => ({ colors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates,
+    useTheme: () => ({ colors, isDark: colors === darkColors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates,
+    getFloatingButtonStyles: () => ({ floatingButton: {} }), KeyboardAvoidingView: 'keyboardAvoiding',
     formatTimeInput: times.formatTimeInput, isValidTime: times.isValidTime, ...categories,
     Animated: { Value: class { setValue() {} }, View: 'animated', spring: (value, config) => ({ value, config }),
       parallel: children => { geometry.push(children); return { start() {}, stop() {} }; } },
@@ -275,3 +276,29 @@ test('date, start, end and duration remain mutually exclusive and reset when reo
   h.props.visible = true; h.reload();
   assert.equal(h.timePicker(), undefined);
 });
+
+for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  for (const embedded of [false, true]) {
+    test(`${theme}, embedded=${embedded}: footer stays outside scroll with bottom space across keyboard changes`, () => {
+      const h = harness(colors, { embedded });
+      const checkFooter = expectedPadding => {
+        const tree = h.render();
+        const save = tree.find(n => n.props.accessibilityLabel === 'Guardar tarefa');
+        const footer = tree.find(n => n.children.flat(Infinity).includes(save));
+        const sheet = tree.find(n => n.props.testID === 'task-details-sheet');
+        assert.ok(sheet.children.flat(Infinity).includes(footer));
+        assert.equal(tree.filter(n => n.type === 'scroll').some(n => nodes(n).includes(save)), false);
+        assert.equal(footer.props.style[1].paddingBottom, expectedPadding);
+        const avoiding = tree.find(n => n.type === 'keyboardAvoiding');
+        assert.equal(avoiding.props.behavior, 'padding');
+        assert.ok(nodes(avoiding).includes(sheet));
+      };
+      checkFooter(48); // 24 px spacing plus the mocked 24 px safe area.
+      h.keyboard('keyboardDidShow', 280);
+      checkFooter(24);
+      assert.equal(h.geometry.at(-1)[1].config.toValue, 0, 'no duplicate keyboard offset');
+      h.keyboard('keyboardDidHide');
+      checkFooter(48);
+    });
+  }
+}

@@ -262,7 +262,7 @@ export default function CreateTaskModal({
     startSheetAnimation(
       Animated.parallel([
         Animated.timing(animatedHeight, {
-          toValue: Math.round(windowHeight * TASK_DETAILS_HEIGHT_RATIO),
+          toValue: windowHeight,
           duration: 200,
           useNativeDriver: false,
         }),
@@ -402,7 +402,6 @@ export default function CreateTaskModal({
                       onPressIn={() => {
                         handleDragged.current = true;
                       }}
-                  
                     >
                       <View
                         testID="task-sheet-handle"
@@ -575,24 +574,25 @@ export default function CreateTaskModal({
                       </TouchableOpacity>
                     </ScrollView>
 
-                    {isFormValid && <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        disabled: isBusy,
-                        busy: isSaving,
-                      }}
-                      accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
-                      style={[buttonStyles.floatingButton, styles.sheetActionButton]}
-
-                      disabled={isBusy}
-                      onPress={handleSave}
-                    >
-                      <Ionicons
-                        name={isSaving ? 'hourglass-outline' : 'arrow-up'}
-                        size={22}
-                        color={colors.text}
-                      />
-                    </TouchableOpacity>}
+                    {isFormValid && (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled: isBusy,
+                          busy: isSaving,
+                        }}
+                        accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
+                        style={[buttonStyles.floatingButton, styles.sheetActionButton]}
+                        disabled={isBusy}
+                        onPress={handleSave}
+                      >
+                        <Ionicons
+                          name={isSaving ? 'hourglass-outline' : 'arrow-up'}
+                          size={22}
+                          color={colors.text}
+                        />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </ScrollView>
               </Animated.View>
@@ -895,7 +895,6 @@ const createStyles = (colors) => {
     saveButtonDisabled: {
       opacity: 0.4,
       backgroundColor: colors.selection,
-
     },
 
     /* ---------------------------------------------------

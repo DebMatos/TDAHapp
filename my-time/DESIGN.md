@@ -98,8 +98,12 @@ picker layout stays unchanged. Text fields have no borders. The circular Quick
 Create action retains its existing ring and geometry, uses an upward arrow,
 and has no elevation or shadow. The Home bee button keeps its existing style.
 Both sheets use the shared `actionButton` presentation with a yellow ring in
-light and dark themes. Details keeps its header action position, uses a right
-arrow, and retains its validation and busy states. Its fixed title starts editing
+light and dark themes. Details places its save action outside the form scroll,
+in a fixed right-aligned footer with 24 px horizontal padding. It uses the same
+44-pixel button and upward arrow as Quick Create, respects the bottom safe area
+when the keyboard is closed, adds 24 px of bottom spacing, and retains its validation and busy states.
+A KeyboardAvoidingView owns keyboard avoidance in standalone and embedded Details;
+the sheet does not add a second keyboard offset. Its fixed title starts editing
 with focus in create mode; edit mode starts with the readable title. The existing
 title focus effect is the sole owner of programmatic focus, including embedded
 create details.
