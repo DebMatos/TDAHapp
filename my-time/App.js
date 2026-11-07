@@ -18,6 +18,12 @@ import { DrawerNavContent } from './src/components/DrawerNavContent';
 import { StatusBar } from 'expo-status-bar';
 const Drawer = createDrawerNavigator();
 
+// Load the diagnostic screen only when its development route is opened.
+function SpeechRecognitionDevelopmentRoute(props) {
+  const Screen = require('./src/screens/SpeechRecognitionTestScreen').default;
+  return <Screen {...props} />;
+}
+
 function ThemeStatusBar() {
   const { isDark } = useTheme();
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
@@ -121,6 +127,9 @@ function AppContent() {
               }}
             >
               <Drawer.Screen name="Home" component={HomeScreen} />
+              {__DEV__ && (
+                <Drawer.Screen name="SpeechRecognitionTest" component={SpeechRecognitionDevelopmentRoute} />
+              )}
             </Drawer.Navigator>
           </NavigationContainer>
         ) : (

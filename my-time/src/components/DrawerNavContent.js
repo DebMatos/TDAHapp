@@ -60,6 +60,16 @@ export function DrawerNavContent(props) {
             }
           />
         </View>
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.developmentButton}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            onPress={() => props.navigation.navigate('SpeechRecognitionTest')}
+          >
+            <Text style={{ color: colors.action }}>Diagnóstico de voz (desenvolvimento)</Text>
+          </TouchableOpacity>
+        )}
       </DrawerContentScrollView>
       {/* <Rodapé do Menu (Terminar Sessão) */}
       <View style={[styles.footer, { borderTopColor: colors.borderSoft }]}>
@@ -81,6 +91,12 @@ export function DrawerNavContent(props) {
 }
 
 const styles = StyleSheet.create({
+  developmentButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   safeArea: {
     flex: 1,
   },

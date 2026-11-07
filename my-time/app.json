@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "my-time",
@@ -15,12 +14,30 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.mytime"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permitir usar o microfone para o diagnóstico de reconhecimento de voz.",
+          "speechRecognitionPermission": "Permitir transcrever voz no diagnóstico temporário.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.tts",
+            "com.google.android.as",
+            "com.samsung.android.bixby.agent",
+            "com.samsung.android.scs"
+          ]
+        }
+      ],
       "expo-font",
       "expo-status-bar",
       [
