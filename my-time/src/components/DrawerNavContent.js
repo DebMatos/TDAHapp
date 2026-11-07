@@ -1,111 +1,81 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-import {
-  DrawerContentScrollView,
-} from '@react-navigation/drawer';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
-export function DrawerNavContent(props) {
-  const { colors, themeMode, setThemeMode, isDark } = useTheme();
+import TaskBanner from './TaskBanner';
+import { CustomThemeToggle } from './ThemeToggle';
 
-  const themeOptions = [
-    { label: 'Automático (Sistema)', value: 'system', icon: 'hardware-chip-outline' },
-    { label: 'Modo Claro', value: 'light', icon: 'sunny-outline' },
-    { label: 'Modo Escuro', value: 'dark', icon: 'moon-outline' },
-  ];
+export function DrawerNavContent(props) {
+  const { colors, isDark } = useTheme();
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const handleSignOut = async () => {
+    if (busy) return;
+    setNotice(null);
+    setBusy(true);
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn('[Auth] Falha ao terminar sessão:', error);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch {
+      setNotice({
+        title: 'Não foi possível terminar sessão',
+        message:
+          'A saída não foi confirmada. Verifica a ligação e tenta novamente. Os dados locais não foram apagados.',
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
-      <DrawerContentScrollView
-        {...props}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent}>
         {/* Cabeçalho do Menu */}
-        <View style={[styles.header, { borderBottomColor: colors.borderSoft }]}>
+        <View style={[styles.header, { borderBottomColor: colors.borderSoft }, {flexDirection: 'row', gap: 12, alignItems: 'flex-start', justifyContent: 'flex-start'}]}>
+          <Image
+            source={
+              isDark
+                ? require('../../assets/prilampoInicio.png')
+                : require('../../assets/abelhaInicio.png')
+            }
+            style={{ width: 50, height: 50}}
+          />
           <Text style={[styles.appTitle, { color: colors.text }]}>My Time</Text>
         </View>
 
-        {/* Secção de Aparência / Tema */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-            APARÊNCIA
-          </Text>
-
-          {themeOptions.map((option) => {
-            const isSelected = themeMode === option.value;
-            return (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.optionRow,
-                  {
-                    backgroundColor: isSelected
-                      ? isDark
-                        ? colors.surfaceSoft
-                        : colors.surfaceMuted
-                      : 'transparent',
-                    borderColor: isSelected ? colors.now : 'transparent',
-                  },
-                ]}
-                onPress={() => setThemeMode(option.value)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.optionLeft}>
-                  <Ionicons
-                    name={option.icon}
-                    size={20}
-                    color={isSelected ? colors.text : colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      {
-                        color: colors.text,
-                        fontWeight: isSelected ? '600' : '400',
-                      },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </View>
-
-                {isSelected && (
-                  <Ionicons name="checkmark" size={18} color={colors.now} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.appearanceRow}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Tema</Text>
+          <CustomThemeToggle
+            disabled={busy}
+            onSaveError={() =>
+              setNotice({
+                title: 'A preferência de tema não ficou guardada',
+                message:
+                  'O tema foi aplicado nesta sessão, mas pode não ser mantido ao reabrir a aplicação. Tenta selecionar o tema novamente.',
+              })
+            }
+          />
         </View>
       </DrawerContentScrollView>
-
-      {/* Rodapé do Menu (Terminar Sessão) */}
+      {/* <Rodapé do Menu (Terminar Sessão) */}
       <View style={[styles.footer, { borderTopColor: colors.borderSoft }]}>
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={handleSignOut}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy }}
           activeOpacity={0.7}
         >
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-          <Text style={[styles.signOutText, { color: colors.danger }]}>
-            Terminar sessão
-          </Text>
+          <Text style={[styles.signOutText, { color: colors.danger }]}>Terminar sessão</Text>
         </TouchableOpacity>
       </View>
+      <TaskBanner notice={notice} onDismiss={() => setNotice(null)} placement="top" />
     </SafeAreaView>
   );
 }
@@ -127,38 +97,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  appSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 4,
-    borderWidth: 1,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  optionLabel: {
-    fontSize: 14,
-  },
   footer: {
     padding: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -172,5 +110,19 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  appearanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginVertical: 8,
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
   },
 });

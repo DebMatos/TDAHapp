@@ -1,11 +1,13 @@
 import TaskBanner from '../TaskBanner';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  Image,
+  Animated,
+  useWindowDimensions,
+  Keyboard,
+  PanResponder,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,37 +16,44 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getCategory, getCategoryOptions } from '../../config/categories';
 import { useTheme } from '../../theme/ThemeContext';
+import {
+  createTaskSheetStyles,
+  TASK_DETAILS_HEIGHT_RATIO,
+} from '../../theme/styles/taskSheets.styles';
+import { formatTimeFromMinutes } from '../../utils/time';
+import { TIMELINE_START_MINUTES } from '../../constants/timeline';
+import {
+  formatDateForInput,
+  getTodayDateInput,
+  formatDateInput,
+  isValidDateInput,
+  dateInputToStorageDate,
+  addDaysToDateInput,
+  getDateDisplayLabel,
+} from '../../utils/taskDateInput';
 /* -------------------------------------------------------
    OPÇÕES
 ------------------------------------------------------- */
+import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
 const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 const getPriorityOptions = (colors) => [
   { id: null, label: 'Sem prioridade', color: colors.textMuted },
-  { id: 'low', label: 'Baixa', color: colors.categories.exercise.color },
-  { id: 'medium', label: 'Média', color: colors.categories.personal.color },
-  { id: 'high', label: 'Alta', color: colors.categories.work.color },
+  { id: 'low', label: 'Baixa', color: colors.priority.low },
+  { id: 'medium', label: 'Média', color: colors.priority.medium },
+  { id: 'high', label: 'Alta', color: colors.priority.high },
 ];
 
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
-
-const formatTimeFromMinutes = (totalMinutes) => {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-
-  const hours = Math.floor(normalized / 60);
-
-  const mins = normalized % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
 
 const formatDuration = (minutes) => {
   if (minutes < 60) {
@@ -72,11 +81,16 @@ export default function CreateTaskModal({
   onSave,
   banner,
   onDismissBanner,
-  onMoreOptions,
+  onExpand,
+  expandedContent = null,
+  onExpandedClose,
+  initialDate = null,
   initialMinutes = null,
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const buttonStyles = getFloatingButtonStyles(isDark);
   const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const [title, setTitle] = useState('');
@@ -96,6 +110,33 @@ export default function CreateTaskModal({
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isHandleActive, setIsHandleActive] = useState(false);
+  const isBusy = isSaving || isTransitioning;
+  const [dateValue, setDateValue] = useState(getTodayDateInput);
+  const [dateEditorVisible, setDateEditorVisible] = useState(false);
+  const isDateValid = isValidDateInput(dateValue);
+  const isFormValid = Boolean(title.trim()) && isDateValid;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const sheetHeight = useRef(300);
+  const dragOriginHeight = useRef(300);
+  const animatedHeight = useRef(new Animated.Value(0)).current;
+  const gestureActions = useRef(null);
+  const transitioned = useRef(false);
+  const handleDragged = useRef(false);
+  const activeAnimation = useRef(null);
+
+  const stopSheetAnimation = useCallback(() => {
+    const animation = activeAnimation.current;
+    // Invalidate first: stop() can synchronously invoke the completion callback.
+    activeAnimation.current = null;
+    animation?.stop();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!visible || expandedContent) stopSheetAnimation();
+    return stopSheetAnimation;
+  }, [visible, expandedContent, stopSheetAnimation]);
 
   const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
 
@@ -109,19 +150,30 @@ export default function CreateTaskModal({
       return;
     }
 
+    stopSheetAnimation();
     setTitle('');
     setDescription('');
     setDuration(30);
     setPriority(null);
     setCategoryId('inbox');
-  }, [visible]);
+    setDateValue(initialDate ? formatDateForInput(initialDate) : getTodayDateInput());
+    setDateEditorVisible(false);
+    setDurationPickerVisible(false);
+    setPriorityPickerVisible(false);
+    setCategoryPickerVisible(false);
+    transitioned.current = false;
+    handleDragged.current = false;
+    setIsTransitioning(false);
+    setIsHandleActive(false);
+    translateY.setValue(0);
+  }, [visible, initialDate, translateY, stopSheetAnimation]);
 
   /* -------------------------------------------------------
      GUARDAR
   ------------------------------------------------------- */
 
   const handleSave = async () => {
-    if (!title.trim() || isSaving) {
+    if (!title.trim() || !isDateValid || isBusy || transitioned.current) {
       return;
     }
 
@@ -134,35 +186,160 @@ export default function CreateTaskModal({
         durationMinutes: duration,
         categoryId,
         priority,
+        date: dateInputToStorageDate(dateValue),
+        startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
       });
+    } catch {
+      // The parent presents the local error; keep this draft open.
     } finally {
       setIsSaving(false);
     }
   };
 
   /* -------------------------------------------------------
-     MAIS OPÇÕES
+     EXPANSÃO PELO HANDLE
   ------------------------------------------------------- */
 
-  const handleMoreOptions = () => {
-    onMoreOptions?.({
-      title: title.trim(),
-      notes: description.trim(),
-      startTime:
-        initialMinutes != null
-          ? formatTimeFromMinutes(initialMinutes)
-          : '07:00',
+  const startSheetAnimation = (animation, onComplete) => {
+    stopSheetAnimation();
+    activeAnimation.current = animation;
+    animation.start(({ finished }) => {
+      if (activeAnimation.current !== animation) return;
+      activeAnimation.current = null;
+      if (!finished) {
+        transitioned.current = false;
+        setIsTransitioning(false);
+        setIsHandleActive(false);
+        translateY.setValue(0);
+        return;
+      }
+      onComplete();
+    });
+  };
+
+  const dismissQuickCreate = () => {
+    stopSheetAnimation();
+    transitioned.current = true;
+    onClose();
+  };
+
+  const resetDrag = () => {
+    if (transitioned.current) return;
+    // Height and transform share one Animated.View, so both stay JS-driven.
+    startSheetAnimation(
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: false }),
+        Animated.spring(animatedHeight, {
+          toValue: dragOriginHeight.current,
+          useNativeDriver: false,
+        }),
+      ]),
+      () => setIsHandleActive(false),
+    );
+  };
+
+  const handleExpand = () => {
+    if (isBusy || transitioned.current || !onExpand) return;
+    if (!isDateValid) {
+      setDateEditorVisible(true);
+      resetDrag();
+      return;
+    }
+    const draft = {
+      title,
+      notes: description,
+      date: dateInputToStorageDate(dateValue),
+      startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
       durationMinutes: duration,
       categoryId,
       priority,
-    });
+    };
+    stopSheetAnimation();
+    transitioned.current = true;
+    setIsTransitioning(true);
+    Keyboard.dismiss();
+    if (!isHandleActive) animatedHeight.setValue(sheetHeight.current);
+    startSheetAnimation(
+      Animated.parallel([
+        Animated.timing(animatedHeight, {
+          toValue: windowHeight,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: false }),
+      ]),
+      () => onExpand(draft),
+    );
   };
-  /* -------------------------------------------------------
-     LABEL DA HORA
-  ------------------------------------------------------- */
 
-  const timeLabel =
-    initialMinutes == null ? '--:--' : formatTimeFromMinutes(initialMinutes);
+  const closeFromDrag = () => {
+    if (isBusy || transitioned.current) return;
+    stopSheetAnimation();
+    transitioned.current = true;
+    setIsTransitioning(true);
+    Keyboard.dismiss();
+    startSheetAnimation(
+      Animated.timing(translateY, {
+        toValue: sheetHeight.current,
+        duration: 160,
+        useNativeDriver: false,
+      }),
+      onClose,
+    );
+  };
+
+  // Keep the responder stable while renders update draft and active-handle state.
+  gestureActions.current = {
+    isBusy,
+    expand: handleExpand,
+    close: closeFromDrag,
+    reset: resetDrag,
+    windowHeight,
+  };
+  const handlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !gestureActions.current.isBusy && !transitioned.current,
+        onStartShouldSetPanResponderCapture: () =>
+          !gestureActions.current.isBusy && !transitioned.current,
+        onMoveShouldSetPanResponder: () => !gestureActions.current.isBusy && !transitioned.current,
+        onMoveShouldSetPanResponderCapture: () =>
+          !gestureActions.current.isBusy && !transitioned.current,
+        onPanResponderGrant: () => {
+          stopSheetAnimation();
+          handleDragged.current = true;
+          dragOriginHeight.current = sheetHeight.current;
+          animatedHeight.setValue(sheetHeight.current);
+          setIsHandleActive(true);
+          Keyboard.dismiss();
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (gesture.dy < 0) {
+            animatedHeight.setValue(
+              Math.min(
+                gestureActions.current.windowHeight * 0.94,
+                dragOriginHeight.current - gesture.dy,
+              ),
+            );
+            translateY.setValue(0);
+          } else {
+            animatedHeight.setValue(dragOriginHeight.current);
+            translateY.setValue(gesture.dy);
+          }
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy < -45 || (Math.abs(gesture.dy) < 4 && Math.abs(gesture.dx) < 4))
+            gestureActions.current.expand();
+          else if (gesture.dy > 55) gestureActions.current.close();
+          else gestureActions.current.reset();
+        },
+        onPanResponderTerminate: () => gestureActions.current.reset(),
+      }),
+    [animatedHeight, translateY, stopSheetAnimation],
+  );
+
+  const timeLabel = formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
+  const dateLabel = isDateValid ? getDateDisplayLabel(dateValue) : 'Data inválida';
 
   /* -------------------------------------------------------
      RENDER
@@ -178,155 +355,250 @@ export default function CreateTaskModal({
         visible={visible}
         transparent
         animationType="fade"
-        onRequestClose={onClose}
+        statusBarTranslucent
+        onRequestClose={expandedContent ? onExpandedClose : dismissQuickCreate}
       >
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior="padding"
-          keyboardVerticalOffset={0}
-        >
-          {/* FUNDO */}
+        {expandedContent || (
+          <KeyboardAvoidingView
+            style={styles.overlay}
+            behavior="padding"
+            keyboardVerticalOffset={0}
+          >
+            {/* FUNDO */}
 
-          <Pressable style={styles.backdrop} onPress={onClose} />
-          <TaskBanner notice={visible ? banner : null} onDismiss={onDismissBanner} placement="top" />
-
-          {/* SHEET */}
-
-          <View style={styles.sheet}>
-            {/* HANDLE */}
-
-            <View style={styles.handle} />
-
-            {/* TÍTULO */}
-
-            <TextInput
-              style={styles.titleInput}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="O que vais fazer?"
-              placeholderTextColor={colors.placeholder}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleSave}
+            <Pressable style={styles.backdrop} onPress={dismissQuickCreate} />
+            <TaskBanner
+              notice={visible ? banner : null}
+              onDismiss={onDismissBanner}
+              placement="top"
             />
 
-            {/* DESCRIÇÃO */}
+            {/* SHEET */}
+            <SafeAreaView style={styles.safe} edges={['bottom']}>
+              <Animated.View
+                testID="quick-task-sheet"
+                style={[
+                  styles.sheet,
+                  { transform: [{ translateY }] },
+                  (isHandleActive || isTransitioning) && { height: animatedHeight },
+                ]}
+                onLayout={(event) => {
+                  sheetHeight.current = event.nativeEvent.layout.height;
+                }}
+              >
+                <View style={styles.topBar}>
+                  <View {...handlePanResponder.panHandlers} style={styles.dragZone}>
+                    <Pressable
+                      style={styles.expandHandle}
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Expandir detalhes da tarefa"
+                      accessibilityHint="Arrasta para cima para abrir detalhes ou para baixo para fechar"
+                      accessibilityState={{ disabled: isBusy }}
+                      accessibilityActions={[{ name: 'activate', label: 'Abrir detalhes' }]}
+                      onAccessibilityAction={(event) => {
+                        if (event.nativeEvent.actionName === 'activate') handleExpand();
+                      }}
+                      onPressIn={() => {
+                        handleDragged.current = true;
+                      }}
+                    >
+                      <View
+                        testID="task-sheet-handle"
+                        style={[styles.handle, isHandleActive && styles.handleActive]}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
 
-            <TextInput
-              style={styles.descriptionInput}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Descrição (opcional)"
-              placeholderTextColor={colors.placeholder}
-              multiline
-            />
+                <ScrollView
+                  style={styles.contentScroll}
+                  contentContainerStyle={styles.content}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                >
+                  {/* TÍTULO */}
 
-            {/* ------------------------------------------------
+                  <TextInput
+                    editable={!isBusy}
+                    accessibilityLabel="Título da tarefa"
+                    style={styles.titleInput}
+                    value={title}
+                    onChangeText={setTitle}
+                    placeholder="O que vais fazer?"
+                    placeholderTextColor={colors.placeholder}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={handleSave}
+                  />
+
+                  {/* DESCRIÇÃO */}
+
+                  <TextInput
+                    editable={!isBusy}
+                    accessibilityLabel="Descrição"
+                    style={styles.descriptionInput}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Descrição (opcional)"
+                    placeholderTextColor={colors.placeholder}
+                    multiline
+                  />
+
+                  {dateEditorVisible && (
+                    <View style={styles.dateEditor}>
+                      <Text style={styles.dateLabel}>Data da tarefa</Text>
+                      <TextInput
+                        accessibilityLabel="Data da tarefa, dia mês e ano"
+                        editable={!isBusy}
+                        value={dateValue}
+                        onChangeText={(value) => setDateValue(formatDateInput(value))}
+                        keyboardType="number-pad"
+                        maxLength={10}
+                        placeholder="DD/MM/AAAA"
+                        placeholderTextColor={colors.placeholder}
+                        style={styles.dateInput}
+                      />
+                      {!isDateValid && (
+                        <Text accessibilityRole="alert" style={styles.dateError}>
+                          Introduz uma data válida no formato DD/MM/AAAA.
+                        </Text>
+                      )}
+                      <View style={styles.dateShortcuts}>
+                        <TouchableOpacity
+                          disabled={isBusy}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            disabled: isBusy,
+                            selected: dateValue === getTodayDateInput(),
+                          }}
+                          onPress={() => setDateValue(getTodayDateInput())}
+                          style={styles.dateShortcut}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.dateShortcutText}>Hoje</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={isBusy}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            disabled: isBusy,
+                            selected: dateValue === addDaysToDateInput(getTodayDateInput(), 1),
+                          }}
+                          onPress={() => setDateValue(addDaysToDateInput(getTodayDateInput(), 1))}
+                          style={styles.dateShortcut}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.dateShortcutText}>Amanhã</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* ------------------------------------------------
                 AÇÕES
             ------------------------------------------------ */}
 
-            <View style={styles.actionsSection}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={styles.actionsRow}
-              >
-                {/* HORA */}
+                  <View style={styles.actionsSection}>
+                    <ScrollView
+                      style={styles.optionsScroll}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={styles.actionsRow}
+                    >
+                      {/* HORA */}
 
-                <View style={styles.actionPill}>
-                  <Ionicons name="calendar-outline" size={17} color={colors.textSecondary} />
+                      <TouchableOpacity
+                        style={styles.actionPill}
+                        activeOpacity={0.7}
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Data: ${dateLabel}. Hora: ${timeLabel}`}
+                        accessibilityState={{ disabled: isBusy, expanded: dateEditorVisible }}
+                        onPress={() => setDateEditorVisible((value) => !value || !isDateValid)}
+                      >
+                        <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
 
-                  <Text style={styles.actionText}>Hoje, {timeLabel}</Text>
-                </View>
+                        <Text style={styles.actionText}>
+                          {dateLabel}, {timeLabel}
+                        </Text>
+                      </TouchableOpacity>
 
-                {/* DURAÇÃO */}
+                      {/* DURAÇÃO */}
 
-                <TouchableOpacity
-                  style={styles.actionPill}
-                  activeOpacity={0.75}
-                  onPress={() => setDurationPickerVisible(true)}
-                >
-                  <Ionicons name="timer-outline" size={17} color={colors.textSecondary} />
+                      <TouchableOpacity
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: isBusy }}
+                        accessibilityLabel={`Duração: ${formatDuration(duration)}`}
+                        style={styles.actionPill}
+                        activeOpacity={0.7}
+                        onPress={() => setDurationPickerVisible(true)}
+                      >
+                        <Ionicons name="timer-outline" size={15} color={colors.textSecondary} />
 
-                  <Text style={styles.actionText}>
-                    {formatDuration(duration)}
-                  </Text>
-                </TouchableOpacity>
+                        <Text style={styles.actionText}>{formatDuration(duration)}</Text>
+                      </TouchableOpacity>
 
-                {/* CATEGORIA */}
+                      {/* CATEGORIA */}
 
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  activeOpacity={0.75}
-                  onPress={() => setCategoryPickerVisible(true)}
-                >
-                  <Ionicons
-                    name={selectedCategory.icon}
-                    size={19}
-                    color={selectedCategory.color}
-                  />
-                </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: isBusy }}
+                        accessibilityLabel={`Categoria: ${selectedCategory.label}`}
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
+                        onPress={() => setCategoryPickerVisible(true)}
+                      >
+                        <Ionicons
+                          name={selectedCategory.icon}
+                          size={16}
+                          color={selectedCategory.color}
+                        />
+                      </TouchableOpacity>
 
-                {/* PRIORIDADE */}
+                      {/* PRIORIDADE */}
 
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  activeOpacity={0.75}
-                  onPress={() => setPriorityPickerVisible(true)}
-                >
-                  <Ionicons
-                    name="flag-outline"
-                    size={17}
-                    color={selectedPriority.color}
-                  />
-                </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: isBusy }}
+                        accessibilityLabel={`Prioridade: ${selectedPriority.label}`}
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
+                        onPress={() => setPriorityPickerVisible(true)}
+                      >
+                        <Ionicons name="flag-outline" size={16} color={selectedPriority.color} />
+                      </TouchableOpacity>
+                    </ScrollView>
 
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  activeOpacity={0.75}
-                  onPress={handleMoreOptions}
-                >
-                  <MaterialCommunityIcons
-                    name="dots-horizontal"
-                    size={22}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </ScrollView>
-
-              {/* ----------------------------------------------
-                  CRIAR
-                  Só existe depois de escrever.
-              ---------------------------------------------- */}
-
-              {title.trim().length > 0 && (
-                <View style={styles.saveRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.saveButton,
-                      isSaving && styles.saveButtonDisabled,
-                    ]}
-                    activeOpacity={0.75}
-                    disabled={isSaving}
-                    onPress={handleSave}
-                  >
-                    <Text style={styles.saveButtonText}>
-                      {isSaving ? 'A guardar…' : 'Criar'}
-                    </Text>
-
-                    {!isSaving && (
-                      <Image
-                        source={require('../../../assets/abelha.png')}
-                        style={styles.saveBee}
-                      />
+                    {isFormValid && (
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled: isBusy,
+                          busy: isSaving,
+                        }}
+                        accessibilityLabel={isSaving ? 'A guardar tarefa' : 'Criar tarefa'}
+                        style={[buttonStyles.floatingButton, styles.sheetActionButton]}
+                        disabled={isBusy}
+                        onPress={handleSave}
+                      >
+                        <Ionicons
+                          name={isSaving ? 'hourglass-outline' : 'arrow-up'}
+                          size={22}
+                          color={colors.text}
+                        />
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+                  </View>
+                </ScrollView>
+              </Animated.View>
+            </SafeAreaView>
+          </KeyboardAvoidingView>
+        )}
       </Modal>
 
       {/* ---------------------------------------------------
@@ -339,19 +611,16 @@ export default function CreateTaskModal({
         animationType="fade"
         onRequestClose={() => setDurationPickerVisible(false)}
       >
-        <Pressable
-          style={styles.pickerOverlay}
-          onPress={() => setDurationPickerVisible(false)}
-        >
+        <Pressable style={styles.pickerOverlay} onPress={() => setDurationPickerVisible(false)}>
           <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Duração</Text>
 
-            <ScrollView
-              style={styles.pickerScroll}
-              keyboardShouldPersistTaps="handled"
-            >
+            <ScrollView style={styles.pickerScroll} keyboardShouldPersistTaps="handled">
               {DURATION_OPTIONS.map((item) => (
                 <TouchableOpacity
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isBusy, selected: item === duration }}
                   key={item}
                   style={styles.pickerRow}
                   activeOpacity={0.7}
@@ -362,11 +631,7 @@ export default function CreateTaskModal({
                   }}
                 >
                   <Text
-                    style={[
-                      styles.pickerRowText,
-
-                      item === duration && styles.pickerRowTextActive,
-                    ]}
+                    style={[styles.pickerRowText, item === duration && styles.pickerRowTextActive]}
                   >
                     {formatDuration(item)}
                   </Text>
@@ -391,15 +656,15 @@ export default function CreateTaskModal({
         animationType="fade"
         onRequestClose={() => setPriorityPickerVisible(false)}
       >
-        <Pressable
-          style={styles.pickerOverlay}
-          onPress={() => setPriorityPickerVisible(false)}
-        >
+        <Pressable style={styles.pickerOverlay} onPress={() => setPriorityPickerVisible(false)}>
           <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Prioridade</Text>
 
             {priorityOptions.map((item) => (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy, selected: item.id === priority }}
                 key={item.id ?? 'none'}
                 style={styles.pickerRow}
                 activeOpacity={0.7}
@@ -439,15 +704,15 @@ export default function CreateTaskModal({
         animationType="fade"
         onRequestClose={() => setCategoryPickerVisible(false)}
       >
-        <Pressable
-          style={styles.pickerOverlay}
-          onPress={() => setCategoryPickerVisible(false)}
-        >
-          <View style={styles.categoryCard}>
+        <Pressable style={styles.pickerOverlay} onPress={() => setCategoryPickerVisible(false)}>
+          <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Categoria</Text>
 
             {categoryOptions.map((item) => (
               <TouchableOpacity
+                disabled={isBusy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBusy, selected: item.id === categoryId }}
                 key={item.id}
                 style={styles.categoryRow}
                 activeOpacity={0.7}
@@ -472,7 +737,7 @@ export default function CreateTaskModal({
                 </View>
 
                 {item.id === categoryId && (
-                  <Ionicons name="checkmark" size={20} color={colors.selectionText} />
+                  <Ionicons name="checkmark" size={20} color={colors.text} />
                 )}
               </TouchableOpacity>
             ))}
@@ -487,293 +752,248 @@ export default function CreateTaskModal({
    STYLES
 ------------------------------------------------------- */
 
-const createStyles = (colors) => StyleSheet.create({
-  /* ---------------------------------------------------
+const createStyles = (colors) => {
+  const sheetStyles = createTaskSheetStyles(colors);
+  return StyleSheet.create({
+    /* ---------------------------------------------------
        MODAL
     --------------------------------------------------- */
 
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
+    overlay: { ...sheetStyles.overlay, justifyContent: 'flex-end' },
 
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    backdrop: sheetStyles.backdrop,
 
-    backgroundColor: colors.backdrop,
-  },
+    sheet: { ...sheetStyles.surface, maxHeight: '100%' },
+    topBar: sheetStyles.topBar,
+    dragZone: { ...sheetStyles.dragZone, height: 44 },
+    expandHandle: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    contentScroll: { flexGrow: 0, flexShrink: 1 },
+    content: { ...sheetStyles.content, paddingBottom: 12 },
 
-  sheet: {
-    backgroundColor: colors.surface,
+    handle: sheetStyles.handle,
+    handleActive: { width: 54, backgroundColor: colors.selection },
 
-    paddingHorizontal: 16,
-    paddingTop: 10,
-
-    paddingBottom: Platform.OS === 'ios' ? 18 : 12,
-
-    borderTopLeftRadius: 22,
-
-    borderTopRightRadius: 22,
-
-    borderWidth: 1,
-    borderBottomWidth: 0,
-
-    borderColor: colors.border,
-  },
-
-  handle: {
-    alignSelf: 'center',
-
-    width: 42,
-    height: 4,
-
-    borderRadius: 2,
-
-    backgroundColor: colors.taskCardMuted,
-
-    marginBottom: 14,
-  },
-
-  /* ---------------------------------------------------
+    /* ---------------------------------------------------
        INPUTS
     --------------------------------------------------- */
 
-  titleInput: {
-    minHeight: 46,
+    titleInput: {
+      minHeight: 46,
 
-    borderRadius: 12,
+      borderRadius: 12,
 
-    backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.surfaceSoft,
 
-    paddingHorizontal: 12,
+      paddingHorizontal: 12,
 
-    fontSize: 17,
-    fontWeight: '500',
+      fontSize: 17,
+      fontWeight: '500',
 
-    color: colors.text,
+      color: colors.text,
 
-    marginBottom: 4,
-  },
+      marginBottom: 4,
+    },
 
-  descriptionInput: {
-    minHeight: 34,
+    descriptionInput: {
+      minHeight: 34,
 
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
 
-    fontSize: 14,
+      fontSize: 14,
 
-    color: colors.textSecondary,
-  },
+      color: colors.textSecondary,
+    },
 
-  /* ---------------------------------------------------
+    /* ---------------------------------------------------
        AÇÕES
     --------------------------------------------------- */
 
-  actionsSection: {
-    marginTop: 8,
-  },
+    dateEditor: { marginTop: 8, marginBottom: 4 },
+    dateLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 6 },
+    dateInput: {
+      minHeight: 44,
+      color: colors.text,
+      backgroundColor: colors.input,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      fontSize: 15,
+    },
+    dateError: { color: colors.danger, fontSize: 12, marginTop: 6 },
+    dateShortcuts: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    dateShortcut: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+    dateShortcutText: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
 
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    actionsSection: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    optionsScroll: { flex: 1 },
 
-    gap: 5,
+    actionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
 
-    paddingRight: 4,
-  },
+      gap: 5,
 
-  actionPill: {
-    height: 34,
+      paddingRight: 3,
+    },
 
-    paddingHorizontal: 9,
+    actionPill: {
+      height: 44,
 
-    borderRadius: 10,
+      paddingHorizontal: 9,
 
-    backgroundColor: colors.surfaceSoft,
+      borderRadius: 10,
 
-    flexDirection: 'row',
-    alignItems: 'center',
+      backgroundColor: colors.taskSheet.chipBackground,
+      borderWidth: 1,
+      borderColor: colors.taskSheet.chipBorder,
 
-    gap: 5,
-  },
+      flexDirection: 'row',
+      alignItems: 'center',
 
-  actionText: {
-    fontSize: 12,
-    fontWeight: '500',
+      gap: 5,
+    },
 
-    color: colors.textSecondary,
-  },
+    actionText: {
+      fontSize: 12,
+      fontWeight: '500',
 
-  iconButton: {
-    width: 34,
-    height: 34,
+      color: colors.textSecondary,
+    },
 
-    borderRadius: 10,
+    iconButton: {
+      width: 44,
+      height: 44,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+      borderRadius: 10,
 
-    backgroundColor: colors.surfaceSoft,
-  },
+      alignItems: 'center',
+      justifyContent: 'center',
 
-  /* ---------------------------------------------------
+      backgroundColor: colors.taskSheet.chipBackground,
+      borderWidth: 1,
+      borderColor: colors.taskSheet.chipBorder,
+    },
+
+    sheetActionButton: sheetStyles.actionButton,
+
+    /* ---------------------------------------------------
        CRIAR
     --------------------------------------------------- */
 
-  saveRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
-  saveButton: {
-    height: 40,
+    saveButton: {
+      ...sheetStyles.button,
+      width: 42,
+      flexShrink: 1,
+      borderRadius: 25,
+      backgroundColor: colors.selection,
+    },
 
-    paddingHorizontal: 14,
+    saveButtonDisabled: {
+      opacity: 0.4,
+      backgroundColor: colors.selection,
+    },
 
-    flexDirection: 'row',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    gap: 7,
-
-    borderRadius: 10,
-
-    backgroundColor: colors.selection,
-  },
-
-  saveButtonDisabled: {
-    opacity: 0.55,
-  },
-  saveButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onAction,
-  },
-
-  saveBee: {
-    width: 21,
-    height: 21,
-
-    resizeMode: 'contain',
-
-    transform: [
-      {
-        rotate: '90deg',
-      },
-    ],
-  },
-
-  /* ---------------------------------------------------
+    /* ---------------------------------------------------
        PICKERS
     --------------------------------------------------- */
 
-  pickerOverlay: {
-    flex: 1,
+    pickerOverlay: {
+      flex: 1,
 
-    justifyContent: 'flex-end',
+      justifyContent: 'flex-end',
 
-    backgroundColor: colors.backdrop,
-  },
+      backgroundColor: colors.taskSheet.backdrop,
+    },
 
-  pickerCard: {
-    backgroundColor: colors.surface,
+    pickerCard: {
+      backgroundColor: colors.taskSheet.surface,
 
-    borderTopLeftRadius: 20,
+      borderTopLeftRadius: 20,
 
-    borderTopRightRadius: 20,
+      borderTopRightRadius: 20,
 
-    paddingHorizontal: 18,
+      paddingHorizontal: 18,
 
-    paddingTop: 18,
-    paddingBottom: 24,
-  },
+      paddingTop: 18,
+      paddingBottom: 24,
+    },
 
-  categoryCard: {
-    backgroundColor: colors.surface,
+    pickerTitle: {
+      fontSize: 17,
 
-    borderTopLeftRadius: 20,
+      fontWeight: '700',
 
-    borderTopRightRadius: 20,
+      color: colors.text,
 
-    paddingHorizontal: 18,
+      marginBottom: 10,
+    },
 
-    paddingTop: 18,
-    paddingBottom: 24,
-  },
+    pickerScroll: {
+      maxHeight: 360,
+    },
 
-  pickerTitle: {
-    fontSize: 17,
+    pickerRow: {
+      minHeight: 48,
 
-    fontWeight: '700',
+      flexDirection: 'row',
 
-    color: colors.text,
+      alignItems: 'center',
 
-    marginBottom: 10,
-  },
+      justifyContent: 'space-between',
 
-  pickerScroll: {
-    maxHeight: 360,
-  },
+      borderBottomWidth: StyleSheet.hairlineWidth,
 
-  pickerRow: {
-    minHeight: 48,
+      borderBottomColor: colors.borderSoft,
+    },
 
-    flexDirection: 'row',
+    pickerRowText: {
+      fontSize: 15,
 
-    alignItems: 'center',
+      color: colors.textSecondary,
+    },
 
-    justifyContent: 'space-between',
+    pickerRowTextActive: {
+      fontWeight: '700',
 
-    borderBottomWidth: StyleSheet.hairlineWidth,
+      color: colors.text,
+    },
 
-    borderBottomColor: colors.borderSoft,
-  },
+    categoryRow: {
+      minHeight: 50,
 
-  pickerRowText: {
-    fontSize: 15,
+      flexDirection: 'row',
 
-    color: colors.textSecondary,
-  },
+      alignItems: 'center',
 
-  pickerRowTextActive: {
-    fontWeight: '700',
+      justifyContent: 'space-between',
 
-    color: colors.text,
-  },
+      borderBottomWidth: StyleSheet.hairlineWidth,
 
-  categoryRow: {
-    minHeight: 50,
+      borderBottomColor: colors.borderSoft,
+    },
 
-    flexDirection: 'row',
+    categoryLeft: {
+      flexDirection: 'row',
 
-    alignItems: 'center',
+      alignItems: 'center',
 
-    justifyContent: 'space-between',
+      gap: 12,
+    },
 
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    categoryText: {
+      fontSize: 15,
 
-    borderBottomColor: colors.borderSoft,
-  },
+      color: colors.textSecondary,
+    },
 
-  categoryLeft: {
-    flexDirection: 'row',
+    categoryTextActive: {
+      fontWeight: '700',
 
-    alignItems: 'center',
-
-    gap: 12,
-  },
-
-  categoryText: {
-    fontSize: 15,
-
-    color: colors.textSecondary,
-  },
-
-  categoryTextActive: {
-    fontWeight: '700',
-
-    color: colors.text,
-  },
-});
+      color: colors.text,
+    },
+  });
+};

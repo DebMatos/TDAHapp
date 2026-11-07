@@ -68,7 +68,7 @@ const TASK_CARD_RIGHT = 22;
 
 const OVERLAP_GAP = 4;
 
-const CREATE_LONG_PRESS_MS = 400;
+const CREATE_LONG_PRESS_MS = 300;
 
 /* -------------------------------------------------------
    CORES DA ESPINHA DORSAL
@@ -241,11 +241,11 @@ export default function TimelineScreen() {
         navigation.openDrawer();
 
   };
-  const { colors, themeMode, setThemeMode } = useTheme();
+  const { colors, setThemeMode } = useTheme();
   const styles = getHomeScreenStyles(isDark);
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
-  const [appearanceVisible, setAppearanceVisible] = useState(false);
+  const [ setAppearanceVisible] = useState(false);
   const [taskError, setTaskError] = useState(null);
   const [syncNotice, setSyncNotice] = useState(null);
   const banner = taskError ?? syncNotice;
@@ -328,6 +328,7 @@ export default function TimelineScreen() {
   const [detailsTask, setDetailsTask] = useState(null);
 
   const [detailsMode, setDetailsMode] = useState('create');
+  const [detailsFromQuick, setDetailsFromQuick] = useState(false);
 
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -596,24 +597,20 @@ export default function TimelineScreen() {
     durationMinutes,
     categoryId,
     priority,
+    date,
+    startTime,
   }) => {
     setTaskError(null);
     try {
-      const startMins = targetSlotMinutes ?? TIMELINE_START_MINUTES;
-
-      const taskDate = getDateKey(
-        getCivilDateForTimelineSlot(selectedTimelineDate, startMins),
-      );
-
       await taskService.createTask({
         title,
         notes,
         categoryId: categoryId || 'inbox',
         priority,
 
-        date: taskDate,
+        date,
 
-        startTime: formatTimeFromMinutes(startMins),
+        startTime,
 
         durationMinutes,
       });
@@ -843,6 +840,69 @@ export default function TimelineScreen() {
       });
     });
   };
+  const closeDetails = () => {
+    setTaskError(null);
+    setDetailsTask(null);
+    setDetailsFromQuick(false);
+    if (detailsMode === 'create') setTargetSlotMinutes(null);
+  };
+  const detailsContent = (
+      <TaskDetailsModal
+        visible={Boolean(detailsTask)}
+        embedded={detailsFromQuick}
+        banner={banner}
+        onDismissBanner={dismissBanner}
+        mode={detailsMode}
+        initialValues={detailsTask}
+        onClose={closeDetails}
+        onSave={async (changes) => {
+          setTaskError(null);
+          try {
+            detailsMode === 'create'
+              ? await taskService.createTask({
+                  ...changes,
+                  date:
+                    changes.date ||
+                    getDateKey(
+                      getCivilDateForTimelineSlot(
+                        selectedTimelineDate,
+                        timeToMinutes(
+                          changes.startTime,
+                          TIMELINE_START_MINUTES,
+                        ),
+                      ),
+                    ),
+                })
+              : await taskService.updateTask(detailsTask.id, changes);
+
+            setDetailsTask(null);
+            setDetailsFromQuick(false);
+
+            setTargetSlotMinutes(null);
+          } catch (error) {
+            console.error('Erro ao guardar tarefa:', error);
+
+            showTaskError('Não foi possível guardar a tarefa', error);
+
+            throw error;
+          }
+        }}
+        onDelete={
+          detailsMode === 'edit'
+            ? async () => {
+                setTaskError(null);
+                try {
+                  await taskService.deleteTask(detailsTask.id);
+                  setDetailsTask(null);
+                } catch (error) {
+                  showTaskError('Não foi possível apagar a tarefa', error);
+                }
+              }
+            : undefined
+        }
+      />
+  );
+
   /* -------------------------------------------------------
      RENDER
   ------------------------------------------------------- */
@@ -1061,10 +1121,15 @@ export default function TimelineScreen() {
       {/* QUICK CREATE */}
 
       <CreateTaskModal
-        visible={modalVisible}
+        visible={modalVisible || (detailsFromQuick && Boolean(detailsTask))}
+        expandedContent={detailsFromQuick ? detailsContent : null}
+        onExpandedClose={closeDetails}
         banner={banner}
         onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
+        initialDate={getDateKey(getCivilDateForTimelineSlot(
+          selectedTimelineDate, targetSlotMinutes ?? TIMELINE_START_MINUTES,
+        ))}
         onClose={() => {
           setTaskError(null);
           setModalVisible(false);
@@ -1072,87 +1137,18 @@ export default function TimelineScreen() {
           setTargetSlotMinutes(null);
         }}
         onSave={handleSaveTask}
-        onMoreOptions={(draft) => {
-          const startMinutes =
-            targetSlotMinutes ??
-            timeToMinutes(draft?.startTime, TIMELINE_START_MINUTES);
-
+        onExpand={(draft) => {
+          setTaskError(null);
           setDetailsMode('create');
-
-          setDetailsTask({
-            ...draft,
-            date:
-              draft?.date ||
-              getDateKey(
-                getCivilDateForTimelineSlot(selectedTimelineDate, startMinutes),
-              ),
-          });
-
+          setDetailsFromQuick(true);
+          setDetailsTask(draft);
           setModalVisible(false);
         }}
       />
 
       {/* DETAILS */}
 
-      <TaskDetailsModal
-        visible={Boolean(detailsTask)}
-        banner={banner}
-        onDismissBanner={dismissBanner}
-        mode={detailsMode}
-        initialValues={detailsTask}
-        onClose={() => {
-          setTaskError(null);
-          setDetailsTask(null);
-
-          if (detailsMode === 'create') {
-            setTargetSlotMinutes(null);
-          }
-        }}
-        onSave={async (changes) => {
-          setTaskError(null);
-          try {
-            detailsMode === 'create'
-              ? await taskService.createTask({
-                  ...changes,
-                  date:
-                    changes.date ||
-                    getDateKey(
-                      getCivilDateForTimelineSlot(
-                        selectedTimelineDate,
-                        timeToMinutes(
-                          changes.startTime,
-                          TIMELINE_START_MINUTES,
-                        ),
-                      ),
-                    ),
-                })
-              : await taskService.updateTask(detailsTask.id, changes);
-
-            setDetailsTask(null);
-
-            setTargetSlotMinutes(null);
-          } catch (error) {
-            console.error('Erro ao guardar tarefa:', error);
-
-            showTaskError('Não foi possível guardar a tarefa', error);
-
-            throw error;
-          }
-        }}
-        onDelete={
-          detailsMode === 'edit'
-            ? async () => {
-                setTaskError(null);
-                try {
-                  await taskService.deleteTask(detailsTask.id);
-                  setDetailsTask(null);
-                } catch (error) {
-                  showTaskError('Não foi possível apagar a tarefa', error);
-                }
-              }
-            : undefined
-        }
-      />
+      {!detailsFromQuick && detailsContent}
     </SafeAreaView>
   );
 }

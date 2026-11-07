@@ -14,19 +14,28 @@ export const lightColors = {
 
   text: '#2F2A27',
   textSecondary: '#625A55',
-  textMuted: '#817770',
+  textMuted: '#756B64',
   textFaint: '#AAA19B',
 
   border: '#E3DDD7',
   borderSoft: '#EFECE6',
   input: '#FFFFFF',
-  placeholder: '#A0958E',
-  backdrop: 'rgba(32, 28, 25, 0.34)',
+  placeholder: '#756B64',
+  backdrop: 'rgba(16, 16, 20, 0.74)',
+  taskSheet: {
+    backdrop: 'rgba(16, 16, 20, 0.74)',
+    surface: '#FFFDFC',
+    chipBackground: '#F6F3EE',
+    chipBorder: '#E3DDD7',
+  },
 
-  selection: '#8A9273',
+  selection: '#66734F',
   selectionSoft: '#F2F4EE',
-  selectionText: '#6F765D',
-  action: '#3A9BB7',
+  selectionText: '#596642',
+  selectionIndicator: '#596642',
+  saveAction: '#276E7A',
+  priority: { low: '#526A52', medium: '#876422', high: '#A8463F' },
+  action: '#276E7A',
   onAction: '#FFFFFF',
   checkboxBorder: '#AAA19B',
 
@@ -48,6 +57,16 @@ export const lightColors = {
   taskCardNeutral: '#F5F4F2',
   taskCardMuted: '#C7BFB9',
   taskCardBorder: '#E7E3DF',
+
+  themeToggle: {
+    track: '#F4F4F5',
+    border: '#E4E4E7',
+    label: '#A1A1AA',
+    thumb: '#EFECE6',
+    thumbBorder: '#EAB308',
+    icon: '#EAB308',
+    shadow: '#000000',
+  },
 
   floatingButton: {
   background: '#FFFDFC',
@@ -72,12 +91,21 @@ export const darkColors = {
   borderSoft: '#35312D',
   input: '#252321',
   placeholder: '#938A82',
-  backdrop: 'rgba(0, 0, 0, 0.64)',
+  backdrop: 'rgba(0, 0, 0, 0.77)',
+  taskSheet: {
+    backdrop: 'rgba(0, 0, 0, 0.48)',
+    surface: '#302E2B',
+    chipBackground: '#252421',
+    chipBorder: '#34322F',
+  },
 
   selection: '#9AA582',
   selectionSoft: '#30352B',
   selectionText: '#B9C69B',
-  action: '#64B9CD',
+  selectionIndicator: '#B9C69B',
+  saveAction: '#79BCC8',
+  priority: { low: '#91B296', medium: '#E2B17A', high: '#E18A6D' },
+  action: '#79BCC8',
   onAction: '#141412',
   checkboxBorder: '#827A73',
 
@@ -99,6 +127,16 @@ export const darkColors = {
   taskCardNeutral: '#302D29',
   taskCardMuted: '#827A73',
   taskCardBorder: '#403B36',
+
+  themeToggle: {
+    track: '#18181B',
+    border: '#27272A',
+    label: '#A1A1AA',
+    thumb: '#1C1C1E',
+    thumbBorder: '#EAB308',
+    icon: '#FACC15',
+    shadow: '#EAB308',
+  },
 
   floatingButton: {
   background: '#302D29',
