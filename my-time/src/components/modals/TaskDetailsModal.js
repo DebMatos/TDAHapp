@@ -68,15 +68,6 @@ const POSTPONE_OPTIONS = [
   },
 ];
 
-const REPEAT_OPTIONS = ['never', 'daily', 'weekdays', 'weekly'];
-
-const REPEAT_LABELS = {
-  never: 'Nunca',
-  daily: 'Todos os dias',
-  weekdays: 'Dias úteis',
-  weekly: 'Todas as semanas',
-};
-
 const STATUS_OPTIONS = [
   {
     id: 'pending',
@@ -245,7 +236,6 @@ export default function TaskDetailsModal({
   const [activeField, setActiveField] = useState(isEdit ? null : 'title');
   const isEditingTitle = activeField === 'title';
   const isEditingPriority = activeField === 'priority';
-  const isEditingRepeat = activeField === 'repeat';
 
   const [dateValue, setDateValue] = useState(getTodayDateInput());
 
@@ -1475,74 +1465,6 @@ export default function TaskDetailsModal({
                 </View>
               )}
 
-              {/* REPEAT */}
-
-              {!isEditingRepeat ? (
-                <TouchableOpacity
-                  disabled={isBusy}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isBusy }}
-                  style={styles.propertyRow}
-                  accessibilityLabel="Editar repetição"
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    openInlineEditor('repeat');
-                  }}
-                >
-                  <Ionicons
-                    name="repeat-outline"
-                    style={styles.propertyIcon}
-                    size={20}
-                    color={colors.textMuted}
-                  />
-
-                  <View style={styles.propertyContent}>
-                    <Text style={styles.propertyLabel}>Repetição</Text>
-                    <Text style={[styles.propertyText, repeat === 'never' && styles.neutralText]}>
-                      {REPEAT_LABELS[repeat]}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.repeatEditor}>
-                  <View style={styles.repeatEditorHeader}>
-                    <Ionicons name="repeat-outline" size={20} color={colors.textMuted} />
-                  </View>
-
-                  <View style={styles.repeatOptionsRow}>
-                    {REPEAT_OPTIONS.map((item) => {
-                      const selected = item === repeat;
-
-                      return (
-                        <TouchableOpacity
-                          disabled={isBusy}
-                          accessibilityRole="button"
-                          accessibilityState={{ disabled: isBusy, selected: selected }}
-                          key={item}
-                          style={[styles.repeatOption, selected && styles.repeatOptionSelected]}
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            setRepeat(item);
-
-                            setActiveField(null);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.repeatOptionText,
-
-                              selected && styles.repeatOptionTextSelected,
-                            ]}
-                          >
-                            {REPEAT_LABELS[item]}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-
               {/* NOTES */}
 
               {activeField !== 'notes' ? (
@@ -2114,62 +2036,6 @@ const createStyles = (colors) => {
       height: 23,
 
       borderColor: colors.selectionText,
-    },
-
-    /* REPEAT */
-
-    repeatEditor: {
-      gap: 8,
-    },
-
-    repeatEditorHeader: {
-      minHeight: 24,
-
-      flexDirection: 'row',
-
-      alignItems: 'center',
-    },
-
-    repeatOptionsRow: {
-      flexDirection: 'row',
-
-      alignItems: 'center',
-
-      flexWrap: 'wrap',
-
-      gap: 7,
-    },
-
-    repeatOption: {
-      minHeight: 44,
-
-      paddingHorizontal: 11,
-
-      borderRadius: 10,
-
-      alignItems: 'center',
-
-      justifyContent: 'center',
-
-      backgroundColor: colors.surfaceSoft,
-    },
-
-    repeatOptionSelected: {
-      backgroundColor: colors.selectionSoft,
-    },
-
-    repeatOptionText: {
-      fontSize: 12,
-
-      fontWeight: '600',
-
-      color: colors.textSecondary,
-    },
-
-    repeatOptionTextSelected: {
-      color: colors.selectionText,
-
-      fontWeight: '700',
     },
 
     /* NOTES */
