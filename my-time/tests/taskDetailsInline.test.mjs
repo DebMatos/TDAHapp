@@ -244,6 +244,14 @@ test('calendar is between schedule and category in the form scroll and expands t
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
 });
 
+test('completed tasks hide the start tracking action', () => {
+  const h = harness(lightColors, { onStartTracking: () => {} });
+  assert.ok(h.button('Começar tarefa'));
+  h.button('Editar estado').props.onPress();
+  h.button('Concluída').props.onPress();
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
