@@ -11,6 +11,7 @@ import {
 } from '../repositories/supabaseTaskSessionRepository';
 
 let inFlight = null;
+let requestedAgain = false;
 
 const assertIdentity = (userId, revision) => {
   const identity = getSessionIdentity();
@@ -51,8 +52,16 @@ const syncOnce = async () => {
 
 // Só uma sincronização de cada vez; outra chamada pode ser feita após terminar.
 export const syncTaskSessions = () => {
-  if (inFlight) return inFlight;
-  const promise = syncOnce();
+  if (inFlight) {
+    requestedAgain = true;
+    return inFlight;
+  }
+  const promise = (async () => {
+    do {
+      requestedAgain = false;
+      await syncOnce();
+    } while (requestedAgain);
+  })();
   inFlight = promise;
   promise.finally(() => {
     if (inFlight === promise) inFlight = null;
