@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -79,7 +79,7 @@ export default function Header({
   onMenuPress,
   selectedDate,
   onSelectDate,
-  onGoToNow,
+  goToNowRequest = 0,
   completedTasks = 0,
   totalTasks = 0,
 }) {
@@ -113,22 +113,17 @@ export default function Header({
     itemVisiblePercentThreshold: 50,
   }).current;
 
-  const handleGoToNow = () => {
+  const lastGoToNowRequest = useRef(goToNowRequest);
+
+  useEffect(() => {
+    if (lastGoToNowRequest.current === goToNowRequest) return;
+    lastGoToNowRequest.current = goToNowRequest;
+
     const currentTimelineDate = getTimelineDate(new Date());
-
-    const targetIndex = getIndexForDate(currentTimelineDate);
-
-    const centeredIndex = Math.max(0, targetIndex - 3);
-
-    flatListRef.current?.scrollToIndex({
-      index: centeredIndex,
-      animated: true,
-    });
-
+    const centeredIndex = Math.max(0, getIndexForDate(currentTimelineDate) - 3);
+    flatListRef.current?.scrollToIndex({ index: centeredIndex, animated: true });
     setVisibleDate(currentTimelineDate);
-
-    onGoToNow?.();
-  };
+  }, [goToNowRequest]);
   return (
     <View style={styles.headerContainer}>
       {/* 1. LINHA SUPERIOR */}
