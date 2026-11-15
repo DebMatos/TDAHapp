@@ -13,7 +13,7 @@ const formatElapsed = (milliseconds) => {
     : `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
 };
 
-export default function ActiveTaskBar({ task, running, durationMs, onPress, onToggle, busy = false }) {
+export default function ActiveTaskBar({ task, running, durationMs, onPress, onToggle, onFinish, busy = false }) {
   const { colors } = useTheme();
   if (!task) return null;
 
@@ -27,6 +27,16 @@ export default function ActiveTaskBar({ task, running, durationMs, onPress, onTo
       >
         <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>{task.title}</Text>
         <Text style={{ color: colors.textSecondary }}>{formatElapsed(durationMs)}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.finish, { borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Terminar registo de tempo"
+        accessibilityState={{ disabled: busy, busy }}
+        disabled={busy}
+        onPress={onFinish}
+      >
+        <Ionicons name="stop" size={20} color={colors.text} />
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.action, { backgroundColor: colors.action }]}
@@ -57,6 +67,14 @@ const styles = StyleSheet.create({
   },
   taskInfo: { flex: 1, gap: 3 },
   title: { fontSize: 15, fontWeight: '600' },
+  finish: {
+    minWidth: 42,
+    minHeight: 46,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   action: {
     minWidth: 46,
     minHeight: 46,
