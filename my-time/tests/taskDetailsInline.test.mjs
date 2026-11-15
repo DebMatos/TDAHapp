@@ -106,7 +106,8 @@ test('title and multiline notes blur to labels; opening another field closes pre
   h.button('Editar hora de fim').props.onPress();
   assert.equal(h.timePicker().props.value, '11:00');
   h.timePicker().props.onChange('11:15');
-  h.timePicker().props.onClose();
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker(), undefined);
   await h.button('Guardar tarefa').props.onPress();
   assert.equal(h.saved.length, 1);
   assert.equal(h.saved[0].title, 'Novo título');
@@ -152,8 +153,8 @@ test('postponement remains relative to original schedule and toggles off without
   action('+30 min').props.onPress();
   h.button('Editar hora de início').props.onPress();
   assert.equal(h.timePicker().props.value, '09:30');
-  h.timePicker().props.onClose();
   action('+30 min').props.onPress();
+  assert.equal(h.timePicker(), undefined);
   assert.equal(action('+30 min').props.accessibilityState.selected, false);
   h.button('Editar hora de início').props.onPress();
   assert.equal(h.timePicker().props.value, '09:00');
