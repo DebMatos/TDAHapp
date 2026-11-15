@@ -51,7 +51,6 @@ import {
   subscribeTasks,
   pullRemoteTasks,
 } from '../../data/taskRepository';
-import { supabase } from '../../lib/supabase';
 import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
@@ -238,17 +237,15 @@ const calculateOverlapColumns = (tasks) => {
 ------------------------------------------------------- */
 
 export default function TimelineScreen() {
-  const { isDark } = useTheme();
   const navigation = useNavigation();
   const handleMenuPress = () => {
         navigation.openDrawer();
 
   };
-  const { colors, setThemeMode } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = getHomeScreenStyles(isDark);
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
-  const [, setAppearanceVisible] = useState(false);
   const [taskError, setTaskError] = useState(null);
   const [syncNotice, setSyncNotice] = useState(null);
   const banner = taskError ?? syncNotice;
@@ -275,33 +272,6 @@ export default function TimelineScreen() {
   };
 
 
-  const selectTheme = async (mode) => {
-    try {
-      await setThemeMode(mode);
-      setAppearanceVisible(false);
-    } catch {
-      Alert.alert(
-        'Não foi possível guardar',
-        'A preferência de tema não foi guardada.',
-      );
-    }
-  };
-
-  const confirmSignOut = () => {
-    setAppearanceVisible(false);
-    Alert.alert('Terminar sessão', 'Queres terminar sessão nesta app?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Terminar sessão',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.auth.signOut();
-          if (error)
-            Alert.alert('Não foi possível terminar sessão', error.message);
-        },
-      },
-    ]);
-  };
   const [selectedTimelineDate, setSelectedTimelineDate] = useState(() =>
     getTimelineDate(new Date()),
   );
