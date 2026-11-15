@@ -36,7 +36,8 @@ export default function ActiveTaskBar({ task, running, durationMs, onPress, onTo
         disabled={busy}
         onPress={onFinish}
       >
-        <Ionicons name="stop" size={20} color={colors.text} />
+        <Ionicons name="stop" size={17} color={colors.text} />
+        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>Terminar</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.action, { backgroundColor: colors.action }]}
@@ -68,8 +69,10 @@ const styles = StyleSheet.create({
   taskInfo: { flex: 1, gap: 3 },
   title: { fontSize: 15, fontWeight: '600' },
   finish: {
-    minWidth: 42,
+    minWidth: 78,
     minHeight: 46,
+    paddingHorizontal: 6,
+    gap: 2,
     borderWidth: 1,
     borderRadius: 14,
     alignItems: 'center',
