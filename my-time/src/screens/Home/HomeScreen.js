@@ -38,6 +38,9 @@ import TaskDetailsModal from '../../components/modals/TaskDetailsModal';
 import TaskCardClean from '../../components/TaskCardClean';
 import Header from '../../components/Header';
 import TaskBanner from '../../components/TaskBanner';
+import ActiveTaskBar from '../../components/ActiveTaskBar';
+import * as taskExecution from '../../services/taskExecutionService';
+import { syncTaskSessions } from '../../services/taskSessionSyncService';
 import { subscribeTaskSyncStatus } from '../../data/taskSyncStatus';
 import { createTaskSyncNoticeTracker } from '../../data/taskSyncNotices';
 import CreateTaskModal from '../../components/modals/CreateTaskModal';
@@ -326,9 +329,12 @@ export default function TimelineScreen() {
   const suppressTimelineCreateRef = useRef(false);
 
   const [detailsTask, setDetailsTask] = useState(null);
+  const [detailsTrackedDurationMs, setDetailsTrackedDurationMs] = useState(null);
+
 
   const [detailsMode, setDetailsMode] = useState('create');
   const [detailsFromQuick, setDetailsFromQuick] = useState(false);
+
 
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -339,6 +345,124 @@ export default function TimelineScreen() {
   const [ppm, setPpm] = useState(DEFAULT_PPM);
 
   const [tasks, setTasks] = useState([]);
+  const [trackedTaskId, setTrackedTaskId] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [trackedDurationMs, setTrackedDurationMs] = useState(0);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingNow, setTrackingNow] = useState(Date.now());
+  const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
+
+  // Tempo real das sessões, independentemente do horário planeado.
+  useEffect(() => {
+    const taskId = detailsTask?.id;
+    if (!taskId) {
+      setDetailsTrackedDurationMs(null);
+      return;
+    }
+    let current = true;
+    setDetailsTrackedDurationMs(null);
+    taskExecution.getRecordedDurationMs(taskId)
+      .then((milliseconds) => {
+        if (current) setDetailsTrackedDurationMs(milliseconds);
+      })
+      .catch((error) => {
+        console.warn('[Tracking] Falha ao carregar duração:', error);
+      });
+    return () => { current = false; };
+  }, [detailsTask?.id, activeSession?.id, trackingBusy]);
+
+
+  const refreshTracking = useCallback(async (preferredTaskId = null) => {
+    const active = await taskExecution.getActiveSession();
+    const taskId = active?.taskId ?? preferredTaskId;
+    const duration = taskId
+      ? await taskExecution.getTrackedDurationMs(taskId)
+      : 0;
+    setActiveSession(active);
+    setTrackedTaskId(taskId ?? null);
+    setTrackedDurationMs(duration);
+    setTrackingBaselineAt(Date.now());
+    setTrackingNow(Date.now());
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    refreshTracking().catch((error) => {
+      console.warn('[Tracking] Falha ao recuperar sessão:', error);
+      if (mounted) setTaskError({
+        title: 'Não foi possível carregar o registo de tempo',
+        message: 'Os dados locais não foram apagados.',
+      });
+    });
+    syncTaskSessions().then(() => {
+      if (mounted) return refreshTracking();
+    }).catch((error) => {
+      console.warn('[Sessions] Não foi possível recuperar sessões remotas:', error);
+    });
+    return () => { mounted = false; };
+  }, [refreshTracking]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const interval = setInterval(() => setTrackingNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  const handleTrackingAction = async (taskId, action) => {
+    if (trackingBusy) return;
+    // O estado da tarefa vem da lista atual, não do snapshot antigo dos detalhes.
+    if (action !== 'pause' && tasks.find((task) => task.id === taskId)?.status === 'completed') {
+      Alert.alert('Tarefa concluída', 'Reabre a tarefa antes de iniciares um novo registo.');
+      return;
+    }
+    setTrackingBusy(true);
+    try {
+      if (action === 'pause') {
+        await taskExecution.pauseTask(taskId);
+      } else {
+        await taskExecution.startTask(taskId);
+      }
+      await refreshTracking(taskId);
+      // O registo local já está confirmado; falhas de rede não bloqueiam o controlo.
+      syncTaskSessions().catch((error) => {
+        console.warn('[Sessions] Envio pendente:', error);
+      });
+    } catch (error) {
+      Alert.alert('Registo de tempo', error.message ?? 'Não foi possível guardar a sessão.');
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
+  // Terminar a execução fecha a sessão ativa (se existir) e retira a barra.
+  // O histórico de tempo mantém-se na persistência local.
+  const finishTrackingForTask = async (taskId) => {
+    await taskExecution.finishTask(taskId);
+    if (trackedTaskId === taskId) {
+      await refreshTracking();
+    }
+    syncTaskSessions().catch((error) => {
+      console.warn('[Sessions] Fecho pendente de sincronização:', error);
+    });
+  };
+
+  const handleFinishTracking = async (taskId) => {
+    if (trackingBusy) return;
+    setTrackingBusy(true);
+    try {
+      await finishTrackingForTask(taskId);
+    } catch (error) {
+      Alert.alert('Registo de tempo', error.message ?? 'Não foi possível terminar o registo.');
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
+  const trackedTask = tasks.find((task) => task.id === trackedTaskId) ?? null;
+  const liveDurationMs = activeSession
+    ? trackedDurationMs + Math.max(0, trackingNow - trackingBaselineAt)
+    : trackedDurationMs;
+
 
   const visibleTasks = useMemo(() => {
     const todayKey = getDateKey(new Date());
@@ -582,9 +706,12 @@ export default function TimelineScreen() {
 
   const toggleTaskComplete = async (taskId) => {
     try {
-      await taskService.toggleCompletion(taskId);
+      const updatedTasks = await taskService.toggleCompletion(taskId);
+      if (updatedTasks.find((task) => task.id === taskId)?.status === 'completed') {
+        await finishTrackingForTask(taskId);
+      }
     } catch (error) {
-      showTaskError('Não foi possível alterar o estado da tarefa', error);
+      showTaskError('Não foi possível alterar o estado da tarefa ou terminar o registo', error);
     }
   };
   /* -------------------------------------------------------
@@ -875,6 +1002,10 @@ export default function TimelineScreen() {
                 })
               : await taskService.updateTask(detailsTask.id, changes);
 
+            if (detailsMode === 'edit' && changes.status === 'completed') {
+              await finishTrackingForTask(detailsTask.id);
+            }
+
             setDetailsTask(null);
             setDetailsFromQuick(false);
 
@@ -887,12 +1018,19 @@ export default function TimelineScreen() {
             throw error;
           }
         }}
+        onStartTracking={detailsMode === 'edit' ? async () => {
+          await handleTrackingAction(detailsTask.id, 'start');
+        } : undefined}
+        isTracking={activeSession?.taskId === detailsTask?.id}
+        trackingBusy={trackingBusy}
+        trackedDurationMs={detailsTrackedDurationMs}
         onDelete={
           detailsMode === 'edit'
             ? async () => {
                 setTaskError(null);
                 try {
                   await taskService.deleteTask(detailsTask.id);
+                  await finishTrackingForTask(detailsTask.id);
                   setDetailsTask(null);
                 } catch (error) {
                   showTaskError('Não foi possível apagar a tarefa', error);
@@ -1117,6 +1255,20 @@ export default function TimelineScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      <ActiveTaskBar
+        task={trackedTask}
+        running={Boolean(activeSession)}
+        durationMs={liveDurationMs}
+        busy={trackingBusy}
+        onToggle={() => handleTrackingAction(trackedTaskId, activeSession ? 'pause' : 'start')}
+        onFinish={() => handleFinishTracking(trackedTaskId)}
+        onPress={() => {
+          setDetailsMode('edit');
+          setDetailsFromQuick(false);
+          setDetailsTask(trackedTask);
+        }}
+      />
 
       {/* QUICK CREATE */}
 

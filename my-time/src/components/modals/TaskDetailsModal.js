@@ -157,6 +157,14 @@ const parseTime = (value, fallback = 7 * 60) => {
   return normalizeMinutes(hours * 60 + minutes);
 };
 
+const formatTrackedDuration = (minutes) => {
+  const rounded = Math.max(0, minutes);
+  const hours = Math.floor(rounded / 60);
+  const remainingMinutes = rounded % 60;
+  if (!hours) return `${remainingMinutes} min`;
+  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
+};
+
 const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
@@ -213,6 +221,10 @@ export default function TaskDetailsModal({
   banner,
   onDismissBanner,
   onDelete,
+  onStartTracking,
+  isTracking = false,
+  trackingBusy = false,
+  trackedDurationMs = null,
 }) {
   const { colors, isDark } = useTheme();
   const buttonStyles = getFloatingButtonStyles(isDark);
@@ -256,6 +268,11 @@ export default function TaskDetailsModal({
   const [repeat, setRepeat] = useState('never');
 
   const [notes, setNotes] = useState('');
+
+  const trackedMinutes = trackedDurationMs === null
+    ? null
+    : Math.round(Math.max(0, trackedDurationMs) / 60000);
+  const differenceMinutes = trackedMinutes === null ? null : trackedMinutes - duration;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
@@ -1576,6 +1593,56 @@ export default function TaskDetailsModal({
                     />
                   </View>
                 </View>
+              )}
+              {/* EXECUÇÃO — independente do horário planeado */}
+              {isEdit && status === 'completed' && trackedMinutes !== null && (
+                <View style={{
+                  alignSelf: 'stretch',
+                  backgroundColor: colors.selectionSoft,
+                  borderRadius: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  marginVertical: 12,
+                  gap: 5,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
+                    <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
+                      Tempo registado: {formatTrackedDuration(trackedMinutes)}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
+                    {differenceMinutes === 0
+                      ? 'Igual ao estimado'
+                      : `${differenceMinutes > 0 ? '+' : '−'}${formatTrackedDuration(Math.abs(differenceMinutes))} face ao estimado`}
+                    {' ('}{formatDuration(duration)}{' previsto)'}
+                  </Text>
+                </View>
+              )}
+              {isEdit && status !== 'completed' && onStartTracking && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={isTracking ? 'Tarefa em execução' : 'Começar tarefa'}
+                  accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
+                  disabled={isBusy || trackingBusy || isTracking}
+                  onPress={onStartTracking}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    marginVertical: 12,
+                    borderRadius: 14,
+                    backgroundColor: colors.selectionSoft,
+                  }}
+                >
+                  <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
+                  <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
+                    {isTracking ? 'Em execução' : trackingBusy ? 'A iniciar...' : 'Começar'}
+                  </Text>
+                </TouchableOpacity>
               )}
               {/* DELETE */}
 

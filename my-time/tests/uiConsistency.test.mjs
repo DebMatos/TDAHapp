@@ -63,8 +63,8 @@ function drawer({ setThemeMode = async () => {}, signOut = async () => ({ error:
   const CustomThemeToggle = new Function('React', 'useState', 'useRef', 'useEffect', 'useTheme', 'Pressable', 'View', 'Text', 'StyleSheet', 'Animated', 'Feather', `${toggleCode};return CustomThemeToggle;`)(
     React, useState, useRef, () => {}, () => ({ colors, isDark: false, setThemeMode }), 'toggle', 'view', 'text', { create: x => x },
     { Value: class { interpolate() {} }, View: 'animated' }, 'icon');
-  const component = new Function('React', 'useState', 'View', 'Text', 'TouchableOpacity', 'StyleSheet', 'DrawerContentScrollView', 'Ionicons', 'useTheme', 'supabase', 'SafeAreaView', 'TaskBanner', 'CustomThemeToggle', `${compiled};return DrawerNavContent;`)(
-    React, useState, 'view', 'text', 'button', { create: x => x, hairlineWidth: 1 }, 'scroll', 'icon',
+  const component = new Function('React', 'useState', 'View', 'Text', 'Image', 'require', 'TouchableOpacity', 'StyleSheet', 'DrawerContentScrollView', 'Ionicons', 'useTheme', 'supabase', 'SafeAreaView', 'TaskBanner', 'CustomThemeToggle', `${compiled};return DrawerNavContent;`)(
+    React, useState, 'view', 'text', 'image', path => path, 'button', { create: x => x, hairlineWidth: 1 }, 'scroll', 'icon',
     () => ({ colors, themeMode: 'light', setThemeMode, isDark: false }), { auth: { signOut } }, 'safe', 'banner', CustomThemeToggle);
   const render = () => { cursor = 0; return flatten(component({})); };
   return {

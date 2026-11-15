@@ -106,7 +106,8 @@ test('title and multiline notes blur to labels; opening another field closes pre
   h.button('Editar hora de fim').props.onPress();
   assert.equal(h.timePicker().props.value, '11:00');
   h.timePicker().props.onChange('11:15');
-  h.timePicker().props.onClose();
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker(), undefined);
   await h.button('Guardar tarefa').props.onPress();
   assert.equal(h.saved.length, 1);
   assert.equal(h.saved[0].title, 'Novo título');
@@ -152,8 +153,8 @@ test('postponement remains relative to original schedule and toggles off without
   action('+30 min').props.onPress();
   h.button('Editar hora de início').props.onPress();
   assert.equal(h.timePicker().props.value, '09:30');
-  h.timePicker().props.onClose();
   action('+30 min').props.onPress();
+  assert.equal(h.timePicker(), undefined);
   assert.equal(action('+30 min').props.accessibilityState.selected, false);
   h.button('Editar hora de início').props.onPress();
   assert.equal(h.timePicker().props.value, '09:00');
@@ -244,13 +245,81 @@ test('calendar is between schedule and category in the form scroll and expands t
   assert.equal(h.render().some(n => n.type === 'calendar'), false);
 });
 
+test('completed tasks hide the start tracking action', () => {
+  const h = harness(lightColors, { onStartTracking: () => {} });
+  assert.ok(h.button('Começar tarefa'));
+  h.button('Editar estado').props.onPress();
+  h.button('Concluída').props.onPress();
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
+test('a task already completed when opening details has no start button', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    initialValues: {
+      title: 'Concluída',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
+test('completed task without sessions shows no misleading zero-minute comparison', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: null,
+    initialValues: {
+      title: 'Sem medição',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.doesNotMatch(content, /Tempo registado:/);
+  assert.doesNotMatch(content, /face ao estimado/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
+test('completed task shows recorded time and variance instead of start control', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: 40 * 60 * 1000,
+    initialValues: {
+      title: 'Tarefa concluída',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.match(content, /Tempo registado: /);
+  assert.match(content, /40 min/);
+  assert.match(content, /10 min/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
-  assert.equal(h.timePicker().props.label, 'Hora de início');
+  assert.equal(h.timePicker().props.value, '09:00');
   h.timePicker().props.onChange('23:50');
   h.button('Editar hora de fim').props.onPress();
-  assert.equal(h.timePicker().props.label, 'Hora de fim');
+  assert.equal(h.timePicker().props.value, '00:20');
   assert.equal(h.timePicker().props.value, '00:20');
   h.timePicker().props.onChange('00:10');
   assert.equal(h.saved.length, 0);
