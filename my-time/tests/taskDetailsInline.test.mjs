@@ -252,6 +252,23 @@ test('completed tasks hide the start tracking action', () => {
   assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
 });
 
+test('a task already completed when opening details has no start button', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    initialValues: {
+      title: 'Concluída',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
