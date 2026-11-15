@@ -167,7 +167,7 @@ test('expansion animates to Details height before transferring the draft', () =>
   handler('handleExpand', context)();
   assert.equal(events.expanded.length, 0);
   assert.equal(context.transitioned.current, true);
-  assert.ok(targets.includes(Math.round(780 * 0.78)));
+  assert.ok(targets.includes(780));
   finish({ finished: true });
   assert.equal(events.expanded.length, 1);
 });
@@ -335,5 +335,5 @@ test('Details cleanup prevents a closing callback from affecting a hidden or reo
   evaluate(layoutEffect(detailsSource), { ...context, visible: false })();
   close.finish(); assert.equal(events.closed, 0); assert.equal(close.stops, 1);
   evaluate(layoutEffect(detailsSource), { ...context, visible: true })();
-  close.finish(); assert.equal(events.closed, 0); assert.equal(context.sheetHeight.current, 608);
+  close.finish(); assert.equal(events.closed, 0); assert.equal(context.sheetHeight.current, 733);
 });
