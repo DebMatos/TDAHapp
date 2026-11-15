@@ -81,10 +81,7 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
       assert.ok(h.button(`Editar ${field}`));
       assert.equal(h.render().some(n => n.type === 'button' && n.props.accessibilityLabel === option), false);
     }
-    h.button('Editar repetição').props.onPress();
-    const repeat = h.render().find(n => n.type === 'button' && nodes(n).some(child => child.children.includes('Todos os dias')));
-    assert.ok(repeat); repeat.props.onPress();
-    assert.ok(h.button('Editar repetição'));
+    assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Editar repetição'), false);
     assert.equal(h.saved.length, 0);
   });
 }
