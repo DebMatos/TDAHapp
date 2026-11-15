@@ -1611,9 +1611,10 @@ export default function TaskDetailsModal({
                     </Text>
                   </View>
                   <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
-                    {trackedDurationMs >= duration * 60000 ? '+' : '−'}
-                    {formatTrackedDuration(Math.abs(trackedDurationMs - duration * 60000))}
-                    {' face ao estimado ('}{formatDuration(duration)}{')'}
+                    {trackedDurationMs === duration * 60000
+                      ? 'Igual ao estimado'
+                      : `${trackedDurationMs > duration * 60000 ? '+' : '−'}${formatTrackedDuration(Math.abs(trackedDurationMs - duration * 60000))} face ao estimado`}
+                    {' ('}{formatDuration(duration)}{' previsto)'}
                   </Text>
                 </View>
               )}
