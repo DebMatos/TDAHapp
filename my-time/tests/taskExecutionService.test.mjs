@@ -76,3 +76,32 @@ test('se a gravação falhar, não confirma o início', async () => {
   });
   await assert.rejects(service.startTask('t1'), /Falha de armazenamento/);
 });
+
+test('terminar execução fecha a sessão sem eliminar o histórico', async () => {
+  const { service, setNow, getSaved } = build();
+  await service.startTask('t1');
+  setNow('2026-11-15T14:15:00Z');
+  const finished = await service.finishTask('t1');
+  assert.equal(finished.endedAt, '2026-11-15T14:15:00.000Z');
+  assert.equal(await service.getActiveSession(), null);
+  assert.equal(getSaved().length, 1);
+  assert.equal(await service.getTrackedDurationMs('t1'), 15 * 60 * 1000);
+});
+
+test('terminar execução pausada é seguro e conserva todas as sessões', async () => {
+  const { service, setNow, getSaved } = build();
+  await service.startTask('t1');
+  setNow('2026-11-15T14:10:00Z');
+  await service.pauseTask('t1');
+  assert.equal(await service.finishTask('t1'), null);
+  assert.equal(getSaved().length, 1);
+  assert.equal(await service.getTrackedDurationMs('t1'), 10 * 60 * 1000);
+});
+
+test('terminar uma tarefa não interrompe a execução de outra', async () => {
+  const { service, getSaved } = build();
+  await service.startTask('t2');
+  assert.equal(await service.finishTask('t1'), null);
+  assert.equal((await service.getActiveSession()).taskId, 't2');
+  assert.equal(getSaved()[0].endedAt, null);
+});
