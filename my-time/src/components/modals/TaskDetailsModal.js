@@ -213,6 +213,9 @@ export default function TaskDetailsModal({
   banner,
   onDismissBanner,
   onDelete,
+  onStartTracking,
+  isTracking = false,
+  trackingBusy = false,
 }) {
   const { colors, isDark } = useTheme();
   const buttonStyles = getFloatingButtonStyles(isDark);
@@ -1576,6 +1579,32 @@ export default function TaskDetailsModal({
                     />
                   </View>
                 </View>
+              )}
+              {/* EXECUÇÃO — independente do horário planeado */}
+              {isEdit && onStartTracking && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={isTracking ? 'Tarefa em execução' : 'Começar tarefa'}
+                  accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
+                  disabled={isBusy || trackingBusy || isTracking}
+                  onPress={onStartTracking}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    marginVertical: 12,
+                    borderRadius: 14,
+                    backgroundColor: colors.selectionSoft,
+                  }}
+                >
+                  <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
+                  <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
+                    {isTracking ? 'Em execução' : trackingBusy ? 'A iniciar...' : 'Começar'}
+                  </Text>
+                </TouchableOpacity>
               )}
               {/* DELETE */}
 
