@@ -40,6 +40,7 @@ import Header from '../../components/Header';
 import TaskBanner from '../../components/TaskBanner';
 import ActiveTaskBar from '../../components/ActiveTaskBar';
 import * as taskExecution from '../../services/taskExecutionService';
+import { syncTaskSessions } from '../../services/taskSessionSyncService';
 import { subscribeTaskSyncStatus } from '../../data/taskSyncStatus';
 import { createTaskSyncNoticeTracker } from '../../data/taskSyncNotices';
 import CreateTaskModal from '../../components/modals/CreateTaskModal';
@@ -387,6 +388,10 @@ export default function TimelineScreen() {
         await taskExecution.startTask(taskId);
       }
       await refreshTracking(taskId);
+      // O registo local já está confirmado; falhas de rede não bloqueiam o controlo.
+      syncTaskSessions().catch((error) => {
+        console.warn('[Sessions] Envio pendente:', error);
+      });
     } catch (error) {
       Alert.alert('Registo de tempo', error.message ?? 'Não foi possível guardar a sessão.');
     } finally {
