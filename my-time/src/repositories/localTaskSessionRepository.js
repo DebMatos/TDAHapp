@@ -101,12 +101,21 @@ export const mergeRemoteSessions = (remoteSessions) => enqueue(async () => {
   const pending = new Set(state.pendingIds);
   const localActive = state.sessions.find((item) => item.endedAt === null);
   for (const item of remote) {
+    const previous = merged.get(item.id);
+    // Uma pausa confirmada remotamente nunca deve ser desfeita por um início antigo.
+    if (previous?.endedAt === null && item.endedAt !== null) {
+      merged.set(item.id, item);
+      pending.delete(item.id);
+      continue;
+    }
     if (pending.has(item.id)) continue;
     // Não importar uma segunda sessão ativa de outro dispositivo.
     if (item.endedAt === null && localActive && localActive.id !== item.id) continue;
+    // Não reabrir uma sessão já fechada localmente.
+    if (previous?.endedAt !== null && previous?.endedAt !== undefined && item.endedAt === null) continue;
     merged.set(item.id, item);
   }
-  await persist({ ...state, sessions: [...merged.values()] });
+  await persist({ ...state, sessions: [...merged.values()], pendingIds: [...pending] });
   return [...merged.values()];
 });
 
