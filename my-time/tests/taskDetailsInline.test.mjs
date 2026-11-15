@@ -270,6 +270,28 @@ test('a task already completed when opening details has no start button', () => 
   assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
 });
 
+test('completed task shows recorded time and variance instead of start control', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: 40 * 60 * 1000,
+    initialValues: {
+      title: 'Tarefa concluída',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.match(content, /Tempo registado: /);
+  assert.match(content, /40 min/);
+  assert.match(content, /10 min/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
