@@ -157,6 +157,18 @@ const parseTime = (value, fallback = 7 * 60) => {
   return normalizeMinutes(hours * 60 + minutes);
 };
 
+const formatTrackedDuration = (milliseconds) => {
+  const seconds = Math.floor(Math.max(0, milliseconds) / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  const parts = [];
+  if (hours) parts.push(`${hours} h`);
+  if (minutes) parts.push(`${minutes} min`);
+  if (remainingSeconds || parts.length === 0) parts.push(`${remainingSeconds} s`);
+  return parts.join(' ');
+};
+
 const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
@@ -216,6 +228,7 @@ export default function TaskDetailsModal({
   onStartTracking,
   isTracking = false,
   trackingBusy = false,
+  trackedDurationMs = 0,
 }) {
   const { colors, isDark } = useTheme();
   const buttonStyles = getFloatingButtonStyles(isDark);
@@ -1581,6 +1594,29 @@ export default function TaskDetailsModal({
                 </View>
               )}
               {/* EXECUÇÃO — independente do horário planeado */}
+              {isEdit && status === 'completed' && (
+                <View style={{
+                  alignSelf: 'stretch',
+                  backgroundColor: colors.selectionSoft,
+                  borderRadius: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  marginVertical: 12,
+                  gap: 5,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
+                    <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
+                      Tempo registado: {formatTrackedDuration(trackedDurationMs)}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
+                    {trackedDurationMs >= duration * 60000 ? '+' : '−'}
+                    {formatTrackedDuration(Math.abs(trackedDurationMs - duration * 60000))}
+                    {' face ao estimado ('}{formatDuration(duration)}{')'}
+                  </Text>
+                </View>
+              )}
               {isEdit && status !== 'completed' && onStartTracking && (
                 <TouchableOpacity
                   accessibilityRole="button"
