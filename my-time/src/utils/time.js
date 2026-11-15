@@ -1,4 +1,4 @@
-import { DAY_MINUTES, SNAP_MINUTES } from '../constants/timeline';
+import { DAY_MINUTES, SNAP_MINUTES, TIMELINE_START_MINUTES } from '../constants/timeline';
 
 export const formatTimeFromMinutes = (totalMinutes) => {
   const normalized = ((totalMinutes % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
@@ -40,6 +40,22 @@ export const formatDuration = (minutes) => {
 
 export const snapMinutes = (minutes, step = SNAP_MINUTES) =>
   Math.round(minutes / step) * step;
+
+// Converte um deslocamento vertical em hora de início na timeline 07:00 → 07:00.
+// Limita o cartão no espaço visual antes de converter para hora civil.
+export const getDraggedTimelineStart = (startMinute, deltaY, ppm, durationMinutes) => {
+  if (!Number.isFinite(ppm) || ppm <= 0) {
+    throw new RangeError('A escala da timeline tem de ser positiva.');
+  }
+  const startOffset = ((startMinute - TIMELINE_START_MINUTES) % DAY_MINUTES + DAY_MINUTES) % DAY_MINUTES;
+  const maxOffset = Math.floor(
+    Math.max(0, DAY_MINUTES - Math.max(0, durationMinutes)) / SNAP_MINUTES
+  ) * SNAP_MINUTES;
+  const nextOffset = Math.max(0, Math.min(maxOffset,
+    snapMinutes(startOffset + deltaY / ppm)
+  ));
+  return (TIMELINE_START_MINUTES + nextOffset) % DAY_MINUTES;
+};
 
 
 export const formatTimeInput = (value) => {
