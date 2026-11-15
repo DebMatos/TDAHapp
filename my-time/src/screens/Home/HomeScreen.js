@@ -275,6 +275,7 @@ export default function TimelineScreen() {
   const [selectedTimelineDate, setSelectedTimelineDate] = useState(() =>
     getTimelineDate(new Date()),
   );
+  const [goToNowRequest, setGoToNowRequest] = useState(0);
 
   const now = new Date();
 
@@ -927,6 +928,7 @@ export default function TimelineScreen() {
     const y = clamp(targetY, 0, maxScroll);
 
     setSelectedTimelineDate(currentTimelineDate);
+    setGoToNowRequest((request) => request + 1);
 
     scrollYRef.current = y;
 
@@ -1020,7 +1022,7 @@ export default function TimelineScreen() {
         onMenuPress={handleMenuPress}
         selectedDate={selectedTimelineDate}
         onSelectDate={setSelectedTimelineDate}
-        onGoToNow={handleGoToNow}
+        goToNowRequest={goToNowRequest}
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
