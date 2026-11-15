@@ -157,16 +157,12 @@ const parseTime = (value, fallback = 7 * 60) => {
   return normalizeMinutes(hours * 60 + minutes);
 };
 
-const formatTrackedDuration = (milliseconds) => {
-  const seconds = Math.floor(Math.max(0, milliseconds) / 1000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-  const parts = [];
-  if (hours) parts.push(`${hours} h`);
-  if (minutes) parts.push(`${minutes} min`);
-  if (remainingSeconds || parts.length === 0) parts.push(`${remainingSeconds} s`);
-  return parts.join(' ');
+const formatTrackedDuration = (minutes) => {
+  const rounded = Math.max(0, minutes);
+  const hours = Math.floor(rounded / 60);
+  const remainingMinutes = rounded % 60;
+  if (!hours) return `${remainingMinutes} min`;
+  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
 };
 
 const formatDuration = (minutes) => {
@@ -272,6 +268,9 @@ export default function TaskDetailsModal({
   const [repeat, setRepeat] = useState('never');
 
   const [notes, setNotes] = useState('');
+
+  const trackedMinutes = Math.round(Math.max(0, trackedDurationMs) / 60000);
+  const differenceMinutes = trackedMinutes - duration;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
@@ -1607,13 +1606,13 @@ export default function TaskDetailsModal({
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
                     <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
-                      Tempo registado: {formatTrackedDuration(trackedDurationMs)}
+                      Tempo registado: {formatTrackedDuration(trackedMinutes)}
                     </Text>
                   </View>
                   <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
-                    {trackedDurationMs === duration * 60000
+                    {differenceMinutes === 0
                       ? 'Igual ao estimado'
-                      : `${trackedDurationMs > duration * 60000 ? '+' : '−'}${formatTrackedDuration(Math.abs(trackedDurationMs - duration * 60000))} face ao estimado`}
+                      : `${differenceMinutes > 0 ? '+' : '−'}${formatTrackedDuration(Math.abs(differenceMinutes))} face ao estimado`}
                     {' ('}{formatDuration(duration)}{' previsto)'}
                   </Text>
                 </View>
