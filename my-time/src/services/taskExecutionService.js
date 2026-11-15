@@ -61,6 +61,19 @@ export const createTaskExecutionService = ({
     return stopped;
   });
 
+  // Termina a execução sem alterar o estado da tarefa.
+  // É seguro chamar quando a tarefa já está pausada ou não tem sessão aberta.
+  const finishTask = (taskId) => enqueue(async () => {
+    const sessions = await load();
+    const active = findActive(sessions);
+    if (!active || active.taskId !== taskId) return null;
+    const finished = stopTaskSession(active, now());
+    await save(sessions.map((session) =>
+      session.id === active.id ? finished : session
+    ));
+    return finished;
+  });
+
   const getActiveSession = async () => {
     await writeQueue;
     return findActive(await load());
@@ -75,6 +88,7 @@ export const createTaskExecutionService = ({
     startTask,
     resumeTask: startTask,
     pauseTask,
+    finishTask,
     getActiveSession,
     getTrackedDurationMs,
   };
@@ -84,5 +98,6 @@ const taskExecutionService = createTaskExecutionService();
 export const startTask = taskExecutionService.startTask;
 export const resumeTask = taskExecutionService.resumeTask;
 export const pauseTask = taskExecutionService.pauseTask;
+export const finishTask = taskExecutionService.finishTask;
 export const getActiveSession = taskExecutionService.getActiveSession;
 export const getTrackedDurationMs = taskExecutionService.getTrackedDurationMs;
