@@ -329,7 +329,7 @@ export default function TimelineScreen() {
   const suppressTimelineCreateRef = useRef(false);
 
   const [detailsTask, setDetailsTask] = useState(null);
-  const [detailsTrackedDurationMs, setDetailsTrackedDurationMs] = useState(0);
+  const [detailsTrackedDurationMs, setDetailsTrackedDurationMs] = useState(null);
 
 
   const [detailsMode, setDetailsMode] = useState('create');
@@ -356,11 +356,12 @@ export default function TimelineScreen() {
   useEffect(() => {
     const taskId = detailsTask?.id;
     if (!taskId) {
-      setDetailsTrackedDurationMs(0);
+      setDetailsTrackedDurationMs(null);
       return;
     }
     let current = true;
-    taskExecution.getTrackedDurationMs(taskId)
+    setDetailsTrackedDurationMs(null);
+    taskExecution.getRecordedDurationMs(taskId)
       .then((milliseconds) => {
         if (current) setDetailsTrackedDurationMs(milliseconds);
       })
