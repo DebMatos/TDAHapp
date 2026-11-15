@@ -363,13 +363,20 @@ export default function TimelineScreen() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     refreshTracking().catch((error) => {
       console.warn('[Tracking] Falha ao recuperar sessão:', error);
-      setTaskError({
+      if (mounted) setTaskError({
         title: 'Não foi possível carregar o registo de tempo',
         message: 'Os dados locais não foram apagados.',
       });
     });
+    syncTaskSessions().then(() => {
+      if (mounted) return refreshTracking();
+    }).catch((error) => {
+      console.warn('[Sessions] Não foi possível recuperar sessões remotas:', error);
+    });
+    return () => { mounted = false; };
   }, [refreshTracking]);
 
   useEffect(() => {
