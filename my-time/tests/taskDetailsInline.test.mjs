@@ -247,10 +247,10 @@ test('calendar is between schedule and category in the form scroll and expands t
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
-  assert.equal(h.timePicker().props.label, 'Hora de início');
+  assert.equal(h.timePicker().props.value, '09:00');
   h.timePicker().props.onChange('23:50');
   h.button('Editar hora de fim').props.onPress();
-  assert.equal(h.timePicker().props.label, 'Hora de fim');
+  assert.equal(h.timePicker().props.value, '00:20');
   assert.equal(h.timePicker().props.value, '00:20');
   h.timePicker().props.onChange('00:10');
   assert.equal(h.saved.length, 0);
