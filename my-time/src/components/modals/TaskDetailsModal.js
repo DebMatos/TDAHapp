@@ -224,7 +224,7 @@ export default function TaskDetailsModal({
   onStartTracking,
   isTracking = false,
   trackingBusy = false,
-  trackedDurationMs = 0,
+  trackedDurationMs = null,
 }) {
   const { colors, isDark } = useTheme();
   const buttonStyles = getFloatingButtonStyles(isDark);
@@ -269,8 +269,10 @@ export default function TaskDetailsModal({
 
   const [notes, setNotes] = useState('');
 
-  const trackedMinutes = Math.round(Math.max(0, trackedDurationMs) / 60000);
-  const differenceMinutes = trackedMinutes - duration;
+  const trackedMinutes = trackedDurationMs === null
+    ? null
+    : Math.round(Math.max(0, trackedDurationMs) / 60000);
+  const differenceMinutes = trackedMinutes === null ? null : trackedMinutes - duration;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
@@ -1593,7 +1595,7 @@ export default function TaskDetailsModal({
                 </View>
               )}
               {/* EXECUÇÃO — independente do horário planeado */}
-              {isEdit && status === 'completed' && (
+              {isEdit && status === 'completed' && trackedMinutes !== null && (
                 <View style={{
                   alignSelf: 'stretch',
                   backgroundColor: colors.selectionSoft,
