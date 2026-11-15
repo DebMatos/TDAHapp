@@ -29,15 +29,14 @@ export default function ActiveTaskBar({ task, running, durationMs, onPress, onTo
         <Text style={{ color: colors.textSecondary }}>{formatElapsed(durationMs)}</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[styles.finish, { borderColor: colors.border }]}
+        style={[styles.action, { backgroundColor: colors.action }]}
         accessibilityRole="button"
         accessibilityLabel="Terminar registo de tempo"
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={onFinish}
       >
-        <Ionicons name="stop" size={17} color={colors.text} />
-        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>Terminar</Text>
+        <Ionicons name="stop" size={22} color={colors.onAction} />
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.action, { backgroundColor: colors.action }]}
@@ -68,16 +67,6 @@ const styles = StyleSheet.create({
   },
   taskInfo: { flex: 1, gap: 3 },
   title: { fontSize: 15, fontWeight: '600' },
-  finish: {
-    minWidth: 78,
-    minHeight: 46,
-    paddingHorizontal: 6,
-    gap: 2,
-    borderWidth: 1,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   action: {
     minWidth: 46,
     minHeight: 46,
