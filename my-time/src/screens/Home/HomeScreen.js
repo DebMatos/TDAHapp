@@ -387,6 +387,11 @@ export default function TimelineScreen() {
 
   const handleTrackingAction = async (taskId, action) => {
     if (trackingBusy) return;
+    // O estado da tarefa vem da lista atual, não do snapshot antigo dos detalhes.
+    if (action !== 'pause' && tasks.find((task) => task.id === taskId)?.status === 'completed') {
+      Alert.alert('Tarefa concluída', 'Reabre a tarefa antes de iniciares um novo registo.');
+      return;
+    }
     setTrackingBusy(true);
     try {
       if (action === 'pause') {
