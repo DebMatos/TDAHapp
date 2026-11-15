@@ -121,15 +121,6 @@ export default function TaskCardClean({
   const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
 
 
-const priorityColor =
-  task.priority === 'high'
-    ? colors.priority.high
-    : task.priority === 'medium'
-      ? colors.priority.medium
-      : task.priority === 'low'
-        ? colors.priority.low
-        : null;
-
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
@@ -476,14 +467,6 @@ const priorityColor =
   </Text>
 
 
-{priorityColor && (
-  <Ionicons
-    name="flag-outline"
-    size={12}
-    color={priorityColor}
-    style={styles.priorityFlag}
-  />
-)}
 </View>
 
         {hasRoomForMeta && (
@@ -717,11 +700,5 @@ cardTopRow: {
   alignItems: 'center',
 },
 
-
-priorityFlag: {
-  marginLeft: 8,
-  marginRight: 4,
-  flexShrink: 0,
-},
 
 });
