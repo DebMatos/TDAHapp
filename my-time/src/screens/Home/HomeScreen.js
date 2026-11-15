@@ -329,9 +329,30 @@ export default function TimelineScreen() {
   const suppressTimelineCreateRef = useRef(false);
 
   const [detailsTask, setDetailsTask] = useState(null);
+  const [detailsTrackedDurationMs, setDetailsTrackedDurationMs] = useState(0);
+
 
   const [detailsMode, setDetailsMode] = useState('create');
   const [detailsFromQuick, setDetailsFromQuick] = useState(false);
+
+  // Tempo real das sessões, independentemente do horário planeado.
+  useEffect(() => {
+    const taskId = detailsTask?.id;
+    if (!taskId) {
+      setDetailsTrackedDurationMs(0);
+      return;
+    }
+    let current = true;
+    taskExecution.getTrackedDurationMs(taskId)
+      .then((milliseconds) => {
+        if (current) setDetailsTrackedDurationMs(milliseconds);
+      })
+      .catch((error) => {
+        console.warn('[Tracking] Falha ao carregar duração:', error);
+      });
+    return () => { current = false; };
+  }, [detailsTask?.id, activeSession?.id, trackingBusy]);
+
 
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -1000,6 +1021,7 @@ export default function TimelineScreen() {
         } : undefined}
         isTracking={activeSession?.taskId === detailsTask?.id}
         trackingBusy={trackingBusy}
+        trackedDurationMs={detailsTrackedDurationMs}
         onDelete={
           detailsMode === 'edit'
             ? async () => {
