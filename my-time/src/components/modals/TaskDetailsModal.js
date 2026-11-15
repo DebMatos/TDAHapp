@@ -1581,7 +1581,7 @@ export default function TaskDetailsModal({
                 </View>
               )}
               {/* EXECUÇÃO — independente do horário planeado */}
-              {isEdit && onStartTracking && (
+              {isEdit && status !== 'completed' && onStartTracking && (
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={isTracking ? 'Tarefa em execução' : 'Começar tarefa'}
