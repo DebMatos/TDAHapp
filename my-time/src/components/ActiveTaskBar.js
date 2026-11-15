@@ -45,7 +45,8 @@ export default function ActiveTaskBar({ task, running, durationMs, onPress, onTo
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 14,
-    marginVertical: 6,
+    marginTop: 6,
+    marginBottom: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
