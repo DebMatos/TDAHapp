@@ -84,6 +84,14 @@ export const createTaskExecutionService = ({
     return getTaskDurationMs(await load(), taskId, timestamp);
   };
 
+  // null significa que nunca foi iniciada uma medição para esta tarefa.
+  const getRecordedDurationMs = async (taskId, timestamp = now()) => {
+    await writeQueue;
+    const sessions = await load();
+    if (!sessions.some((session) => session.taskId === taskId)) return null;
+    return getTaskDurationMs(sessions, taskId, timestamp);
+  };
+
   return {
     startTask,
     resumeTask: startTask,
@@ -91,6 +99,7 @@ export const createTaskExecutionService = ({
     finishTask,
     getActiveSession,
     getTrackedDurationMs,
+    getRecordedDurationMs,
   };
 };
 
@@ -101,3 +110,5 @@ export const pauseTask = taskExecutionService.pauseTask;
 export const finishTask = taskExecutionService.finishTask;
 export const getActiveSession = taskExecutionService.getActiveSession;
 export const getTrackedDurationMs = taskExecutionService.getTrackedDurationMs;
+
+export const getRecordedDurationMs = taskExecutionService.getRecordedDurationMs;
