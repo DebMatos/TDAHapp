@@ -406,6 +406,30 @@ export default function TimelineScreen() {
     }
   };
 
+  // Terminar a execução fecha a sessão ativa (se existir) e retira a barra.
+  // O histórico de tempo mantém-se na persistência local.
+  const finishTrackingForTask = async (taskId) => {
+    await taskExecution.finishTask(taskId);
+    if (trackedTaskId === taskId) {
+      await refreshTracking();
+    }
+    syncTaskSessions().catch((error) => {
+      console.warn('[Sessions] Fecho pendente de sincronização:', error);
+    });
+  };
+
+  const handleFinishTracking = async (taskId) => {
+    if (trackingBusy) return;
+    setTrackingBusy(true);
+    try {
+      await finishTrackingForTask(taskId);
+    } catch (error) {
+      Alert.alert('Registo de tempo', error.message ?? 'Não foi possível terminar o registo.');
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
   const trackedTask = tasks.find((task) => task.id === trackedTaskId) ?? null;
   const liveDurationMs = activeSession
     ? trackedDurationMs + Math.max(0, trackingNow - trackingBaselineAt)
@@ -654,9 +678,12 @@ export default function TimelineScreen() {
 
   const toggleTaskComplete = async (taskId) => {
     try {
-      await taskService.toggleCompletion(taskId);
+      const updatedTasks = await taskService.toggleCompletion(taskId);
+      if (updatedTasks.find((task) => task.id === taskId)?.status === 'completed') {
+        await finishTrackingForTask(taskId);
+      }
     } catch (error) {
-      showTaskError('Não foi possível alterar o estado da tarefa', error);
+      showTaskError('Não foi possível alterar o estado da tarefa ou terminar o registo', error);
     }
   };
   /* -------------------------------------------------------
@@ -947,6 +974,10 @@ export default function TimelineScreen() {
                 })
               : await taskService.updateTask(detailsTask.id, changes);
 
+            if (detailsMode === 'edit' && changes.status === 'completed') {
+              await finishTrackingForTask(detailsTask.id);
+            }
+
             setDetailsTask(null);
             setDetailsFromQuick(false);
 
@@ -970,6 +1001,7 @@ export default function TimelineScreen() {
                 setTaskError(null);
                 try {
                   await taskService.deleteTask(detailsTask.id);
+                  await finishTrackingForTask(detailsTask.id);
                   setDetailsTask(null);
                 } catch (error) {
                   showTaskError('Não foi possível apagar a tarefa', error);
@@ -1201,6 +1233,7 @@ export default function TimelineScreen() {
         durationMs={liveDurationMs}
         busy={trackingBusy}
         onToggle={() => handleTrackingAction(trackedTaskId, activeSession ? 'pause' : 'start')}
+        onFinish={() => handleFinishTracking(trackedTaskId)}
         onPress={() => {
           setDetailsMode('edit');
           setDetailsFromQuick(false);
