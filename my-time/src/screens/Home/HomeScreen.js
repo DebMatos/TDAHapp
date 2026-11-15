@@ -335,6 +335,23 @@ export default function TimelineScreen() {
   const [detailsMode, setDetailsMode] = useState('create');
   const [detailsFromQuick, setDetailsFromQuick] = useState(false);
 
+
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const [ppm, setPpm] = useState(DEFAULT_PPM);
+
+  const [tasks, setTasks] = useState([]);
+  const [trackedTaskId, setTrackedTaskId] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [trackedDurationMs, setTrackedDurationMs] = useState(0);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingNow, setTrackingNow] = useState(Date.now());
+  const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
+
   // Tempo real das sessões, independentemente do horário planeado.
   useEffect(() => {
     const taskId = detailsTask?.id;
@@ -353,22 +370,6 @@ export default function TimelineScreen() {
     return () => { current = false; };
   }, [detailsTask?.id, activeSession?.id, trackingBusy]);
 
-
-  const [viewportHeight, setViewportHeight] = useState(0);
-
-  const [viewportWidth, setViewportWidth] = useState(0);
-
-  const [isDragging, setIsDragging] = useState(false);
-
-  const [ppm, setPpm] = useState(DEFAULT_PPM);
-
-  const [tasks, setTasks] = useState([]);
-  const [trackedTaskId, setTrackedTaskId] = useState(null);
-  const [activeSession, setActiveSession] = useState(null);
-  const [trackedDurationMs, setTrackedDurationMs] = useState(0);
-  const [trackingBusy, setTrackingBusy] = useState(false);
-  const [trackingNow, setTrackingNow] = useState(Date.now());
-  const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
 
   const refreshTracking = useCallback(async (preferredTaskId = null) => {
     const active = await taskExecution.getActiveSession();
