@@ -248,7 +248,7 @@ export default function TimelineScreen() {
   const styles = getHomeScreenStyles(isDark);
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
-  const [ setAppearanceVisible] = useState(false);
+  const [, setAppearanceVisible] = useState(false);
   const [taskError, setTaskError] = useState(null);
   const [syncNotice, setSyncNotice] = useState(null);
   const banner = taskError ?? syncNotice;
