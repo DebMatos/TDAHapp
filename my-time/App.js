@@ -11,6 +11,7 @@ import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/Home/HomeScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { syncPendingTasks } from './src/data/taskRepository';
+import { syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -55,6 +56,9 @@ function AppContent() {
         syncPendingTasks().catch((error) => {
           console.warn('[Sync] Falha ao recuperar ligação:', error);
         });
+        syncTaskSessions().catch((error) => {
+          console.warn('[Sessions] Falha ao sincronizar na reconexão:', error);
+        });
       }
     });
 
@@ -70,6 +74,9 @@ function AppContent() {
       .catch((error) => {
         console.warn('[Sync] Falha na sincronização:', error);
       });
+    syncTaskSessions().catch((error) => {
+      console.warn('[Sessions] Falha na sincronização inicial:', error);
+    });
   }, [session?.user?.id]);
 
   if (!fontsLoaded || session === undefined) {
