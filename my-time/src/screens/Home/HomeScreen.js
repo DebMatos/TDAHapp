@@ -38,6 +38,8 @@ import TaskDetailsModal from '../../components/modals/TaskDetailsModal';
 import TaskCardClean from '../../components/TaskCardClean';
 import Header from '../../components/Header';
 import TaskBanner from '../../components/TaskBanner';
+import ActiveTaskBar from '../../components/ActiveTaskBar';
+import * as taskExecution from '../../services/taskExecutionService';
 import { subscribeTaskSyncStatus } from '../../data/taskSyncStatus';
 import { createTaskSyncNoticeTracker } from '../../data/taskSyncNotices';
 import CreateTaskModal from '../../components/modals/CreateTaskModal';
@@ -339,6 +341,64 @@ export default function TimelineScreen() {
   const [ppm, setPpm] = useState(DEFAULT_PPM);
 
   const [tasks, setTasks] = useState([]);
+  const [trackedTaskId, setTrackedTaskId] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [trackedDurationMs, setTrackedDurationMs] = useState(0);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingNow, setTrackingNow] = useState(Date.now());
+  const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
+
+  const refreshTracking = useCallback(async (preferredTaskId = null) => {
+    const active = await taskExecution.getActiveSession();
+    const taskId = active?.taskId ?? preferredTaskId;
+    const duration = taskId
+      ? await taskExecution.getTrackedDurationMs(taskId)
+      : 0;
+    setActiveSession(active);
+    setTrackedTaskId(taskId ?? null);
+    setTrackedDurationMs(duration);
+    setTrackingBaselineAt(Date.now());
+    setTrackingNow(Date.now());
+  }, []);
+
+  useEffect(() => {
+    refreshTracking().catch((error) => {
+      console.warn('[Tracking] Falha ao recuperar sessão:', error);
+      setTaskError({
+        title: 'Não foi possível carregar o registo de tempo',
+        message: 'Os dados locais não foram apagados.',
+      });
+    });
+  }, [refreshTracking]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const interval = setInterval(() => setTrackingNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  const handleTrackingAction = async (taskId, action) => {
+    if (trackingBusy) return;
+    setTrackingBusy(true);
+    try {
+      if (action === 'pause') {
+        await taskExecution.pauseTask(taskId);
+      } else {
+        await taskExecution.startTask(taskId);
+      }
+      await refreshTracking(taskId);
+    } catch (error) {
+      Alert.alert('Registo de tempo', error.message ?? 'Não foi possível guardar a sessão.');
+    } finally {
+      setTrackingBusy(false);
+    }
+  };
+
+  const trackedTask = tasks.find((task) => task.id === trackedTaskId) ?? null;
+  const liveDurationMs = activeSession
+    ? trackedDurationMs + Math.max(0, trackingNow - trackingBaselineAt)
+    : trackedDurationMs;
+
 
   const visibleTasks = useMemo(() => {
     const todayKey = getDateKey(new Date());
@@ -887,6 +947,11 @@ export default function TimelineScreen() {
             throw error;
           }
         }}
+        onStartTracking={detailsMode === 'edit' ? async () => {
+          await handleTrackingAction(detailsTask.id, 'start');
+        } : undefined}
+        isTracking={activeSession?.taskId === detailsTask?.id}
+        trackingBusy={trackingBusy}
         onDelete={
           detailsMode === 'edit'
             ? async () => {
@@ -1117,6 +1182,19 @@ export default function TimelineScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      <ActiveTaskBar
+        task={trackedTask}
+        running={Boolean(activeSession)}
+        durationMs={liveDurationMs}
+        busy={trackingBusy}
+        onToggle={() => handleTrackingAction(trackedTaskId, activeSession ? 'pause' : 'start')}
+        onPress={() => {
+          setDetailsMode('edit');
+          setDetailsFromQuick(false);
+          setDetailsTask(trackedTask);
+        }}
+      />
 
       {/* QUICK CREATE */}
 
