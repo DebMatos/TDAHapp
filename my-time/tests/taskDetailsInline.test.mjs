@@ -270,6 +270,27 @@ test('a task already completed when opening details has no start button', () => 
   assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
 });
 
+test('completed task without sessions shows no misleading zero-minute comparison', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: null,
+    initialValues: {
+      title: 'Sem medição',
+      date: '2027-01-01',
+      startTime: '09:00',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'completed',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.doesNotMatch(content, /Tempo registado:/);
+  assert.doesNotMatch(content, /face ao estimado/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('completed task shows recorded time and variance instead of start control', () => {
   const h = harness(lightColors, {
     onStartTracking: () => {},
