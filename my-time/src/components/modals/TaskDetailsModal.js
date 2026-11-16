@@ -1254,7 +1254,7 @@ export default function TaskDetailsModal({
                   >
                     <Ionicons
                       name="sunny-outline"
-                      size={14}
+                      size={12}
                       color={postponeSelection === 'tomorrow' ? colors.selection : colors.text}
                     />
 
@@ -1928,7 +1928,9 @@ const createStyles = (colors) => {
       marginTop: 4,
       marginBottom: 8,
       paddingVertical: 6,
-      gap: 7,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
 
     quickActionsTitle: {
@@ -1938,20 +1940,22 @@ const createStyles = (colors) => {
     },
 
     postponeRow: {
+      flex: 1,
+      minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: 7,
+      justifyContent: 'flex-start',
+      gap: 5,
     },
 
     postponeButton: {
       height: 34,
-      paddingHorizontal: 10,
+      paddingHorizontal: 6,
       borderRadius: 9,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 5,
+      gap: 3,
       backgroundColor: colors.surfaceSoft,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
@@ -1963,7 +1967,7 @@ const createStyles = (colors) => {
     },
 
     postponeButtonText: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.text,
     },
