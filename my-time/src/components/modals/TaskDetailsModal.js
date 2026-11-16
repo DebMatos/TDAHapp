@@ -1078,23 +1078,28 @@ export default function TaskDetailsModal({
 
 
     return (
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.scheduleLine}
-        keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator={false}
-      >
-        {[
-          { field: 'date', icon: 'calendar-outline', content: dateContent },
-          { field: 'time', icon: 'time-outline', content: timeContent },
-          { field: 'duration', icon: 'timer-outline', content: durationContent },
-        ].map(({ field, icon, content }) => (
-          <View key={field} style={styles.scheduleItem}>
-            <Ionicons name={icon} size={16} color={colors.textMuted} />
-            {content}
-          </View>
-        ))}
-      </ScrollView>
+      <>
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.scheduleLine}
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+        >
+          {[
+            { field: 'date', icon: 'calendar-outline', content: dateContent },
+            { field: 'time', icon: 'time-outline', content: timeContent },
+            { field: 'duration', icon: 'timer-outline', content: durationContent },
+          ].map(({ field, icon, content }) => (
+            <View key={field} style={styles.scheduleItem}>
+              <Ionicons name={icon} size={16} color={colors.textMuted} />
+              {content}
+            </View>
+          ))}
+        </ScrollView>
+        {activeField === 'duration' && (
+          <View style={styles.durationOptionsRow}>{renderDurationOptions()}</View>
+        )}
+      </>
     );
   };
 
@@ -1190,10 +1195,6 @@ export default function TaskDetailsModal({
               {/* SCHEDULE */}
 
               <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
-
-              {activeField === 'duration' && (
-                <View style={styles.durationOptionsRow}>{renderDurationOptions()}</View>
-              )}
 
               {/* POSTPONE */}
 
