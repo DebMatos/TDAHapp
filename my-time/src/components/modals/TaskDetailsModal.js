@@ -1187,7 +1187,9 @@ export default function TaskDetailsModal({
               {/* POSTPONE */}
 
               {isEdit && (
-                <View style={styles.postponeRow}>
+                <View style={styles.quickActionsPanel}>
+                  <Text style={styles.quickActionsTitle}>Ações rápidas</Text>
+                  <View style={styles.postponeRow}>
                   {POSTPONE_OPTIONS.map((option) => {
                     const selected = postponeSelection === option.id;
 
@@ -1254,6 +1256,7 @@ export default function TaskDetailsModal({
                       Amanhã
                     </Text>
                   </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -1906,48 +1909,56 @@ const createStyles = (colors) => {
       color: colors.textMuted,
     },
 
-    /* POSTPONE */
+    /* QUICK ACTIONS — compact buttons inside a distinct panel */
+
+    quickActionsPanel: {
+      marginTop: 8,
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceSoft,
+      gap: 9,
+    },
+
+    quickActionsTitle: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textMuted,
+    },
 
     postponeRow: {
-      marginTop: 8,
-      marginBottom: 8,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-start',
-      gap: 6,
+      flexWrap: 'wrap',
+      gap: 7,
     },
 
     postponeButton: {
-      minHeight: 44,
-      flex: 1,
-      paddingHorizontal: 4,
+      height: 34,
+      paddingHorizontal: 11,
       borderRadius: 9,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 5,
-      backgroundColor: colors.surfaceMuted,
+      backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
     },
 
     postponeButtonSelected: {
       backgroundColor: colors.selectionSoft,
-
       borderColor: colors.selection,
     },
 
     postponeButtonText: {
       fontSize: 12,
-
-      fontWeight: '700',
-
+      fontWeight: '600',
       color: colors.text,
     },
 
     postponeButtonTextSelected: {
       fontWeight: '700',
-
       color: colors.selectionText,
     },
 
