@@ -1184,11 +1184,15 @@ export default function TaskDetailsModal({
                 ['date', 'startTime', 'endTime'].includes(activeField) ? undefined : closeInlineEditor
               }
             >
+              {/* SCHEDULE */}
+
+              <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+
               {/* POSTPONE */}
 
               {isEdit && (
                 <View style={styles.quickActionsPanel}>
-                  <Text style={styles.quickActionsTitle}>Ações rápidas</Text>
+                  <Text style={styles.quickActionsTitle}>Adiar</Text>
                   <View style={styles.postponeRow}>
                   {POSTPONE_OPTIONS.map((option) => {
                     const selected = postponeSelection === option.id;
@@ -1260,9 +1264,6 @@ export default function TaskDetailsModal({
                 </View>
               )}
 
-              {/* SCHEDULE */}
-
-              <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
 
               {visible && activeField === 'date' && keyboardHeight === 0 && (
                 <InlineDatePicker
@@ -1764,7 +1765,7 @@ const createStyles = (colors) => {
     },
 
     inlineDateText: {
-      fontSize: 14,
+      fontSize: 16,
 
       lineHeight: 20,
 
@@ -1774,7 +1775,7 @@ const createStyles = (colors) => {
     },
 
     inlineTimeText: {
-      fontSize: 14,
+      fontSize: 16,
       lineHeight: 20,
       fontWeight: '600',
       color: colors.text,
@@ -1789,7 +1790,7 @@ const createStyles = (colors) => {
     },
 
     inlineDurationText: {
-      fontSize: 13,
+      fontSize: 15,
 
       lineHeight: 20,
 
