@@ -1925,17 +1925,15 @@ const createStyles = (colors) => {
     /* QUICK ACTIONS — compact buttons inside a distinct panel */
 
     quickActionsPanel: {
-      marginTop: 8,
-      marginBottom: 12,
-      padding: 12,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceSoft,
-      gap: 9,
+      marginTop: 4,
+      marginBottom: 8,
+      paddingVertical: 6,
+      gap: 7,
     },
 
     quickActionsTitle: {
       fontSize: 12,
-      fontWeight: '600',
+      fontWeight: '500',
       color: colors.textMuted,
     },
 
@@ -1948,14 +1946,14 @@ const createStyles = (colors) => {
 
     postponeButton: {
       height: 34,
-      paddingHorizontal: 11,
+      paddingHorizontal: 10,
       borderRadius: 9,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 5,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
+      backgroundColor: colors.surfaceSoft,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
 
