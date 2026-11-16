@@ -1009,8 +1009,21 @@ export default function TaskDetailsModal({
       </View>
     );
 
-    const durationContent =
-      activeField === 'duration' ? (
+    const durationContent = (
+      <TouchableOpacity
+        disabled={isBusy}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isBusy, expanded: activeField === 'duration' }}
+        activeOpacity={0.7}
+        style={styles.propertyTouch}
+        accessibilityLabel="Editar duração"
+        onPress={() => (activeField === 'duration' ? closeInlineEditor() : openInlineEditor('duration'))}
+      >
+        <Text style={styles.inlineDurationText}>{formatDuration(duration)}</Text>
+      </TouchableOpacity>
+    );
+
+    const renderDurationOptions = () => (
         <View style={styles.inlineDurationEditor}>
           {DURATION_PRESETS.map((preset) => {
             const selected = duration === preset && customDuration === '';
@@ -1060,19 +1073,9 @@ export default function TaskDetailsModal({
             <Text style={styles.inlineCustomDurationUnit}>min</Text>
           </View>
         </View>
-      ) : (
-        <TouchableOpacity
-          disabled={isBusy}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
-          activeOpacity={0.7}
-          style={styles.propertyTouch}
-          accessibilityLabel="Editar duração"
-          onPress={() => openInlineEditor('duration')}
-        >
-          <Text style={styles.inlineDurationText}>{formatDuration(duration)}</Text>
-        </TouchableOpacity>
       );
+
+
 
     return (
       <ScrollView
@@ -1187,6 +1190,10 @@ export default function TaskDetailsModal({
               {/* SCHEDULE */}
 
               <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+
+              {activeField === 'duration' && (
+                <View style={styles.durationOptionsRow}>{renderDurationOptions()}</View>
+              )}
 
               {/* POSTPONE */}
 
@@ -1829,6 +1836,10 @@ const createStyles = (colors) => {
       fontSize: 14,
 
       color: colors.textMuted,
+    },
+
+    durationOptionsRow: {
+      paddingVertical: 8,
     },
 
     inlineDurationEditor: {
