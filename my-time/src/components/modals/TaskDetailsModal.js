@@ -1554,29 +1554,53 @@ export default function TaskDetailsModal({
                 </View>
               )}
               {isEdit && status !== 'completed' && onStartTracking && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={isTracking ? 'Tarefa em execução' : 'Começar tarefa'}
-                  accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
-                  disabled={isBusy || trackingBusy || isTracking}
-                  onPress={onStartTracking}
-                  activeOpacity={0.7}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    alignSelf: 'flex-start',
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    marginVertical: 12,
-                    borderRadius: 14,
-                    backgroundColor: colors.selectionSoft,
-                  }}
-                >
-                  <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
-                  <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
-                    {isTracking ? 'Em execução' : trackingBusy ? 'A iniciar...' : 'Começar'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={{
+                  alignSelf: 'stretch',
+                  backgroundColor: colors.selectionSoft,
+                  borderRadius: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  marginVertical: 12,
+                  gap: 10,
+                }}>
+                  {trackedMinutes !== null && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
+                      <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
+                        Tempo registado: {formatTrackedDuration(trackedMinutes)}
+                      </Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isTracking
+                        ? 'Tarefa em execução'
+                        : trackedMinutes !== null
+                          ? 'Continuar tarefa'
+                          : 'Começar tarefa'
+                    }
+                    accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
+                    disabled={isBusy || trackingBusy || isTracking}
+                    onPress={onStartTracking}
+                    activeOpacity={0.7}
+                    style={{
+                      minHeight: 44,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
+                    <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
+                      {isTracking
+                        ? 'Em execução'
+                        : trackingBusy
+                          ? trackedMinutes !== null ? 'A continuar...' : 'A iniciar...'
+                          : trackedMinutes !== null ? 'Continuar' : 'Começar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               )}
               {/* DELETE */}
 

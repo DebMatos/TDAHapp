@@ -33,10 +33,18 @@ Retain the application’s platform font and existing task-sheet hierarchy.
 ## Layout
 
 `TaskSyncStatus` owns one fixed-size synchronization icon between “Agora” and
-its header menu, plus a contextual overlay panel and retry. It reserves no region
+its header menu, plus a simple contextual overlay with a summary and navigation
+to the dedicated synchronization screen. It reserves no region
 below the header and never moves the timeline when status changes. The panel
 closes through its close action, outside press or platform back/Escape. Header
 text may truncate on narrow screens, while actions retain fixed hit regions.
+
+`SyncStatusScreen` owns the detailed synchronization view. A centered cloud state
+summarizes whether everything is confirmed; one stable card separates connection,
+local queue, server upload and remote verification. Text and icons carry every
+state, with theme tokens providing supporting color. Retry lives only on this
+screen, remains disabled offline or while busy, and keeps its dimensions stable.
+The screen is reachable from both the summary overlay and the navigation drawer.
 
 Offline takes priority over activity, then errors, then confirmed synchronization.
 Checking and queued work use neutral, non-rotating icons. Rotation occurs only
@@ -183,3 +191,8 @@ Minutes must stay within 00–59. A single minute digit 0–5 waits for a second
 minute digit; 6–9 applies immediately as 06–09 because no valid two-digit minute
 can start with it. Two minute digits apply immediately. There is no typing timer;
 keyboard submit can explicitly complete a short valid input.
+
+Task execution actions use session history, not only the active-session flag.
+A task with no sessions shows “Começar”. A non-completed task with recorded time
+shows the accumulated duration and “Continuar”; an active session shows “Em execução”.
+Completed tasks keep the recorded-time comparison without a start/continue action.

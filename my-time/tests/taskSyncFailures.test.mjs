@@ -16,7 +16,12 @@ function setup() {
     { id: 'second', type: 'delete', taskId: 'b' },
   ] };
   let error = { code: '23514', message: 'PRIVATE TASK CONTENT', details: 'PRIVATE' };
+  let syncImplementation = async (userId, op) => {
+    sent.push(op.id);
+    if (error) throw error;
+  };
   let failStorage = false;
+  let remoteLoads = 0;
   const sent = [];
   const status = new Function('console', `${stripImports(read('data/taskSyncStatus.js'))}; return { subscribeTaskSyncStatus, updateTaskSyncStatus, getTaskSyncMessage };`)({ warn() {} });
   let observed;
@@ -24,13 +29,16 @@ function setup() {
   const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => structuredClone(state), async next => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
-    async () => [], { auth: { getSession: async () => ({ data: { session: { user: { id: 'u' } } } }) } },
+    async () => { remoteLoads += 1; return []; }, { auth: { getSession: async () => ({ data: { session: { user: { id: 'u' } } } }) } },
     () => ({ userId: 'u', revision: 0 }),
-    async (userId, op) => { sent.push(op.id); if (error) throw error; }, classifyTaskSyncError,
+    (...args) => syncImplementation(...args), classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
-  const repository = new Function(...names, `${stripImports(read('data/taskRepository.js'))}; return { syncPendingTasks, loadTasksSnapshot };`)(...values);
+  const repository = new Function(...names, `${stripImports(read('data/taskRepository.js'))}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, pullRemoteTasks, loadTasksSnapshot };`)(...values);
   return { repository, sent, state: () => state, observed: () => observed, status,
-    setError: value => { error = value; }, failStorage: () => { failStorage = true; } };
+    setError: value => { error = value; },
+    setSyncImplementation: value => { syncImplementation = value; },
+    remoteLoads: () => remoteLoads,
+    failStorage: () => { failStorage = true; } };
 }
 
 test('classification uses known protocol signals, never messages or attempt count', () => {
@@ -101,6 +109,75 @@ test('diagnostic write failure preserves original queue and send error', async (
   await assert.rejects(h.repository.syncPendingTasks(), error => error === original);
   assert.equal(h.state().pendingOps.length, 2);
   assert.equal(h.state().pendingOps[0].sync, undefined);
+});
+
+test('hung remote operation is aborted and reported as a transient timeout', async () => {
+  const h = setup();
+  let signal;
+  h.setSyncImplementation(async (userId, operation, options) => {
+    signal = options.signal;
+    await new Promise(() => {});
+  });
+  await assert.rejects(
+    h.repository.syncOperationWithTimeout('u', h.state().pendingOps[0], 20),
+    error => error.name === 'AbortError',
+  );
+  assert.equal(signal.aborted, true);
+});
+
+test('confirmed offline state never starts a task synchronization', async () => {
+  const h = setup();
+  h.repository.setTaskSyncOnline(false);
+  assert.equal(await h.repository.syncPendingTasks(), 0);
+  assert.deepEqual(h.sent, []);
+  assert.equal(h.state().pendingOps.length, 2);
+  assert.equal(h.observed().sending, false);
+});
+
+test('confirmed offline state never starts a remote task recovery', async () => {
+  const h = setup();
+  h.repository.setTaskSyncOnline(false);
+  const tasks = await h.repository.pullRemoteTasks();
+  assert.equal(h.remoteLoads(), 0);
+  assert.equal(tasks.length, 1);
+  assert.equal(h.observed().pulling, false);
+});
+
+test('losing connectivity aborts an active task synchronization', async () => {
+  const h = setup();
+  let signal;
+  h.setSyncImplementation(async (userId, operation, options) => {
+    signal = options.signal;
+    await new Promise(() => {});
+  });
+  const syncing = h.repository.syncPendingTasks();
+  await until(() => Boolean(signal));
+  h.repository.setTaskSyncOnline(false);
+  await assert.rejects(syncing, error => error.name === 'AbortError');
+  assert.equal(signal.aborted, true);
+  assert.equal(h.observed().sending, false);
+  assert.equal(h.state().pendingOps.length, 2);
+});
+
+test('online transient failure retries automatically and drains the FIFO queue', async () => {
+  const h = setup();
+  h.setError({ status: 503 });
+  h.repository.setTaskSyncOnline(true);
+  await until(() => h.sent.length === 1);
+  h.setError(null);
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await until(() => h.state().pendingOps.length === 0);
+  assert.deepEqual(h.sent, ['first', 'first', 'second']);
+  assert.equal(h.observed().sendConfirmed, true);
+});
+
+test('online permanent rejection does not enter an automatic retry loop', async () => {
+  const h = setup();
+  h.repository.setTaskSyncOnline(true);
+  await until(() => h.sent.length === 1);
+  await new Promise(resolve => setTimeout(resolve, 650));
+  assert.deepEqual(h.sent, ['first']);
+  assert.equal(h.state().pendingOps[0].sync.state, 'blocked');
 });
 
 function setupPull() {

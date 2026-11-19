@@ -70,7 +70,7 @@ function drawer({ setThemeMode = async () => {}, signOut = async () => ({ error:
   return {
     nodes: render,
     theme: () => render().find(node => node.props.accessibilityRole === 'switch'),
-    logout: () => render().find(node => node.props.accessibilityRole === 'button'),
+    logout: () => render().find(node => node.props.accessibilityLabel === 'Terminar sessão'),
     notice: () => render().find(node => node.type === 'banner').props.notice,
   };
 }

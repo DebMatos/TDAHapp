@@ -310,6 +310,18 @@ test('completed task shows recorded time and variance instead of start control',
   assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
 });
 
+test('paused task shows recorded time and a continue action instead of start', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: 25 * 60 * 1000,
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.match(content, /Tempo registado: /);
+  assert.match(content, /25 min/);
+  assert.ok(h.button('Continuar tarefa'));
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+});
+
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
