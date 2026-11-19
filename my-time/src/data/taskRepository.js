@@ -125,7 +125,6 @@ export const loadTasks = async () => {
   await writeQueue;
 
   const state = await getState();
-    console.log('[Debug] Operações pendentes:', state.pendingOps);
 
   return state.tasks;
 };
