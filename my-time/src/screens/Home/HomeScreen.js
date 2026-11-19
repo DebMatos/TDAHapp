@@ -993,9 +993,17 @@ export default function TimelineScreen() {
         onStartTracking={detailsMode === 'edit' ? async () => {
           await handleTrackingAction(detailsTask.id, 'start');
         } : undefined}
+        onOpenSessionHistory={detailsMode === 'edit' ? () => {
+          const task = detailsTask;
+          setDetailsTask(null);
+          setDetailsFromQuick(false);
+          navigation.navigate('TaskSessionHistory', { task });
+        } : undefined}
         isTracking={activeSession?.taskId === detailsTask?.id}
         trackingBusy={trackingBusy}
-        trackedDurationMs={detailsTrackedDurationMs}
+        trackedDurationMs={activeSession?.taskId === detailsTask?.id
+          ? liveDurationMs
+          : detailsTrackedDurationMs}
         onDelete={
           detailsMode === 'edit'
             ? async () => {

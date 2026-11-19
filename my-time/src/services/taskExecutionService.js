@@ -92,6 +92,13 @@ export const createTaskExecutionService = ({
     return getTaskDurationMs(sessions, taskId, timestamp);
   };
 
+  const getTaskSessions = async (taskId) => {
+    await writeQueue;
+    return (await load())
+      .filter((session) => session.taskId === taskId)
+      .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
+  };
+
   return {
     startTask,
     resumeTask: startTask,
@@ -100,6 +107,7 @@ export const createTaskExecutionService = ({
     getActiveSession,
     getTrackedDurationMs,
     getRecordedDurationMs,
+    getTaskSessions,
   };
 };
 
@@ -112,3 +120,4 @@ export const getActiveSession = taskExecutionService.getActiveSession;
 export const getTrackedDurationMs = taskExecutionService.getTrackedDurationMs;
 
 export const getRecordedDurationMs = taskExecutionService.getRecordedDurationMs;
+export const getTaskSessions = taskExecutionService.getTaskSessions;

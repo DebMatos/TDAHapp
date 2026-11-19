@@ -40,6 +40,7 @@ import {
 } from '../../utils/taskDateInput';
 
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
+import { formatTrackingMinutes, getTrackingComparisonLabel } from '../../utils/taskSessionHistory';
 
 const DAY_MINUTES = 24 * 60;
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
@@ -148,14 +149,6 @@ const parseTime = (value, fallback = 7 * 60) => {
   return normalizeMinutes(hours * 60 + minutes);
 };
 
-const formatTrackedDuration = (minutes) => {
-  const rounded = Math.max(0, minutes);
-  const hours = Math.floor(rounded / 60);
-  const remainingMinutes = rounded % 60;
-  if (!hours) return `${remainingMinutes} min`;
-  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
-};
-
 const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
@@ -213,6 +206,7 @@ export default function TaskDetailsModal({
   onDismissBanner,
   onDelete,
   onStartTracking,
+  onOpenSessionHistory,
   isTracking = false,
   trackingBusy = false,
   trackedDurationMs = null,
@@ -262,7 +256,7 @@ export default function TaskDetailsModal({
   const trackedMinutes = trackedDurationMs === null
     ? null
     : Math.round(Math.max(0, trackedDurationMs) / 60000);
-  const differenceMinutes = trackedMinutes === null ? null : trackedMinutes - duration;
+  const displayedTrackedMinutes = trackedMinutes ?? 0;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
@@ -1528,78 +1522,57 @@ export default function TaskDetailsModal({
                   </View>
                 </View>
               )}
-              {/* EXECUÇÃO — independente do horário planeado */}
-              {isEdit && status === 'completed' && trackedMinutes !== null && (
-                <View style={{
-                  alignSelf: 'stretch',
-                  backgroundColor: colors.selectionSoft,
-                  borderRadius: 14,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  marginVertical: 12,
-                  gap: 5,
-                }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
-                    <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
-                      Tempo registado: {formatTrackedDuration(trackedMinutes)}
-                    </Text>
-                  </View>
-                  <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
-                    {differenceMinutes === 0
-                      ? 'Igual ao estimado'
-                      : `${differenceMinutes > 0 ? '+' : '−'}${formatTrackedDuration(Math.abs(differenceMinutes))} face ao estimado`}
-                    {' ('}{formatDuration(duration)}{' previsto)'}
-                  </Text>
-                </View>
-              )}
-              {isEdit && status !== 'completed' && onStartTracking && (
-                <View style={{
-                  alignSelf: 'stretch',
-                  backgroundColor: colors.selectionSoft,
-                  borderRadius: 14,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  marginVertical: 12,
-                  gap: 10,
-                }}>
-                  {trackedMinutes !== null && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
-                      <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
-                        Tempo registado: {formatTrackedDuration(trackedMinutes)}
-                      </Text>
-                    </View>
-                  )}
+              {/* EXECUÇÃO — apresentação uniforme e independente do horário planeado */}
+              {isEdit && (
+                <View style={styles.trackingSection}>
                   <TouchableOpacity
                     accessibilityRole="button"
-                    accessibilityLabel={
-                      isTracking
-                        ? 'Tarefa em execução'
-                        : trackedMinutes !== null
-                          ? 'Continuar tarefa'
-                          : 'Começar tarefa'
-                    }
-                    accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
-                    disabled={isBusy || trackingBusy || isTracking}
-                    onPress={onStartTracking}
+                    accessibilityLabel="Abrir histórico de sessões"
+                    accessibilityState={{ disabled: !onOpenSessionHistory }}
+                    disabled={!onOpenSessionHistory}
+                    onPress={onOpenSessionHistory}
                     activeOpacity={0.7}
-                    style={{
-                      minHeight: 44,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      alignSelf: 'flex-start',
-                    }}
+                    style={styles.trackingRow}
                   >
-                    <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
-                    <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
-                      {isTracking
-                        ? 'Em execução'
-                        : trackingBusy
-                          ? trackedMinutes !== null ? 'A continuar...' : 'A iniciar...'
-                          : trackedMinutes !== null ? 'Continuar' : 'Começar'}
-                    </Text>
+                    <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+                    <View style={styles.trackingContent}>
+                      <Text style={styles.trackingPrimary}>
+                        Tempo registado: {formatTrackingMinutes(displayedTrackedMinutes)}
+                      </Text>
+                      {status === 'completed' && (
+                        <Text style={styles.trackingSecondary}>
+                          {getTrackingComparisonLabel(displayedTrackedMinutes, duration)}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {status !== 'completed' && onStartTracking && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        isTracking
+                          ? 'Tarefa em execução'
+                          : trackedMinutes !== null
+                            ? 'Continuar tarefa'
+                            : 'Iniciar tarefa'
+                      }
+                      accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
+                      disabled={isBusy || trackingBusy || isTracking}
+                      onPress={onStartTracking}
+                      activeOpacity={0.7}
+                      style={styles.trackingRow}
+                    >
+                      <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.textMuted} />
+                      <Text style={styles.trackingPrimary}>
+                        {isTracking
+                          ? 'Em execução'
+                          : trackingBusy
+                            ? trackedMinutes !== null ? 'A continuar…' : 'A iniciar…'
+                            : trackedMinutes !== null ? 'Continuar' : 'Iniciar'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
               {/* DELETE */}
@@ -2106,6 +2079,41 @@ const createStyles = (colors) => {
       fontSize: 14,
 
       color: colors.text,
+    },
+
+    trackingSection: {
+      alignSelf: 'stretch',
+      marginTop: 14,
+      paddingTop: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderSoft,
+    },
+
+    trackingRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+
+    trackingContent: {
+      flex: 1,
+      paddingVertical: 8,
+    },
+
+    trackingPrimary: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '600',
+    },
+
+    trackingSecondary: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 3,
     },
 
     /* DELETE */

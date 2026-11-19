@@ -10,6 +10,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
+import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { setTaskSyncOnline } from './src/data/taskRepository';
 import { syncTaskSessions } from './src/services/taskSessionSyncService';
@@ -142,6 +143,7 @@ function AppContent() {
             >
               <Drawer.Screen name="Home" component={HomeScreen} />
               <Drawer.Screen name="SyncStatus" component={SyncStatusScreen} />
+              <Drawer.Screen name="TaskSessionHistory" component={TaskSessionHistoryScreen} />
             </Drawer.Navigator>
           </NavigationContainer>
         ) : (

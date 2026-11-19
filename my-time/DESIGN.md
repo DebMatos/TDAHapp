@@ -192,7 +192,16 @@ minute digit; 6–9 applies immediately as 06–09 because no valid two-digit mi
 can start with it. Two minute digits apply immediately. There is no typing timer;
 keyboard submit can explicitly complete a short valid input.
 
-Task execution actions use session history, not only the active-session flag.
-A task with no sessions shows “Começar”. A non-completed task with recorded time
-shows the accumulated duration and “Continuar”; an active session shows “Em execução”.
-Completed tasks keep the recorded-time comparison without a start/continue action.
+Task execution uses one borderless section after the task properties, separated by
+a hairline. Every edited task shows a clock row with the dynamically summed recorded
+time and a chevron to the read-only session history. Pending tasks add a second,
+equally aligned play row: “Iniciar” without sessions, “Continuar” with history, or
+“Em execução” while active. Completed tasks omit execution actions and show only a
+neutral natural-language comparison below the recorded total. The section never
+repeats planned duration and uses no status color, card background or outline.
+
+The session-history screen groups unique sessions chronologically by local civil
+date, derives every individual and total duration from the existing session model,
+and treats an open session as ending at the current instant. It is read-only, uses
+the same neutral typography in light and dark themes, and provides loading, empty
+and safe local-read failure states.
