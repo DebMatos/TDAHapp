@@ -12,7 +12,7 @@ import {
 export const createTask = async (values) => {
   return createTaskAndLoadTasks({
     ...values,
-    id: `task-${Date.now()}`,
+    id: `task-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   });
 };
 
