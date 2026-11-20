@@ -12,6 +12,16 @@ const contrast = (foreground, background) => {
   const a = luminance(foreground), b = luminance(background);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 };
+
+test('light: canvas tokens use the temporary warm palette', () => {
+  assert.equal(lightColors.background, '#EAE7E1');
+  assert.equal(lightColors.surface, '#F5F2ED');
+});
+
+test('light: tracking control icons meet non-text contrast', () => {
+  assert.ok(contrast(lightColors.onAction, lightColors.danger) >= 3);
+  assert.ok(contrast(lightColors.text, lightColors.completed) >= 3);
+});
 for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
   test(`${theme}: action labels, selected day and Quick Create meet small-text contrast`, () => {
     for (const [text, background] of [[colors.onAction, colors.action], [colors.onAction, colors.selection], [colors.surface, colors.selection]]) {

@@ -4,28 +4,20 @@ import {
   StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import {
   getTaskSyncMessage, getTaskSyncState, subscribeTaskSyncStatus,
 } from '../data/taskSyncStatus';
-import { pullRemoteTasks, syncPendingTasks } from '../data/taskRepository';
+import { TASK_SYNC_PRESENTATIONS } from '../data/taskSyncPresentation';
 import { useTheme } from '../theme/ThemeContext';
 
-const presentations = {
-  syncing: { icon: 'autorenew', title: 'A sincronizar', message: 'Existem operações de envio ou recuperação em curso.' },
-  offline: { icon: 'cloud-off-outline', title: 'Sem Internet', message: 'As tarefas locais permanecem guardadas neste dispositivo. As alterações pendentes serão enviadas quando houver ligação.' },
-  synced: { icon: 'cloud-check-outline', title: 'Sincronizado', message: 'O envio e a recuperação foram concluídos. Não existem alterações locais pendentes.' },
-  error: { icon: 'cloud-alert-outline', title: 'A sincronização precisa de atenção' },
-  pending: { icon: 'cloud-sync-outline', title: 'Sincronização pendente', message: 'Existem alterações guardadas neste dispositivo por enviar.' },
-  checking: { icon: 'cloud-outline', title: 'A verificar sincronização', message: 'Ainda não foi possível confirmar o envio e a recuperação de tarefas.' },
-};
-
 export default function TaskSyncStatus() {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [status, setStatus] = useState({});
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState(null);
-  const [retrying, setRetrying] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(true);
   const trigger = useRef(null);
   const rotation = useRef(new Animated.Value(0)).current;
@@ -40,9 +32,7 @@ export default function TaskSyncStatus() {
     return () => { active = false; subscription.remove(); };
   }, []);
   const mode = getTaskSyncState(status);
-  const presentation = presentations[mode];
-  const busy = retrying || status.sending || status.pulling;
-  const canRetry = mode !== 'synced' && mode !== 'offline';
+  const presentation = TASK_SYNC_PRESENTATIONS[mode];
 
   useEffect(() => {
     rotation.setValue(0);
@@ -64,14 +54,9 @@ export default function TaskSyncStatus() {
       setOpen(true);
     });
   };
-  const retry = async () => {
-    if (busy) return;
-    setRetrying(true);
-    try {
-      await Promise.allSettled([syncPendingTasks(), pullRemoteTasks()]);
-    } finally {
-      setRetrying(false);
-    }
+  const showDetails = () => {
+    setOpen(false);
+    navigation.navigate('SyncStatus');
   };
   const panelWidth = Math.max(0, Math.min(320, width - 24));
   const left = Math.max(12, Math.min((anchor?.x ?? width) + (anchor?.width ?? 0) - panelWidth, width - panelWidth - 12));
@@ -98,22 +83,13 @@ export default function TaskSyncStatus() {
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text accessibilityRole="header" style={styles.title}>{presentation.title}</Text>
               <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text>
-              {mode === 'offline' && (status.sendFailed || status.pullFailed || status.failureCategory) && (
-                <Text style={styles.message}>{detail || 'Existe uma falha anterior de sincronização. Poderás tentar novamente quando houver ligação.'}</Text>
-              )}
-              {Number.isInteger(status.pending) && status.pending > 0 && (
-                <Text style={styles.count}>{status.pending === 1 ? '1 operação pendente' : `${status.pending} operações pendentes`}</Text>
-              )}
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" onPress={close} style={styles.action}>
                   <Text style={styles.actionText}>Fechar</Text>
                 </Pressable>
-                {canRetry && (
-                  <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy }}
-                    disabled={busy} onPress={retry} style={styles.action}>
-                    <Text style={[styles.actionText, busy && styles.disabled]}>{busy ? 'A tentar…' : 'Tentar novamente'}</Text>
-                  </Pressable>
-                )}
+                <Pressable accessibilityRole="button" onPress={showDetails} style={styles.action}>
+                  <Text style={styles.actionText}>Ver estado completo</Text>
+                </Pressable>
               </View>
             </ScrollView>
           </View>
@@ -129,9 +105,7 @@ const createStyles = (colors) => StyleSheet.create({
   panel: { position: 'absolute', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 16, elevation: 5, shadowColor: colors.text, shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   title: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 8 },
   message: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 8 },
-  count: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 8 },
   action: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
   actionText: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
-  disabled: { color: colors.textMuted },
 });

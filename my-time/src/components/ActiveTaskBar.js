@@ -2,23 +2,25 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-
-const formatElapsed = (milliseconds) => {
-  const seconds = Math.floor(Math.max(0, milliseconds) / 1000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
-    : `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
-};
+import { formatChronometerDuration } from '../utils/trackingChronometer';
 
 export default function ActiveTaskBar({ task, running, durationMs, onPress, onToggle, onFinish, busy = false }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   if (!task) return null;
+  const stopIconColor = isDark ? colors.text : colors.onAction;
+  const toggleIconColor = colors.text;
+  const panelStyle = {
+    backgroundColor: colors.surface,
+    borderColor: isDark ? colors.border : colors.now,
+    elevation: isDark ? 0 : 2,
+    shadowColor: colors.floatingButton.shadow,
+    shadowOffset: { width: 0, height: isDark ? 0 : 2 },
+    shadowOpacity: isDark ? 0 : 0.08,
+    shadowRadius: isDark ? 0 : 8,
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.container, panelStyle]}>
       <TouchableOpacity
         style={styles.taskInfo}
         accessibilityRole="button"
@@ -26,27 +28,27 @@ export default function ActiveTaskBar({ task, running, durationMs, onPress, onTo
         onPress={onPress}
       >
         <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>{task.title}</Text>
-        <Text style={{ color: colors.textSecondary }}>{formatElapsed(durationMs)}</Text>
+        <Text style={{ color: colors.textSecondary }}>{formatChronometerDuration(durationMs)}</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[styles.action, { backgroundColor: colors.action }]}
+        style={[styles.action, { backgroundColor: colors.danger }]}
         accessibilityRole="button"
         accessibilityLabel="Terminar registo de tempo"
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={onFinish}
       >
-        <Ionicons name="stop" size={22} color={colors.onAction} />
+        <Ionicons name="stop" size={22} color={stopIconColor} />
       </TouchableOpacity>
       <TouchableOpacity
-        style={[styles.action, { backgroundColor: colors.action }]}
+        style={[styles.action, { backgroundColor: colors.completed }]}
         accessibilityRole="button"
         accessibilityLabel={running ? 'Pausar tarefa' : 'Retomar tarefa'}
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={onToggle}
       >
-        <Ionicons name={running ? 'pause' : 'play'} size={22} color={colors.onAction} />
+        <Ionicons name={running ? 'pause' : 'play'} size={22} color={toggleIconColor} />
       </TouchableOpacity>
     </View>
   );

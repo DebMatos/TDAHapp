@@ -60,6 +60,16 @@ export function DrawerNavContent(props) {
             }
           />
         </View>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => props.navigation.navigate('SyncStatus')}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir estado da sincronização"
+          activeOpacity={0.7}
+        >
+          <Ionicons name="cloud-done-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.navItemText, { color: colors.text }]}>Sincronização</Text>
+        </TouchableOpacity>
       </DrawerContentScrollView>
       {/* <Rodapé do Menu (Terminar Sessão) */}
       <View style={[styles.footer, { borderTopColor: colors.borderSoft }]}>
@@ -68,6 +78,7 @@ export function DrawerNavContent(props) {
           onPress={handleSignOut}
           disabled={busy}
           accessibilityRole="button"
+          accessibilityLabel="Terminar sessão"
           accessibilityState={{ disabled: busy, busy }}
           activeOpacity={0.7}
         >
@@ -124,5 +135,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
+  },
+  navItem: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  navItemText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

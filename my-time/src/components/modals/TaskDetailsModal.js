@@ -40,6 +40,7 @@ import {
 } from '../../utils/taskDateInput';
 
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
+import { formatTrackingMinutes, getTrackingComparisonLabel } from '../../utils/taskSessionHistory';
 
 const DAY_MINUTES = 24 * 60;
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
@@ -67,15 +68,6 @@ const POSTPONE_OPTIONS = [
     minutes: 60,
   },
 ];
-
-const REPEAT_OPTIONS = ['never', 'daily', 'weekdays', 'weekly'];
-
-const REPEAT_LABELS = {
-  never: 'Nunca',
-  daily: 'Todos os dias',
-  weekdays: 'Dias úteis',
-  weekly: 'Todas as semanas',
-};
 
 const STATUS_OPTIONS = [
   {
@@ -157,14 +149,6 @@ const parseTime = (value, fallback = 7 * 60) => {
   return normalizeMinutes(hours * 60 + minutes);
 };
 
-const formatTrackedDuration = (minutes) => {
-  const rounded = Math.max(0, minutes);
-  const hours = Math.floor(rounded / 60);
-  const remainingMinutes = rounded % 60;
-  if (!hours) return `${remainingMinutes} min`;
-  return remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
-};
-
 const formatDuration = (minutes) => {
   if (minutes < 60) {
     return `${minutes} min`;
@@ -222,6 +206,7 @@ export default function TaskDetailsModal({
   onDismissBanner,
   onDelete,
   onStartTracking,
+  onOpenSessionHistory,
   isTracking = false,
   trackingBusy = false,
   trackedDurationMs = null,
@@ -245,7 +230,6 @@ export default function TaskDetailsModal({
   const [activeField, setActiveField] = useState(isEdit ? null : 'title');
   const isEditingTitle = activeField === 'title';
   const isEditingPriority = activeField === 'priority';
-  const isEditingRepeat = activeField === 'repeat';
 
   const [dateValue, setDateValue] = useState(getTodayDateInput());
 
@@ -271,8 +255,8 @@ export default function TaskDetailsModal({
 
   const trackedMinutes = trackedDurationMs === null
     ? null
-    : Math.round(Math.max(0, trackedDurationMs) / 60000);
-  const differenceMinutes = trackedMinutes === null ? null : trackedMinutes - duration;
+    : Math.max(0, trackedDurationMs) / 60000;
+  const displayedTrackedMinutes = trackedMinutes ?? 0;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);
 
@@ -1019,8 +1003,21 @@ export default function TaskDetailsModal({
       </View>
     );
 
-    const durationContent =
-      activeField === 'duration' ? (
+    const durationContent = (
+      <TouchableOpacity
+        disabled={isBusy}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isBusy, expanded: activeField === 'duration' }}
+        activeOpacity={0.7}
+        style={styles.propertyTouch}
+        accessibilityLabel="Editar duração"
+        onPress={() => (activeField === 'duration' ? closeInlineEditor() : openInlineEditor('duration'))}
+      >
+        <Text style={styles.inlineDurationText}>{formatDuration(duration)}</Text>
+      </TouchableOpacity>
+    );
+
+    const renderDurationOptions = () => (
         <View style={styles.inlineDurationEditor}>
           {DURATION_PRESETS.map((preset) => {
             const selected = duration === preset && customDuration === '';
@@ -1070,38 +1067,33 @@ export default function TaskDetailsModal({
             <Text style={styles.inlineCustomDurationUnit}>min</Text>
           </View>
         </View>
-      ) : (
-        <TouchableOpacity
-          disabled={isBusy}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
-          activeOpacity={0.7}
-          style={styles.propertyTouch}
-          accessibilityLabel="Editar duração"
-          onPress={() => openInlineEditor('duration')}
-        >
-          <Text style={styles.inlineDurationText}>{formatDuration(duration)}</Text>
-        </TouchableOpacity>
       );
 
+
+
     return (
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.scheduleLine}
-        keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator={false}
-      >
-        {[
-          { field: 'date', icon: 'calendar-outline', content: dateContent },
-          { field: 'time', icon: 'time-outline', content: timeContent },
-          { field: 'duration', icon: 'timer-outline', content: durationContent },
-        ].map(({ field, icon, content }) => (
-          <View key={field} style={styles.scheduleItem}>
-            <Ionicons name={icon} size={16} color={colors.textMuted} />
-            {content}
-          </View>
-        ))}
-      </ScrollView>
+      <>
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.scheduleLine}
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+        >
+          {[
+            { field: 'date', icon: 'calendar-outline', content: dateContent },
+            { field: 'time', icon: 'time-outline', content: timeContent },
+            { field: 'duration', icon: 'timer-outline', content: durationContent },
+          ].map(({ field, icon, content }) => (
+            <View key={field} style={styles.scheduleItem}>
+              <Ionicons name={icon} size={16} color={colors.textMuted} />
+              {content}
+            </View>
+          ))}
+        </ScrollView>
+        {activeField === 'duration' && (
+          <View style={styles.durationOptionsRow}>{renderDurationOptions()}</View>
+        )}
+      </>
     );
   };
 
@@ -1194,10 +1186,16 @@ export default function TaskDetailsModal({
                 ['date', 'startTime', 'endTime'].includes(activeField) ? undefined : closeInlineEditor
               }
             >
+              {/* SCHEDULE */}
+
+              <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
+
               {/* POSTPONE */}
 
               {isEdit && (
-                <View style={styles.postponeRow}>
+                <View style={styles.quickActionsPanel}>
+                  <Text style={styles.quickActionsTitle}>Adiar</Text>
+                  <View style={styles.postponeRow}>
                   {POSTPONE_OPTIONS.map((option) => {
                     const selected = postponeSelection === option.id;
 
@@ -1250,7 +1248,7 @@ export default function TaskDetailsModal({
                   >
                     <Ionicons
                       name="sunny-outline"
-                      size={14}
+                      size={12}
                       color={postponeSelection === 'tomorrow' ? colors.selection : colors.text}
                     />
 
@@ -1264,12 +1262,10 @@ export default function TaskDetailsModal({
                       Amanhã
                     </Text>
                   </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
-              {/* SCHEDULE */}
-
-              <View style={styles.scheduleArea}>{renderScheduleLine()}</View>
 
               {visible && activeField === 'date' && keyboardHeight === 0 && (
                 <InlineDatePicker
@@ -1475,74 +1471,6 @@ export default function TaskDetailsModal({
                 </View>
               )}
 
-              {/* REPEAT */}
-
-              {!isEditingRepeat ? (
-                <TouchableOpacity
-                  disabled={isBusy}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isBusy }}
-                  style={styles.propertyRow}
-                  accessibilityLabel="Editar repetição"
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    openInlineEditor('repeat');
-                  }}
-                >
-                  <Ionicons
-                    name="repeat-outline"
-                    style={styles.propertyIcon}
-                    size={20}
-                    color={colors.textMuted}
-                  />
-
-                  <View style={styles.propertyContent}>
-                    <Text style={styles.propertyLabel}>Repetição</Text>
-                    <Text style={[styles.propertyText, repeat === 'never' && styles.neutralText]}>
-                      {REPEAT_LABELS[repeat]}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.repeatEditor}>
-                  <View style={styles.repeatEditorHeader}>
-                    <Ionicons name="repeat-outline" size={20} color={colors.textMuted} />
-                  </View>
-
-                  <View style={styles.repeatOptionsRow}>
-                    {REPEAT_OPTIONS.map((item) => {
-                      const selected = item === repeat;
-
-                      return (
-                        <TouchableOpacity
-                          disabled={isBusy}
-                          accessibilityRole="button"
-                          accessibilityState={{ disabled: isBusy, selected: selected }}
-                          key={item}
-                          style={[styles.repeatOption, selected && styles.repeatOptionSelected]}
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            setRepeat(item);
-
-                            setActiveField(null);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.repeatOptionText,
-
-                              selected && styles.repeatOptionTextSelected,
-                            ]}
-                          >
-                            {REPEAT_LABELS[item]}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-
               {/* NOTES */}
 
               {activeField !== 'notes' ? (
@@ -1594,55 +1522,58 @@ export default function TaskDetailsModal({
                   </View>
                 </View>
               )}
-              {/* EXECUÇÃO — independente do horário planeado */}
-              {isEdit && status === 'completed' && trackedMinutes !== null && (
-                <View style={{
-                  alignSelf: 'stretch',
-                  backgroundColor: colors.selectionSoft,
-                  borderRadius: 14,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  marginVertical: 12,
-                  gap: 5,
-                }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Ionicons name="timer-outline" size={20} color={colors.selectionText} />
-                    <Text style={{ color: colors.selectionText, fontWeight: '600' }}>
-                      Tempo registado: {formatTrackedDuration(trackedMinutes)}
-                    </Text>
-                  </View>
-                  <Text style={{ color: colors.textSecondary, marginLeft: 28 }}>
-                    {differenceMinutes === 0
-                      ? 'Igual ao estimado'
-                      : `${differenceMinutes > 0 ? '+' : '−'}${formatTrackedDuration(Math.abs(differenceMinutes))} face ao estimado`}
-                    {' ('}{formatDuration(duration)}{' previsto)'}
-                  </Text>
+              {/* EXECUÇÃO — apresentação uniforme e independente do horário planeado */}
+              {isEdit && (
+                <View style={styles.trackingSection}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir histórico de sessões"
+                    accessibilityState={{ disabled: !onOpenSessionHistory }}
+                    disabled={!onOpenSessionHistory}
+                    onPress={onOpenSessionHistory}
+                    activeOpacity={0.7}
+                    style={styles.trackingRow}
+                  >
+                    <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+                    <View style={styles.trackingContent}>
+                      <Text style={styles.trackingPrimary}>
+                        Tempo registado: {formatTrackingMinutes(displayedTrackedMinutes)}
+                      </Text>
+                      {status === 'completed' && (
+                        <Text style={styles.trackingSecondary}>
+                          {getTrackingComparisonLabel(displayedTrackedMinutes, duration)}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  {status !== 'completed' && onStartTracking && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        isTracking
+                          ? 'Tarefa em execução'
+                          : trackedMinutes !== null
+                            ? 'Continuar tarefa'
+                            : 'Iniciar tarefa'
+                      }
+                      accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
+                      disabled={isBusy || trackingBusy || isTracking}
+                      onPress={onStartTracking}
+                      activeOpacity={0.7}
+                      style={styles.trackingRow}
+                    >
+                      <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.textMuted} />
+                      <Text style={styles.trackingPrimary}>
+                        {isTracking
+                          ? 'Em execução'
+                          : trackingBusy
+                            ? trackedMinutes !== null ? 'A continuar…' : 'A iniciar…'
+                            : trackedMinutes !== null ? 'Continuar' : 'Iniciar'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              )}
-              {isEdit && status !== 'completed' && onStartTracking && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={isTracking ? 'Tarefa em execução' : 'Começar tarefa'}
-                  accessibilityState={{ disabled: isBusy || trackingBusy || isTracking }}
-                  disabled={isBusy || trackingBusy || isTracking}
-                  onPress={onStartTracking}
-                  activeOpacity={0.7}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    alignSelf: 'flex-start',
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    marginVertical: 12,
-                    borderRadius: 14,
-                    backgroundColor: colors.selectionSoft,
-                  }}
-                >
-                  <Ionicons name={isTracking ? 'time-outline' : 'play-outline'} size={20} color={colors.selectionText} />
-                  <Text style={{ color: colors.selectionText, fontWeight: '600', marginLeft: 8 }}>
-                    {isTracking ? 'Em execução' : trackingBusy ? 'A iniciar...' : 'Começar'}
-                  </Text>
-                </TouchableOpacity>
               )}
               {/* DELETE */}
 
@@ -1839,7 +1770,7 @@ const createStyles = (colors) => {
     },
 
     inlineDateText: {
-      fontSize: 14,
+      fontSize: 16,
 
       lineHeight: 20,
 
@@ -1849,7 +1780,7 @@ const createStyles = (colors) => {
     },
 
     inlineTimeText: {
-      fontSize: 14,
+      fontSize: 16,
       lineHeight: 20,
       fontWeight: '600',
       color: colors.text,
@@ -1864,7 +1795,7 @@ const createStyles = (colors) => {
     },
 
     inlineDurationText: {
-      fontSize: 13,
+      fontSize: 15,
 
       lineHeight: 20,
 
@@ -1903,6 +1834,10 @@ const createStyles = (colors) => {
       fontSize: 14,
 
       color: colors.textMuted,
+    },
+
+    durationOptionsRow: {
+      paddingVertical: 8,
     },
 
     inlineDurationEditor: {
@@ -1984,48 +1919,58 @@ const createStyles = (colors) => {
       color: colors.textMuted,
     },
 
-    /* POSTPONE */
+    /* QUICK ACTIONS — compact buttons inside a distinct panel */
 
-    postponeRow: {
-      marginTop: 8,
+    quickActionsPanel: {
+      marginTop: 4,
       marginBottom: 8,
+      paddingVertical: 6,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-start',
       gap: 6,
     },
 
-    postponeButton: {
-      minHeight: 44,
+    quickActionsTitle: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.textMuted,
+    },
+
+    postponeRow: {
       flex: 1,
-      paddingHorizontal: 4,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      gap: 5,
+    },
+
+    postponeButton: {
+      height: 34,
+      paddingHorizontal: 6,
       borderRadius: 9,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 5,
-      backgroundColor: colors.surfaceMuted,
-      borderWidth: 1,
+      gap: 3,
+      backgroundColor: colors.surfaceSoft,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
 
     postponeButtonSelected: {
       backgroundColor: colors.selectionSoft,
-
       borderColor: colors.selection,
     },
 
     postponeButtonText: {
-      fontSize: 12,
-
-      fontWeight: '700',
-
+      fontSize: 11,
+      fontWeight: '600',
       color: colors.text,
     },
 
     postponeButtonTextSelected: {
       fontWeight: '700',
-
       color: colors.selectionText,
     },
 
@@ -2116,62 +2061,6 @@ const createStyles = (colors) => {
       borderColor: colors.selectionText,
     },
 
-    /* REPEAT */
-
-    repeatEditor: {
-      gap: 8,
-    },
-
-    repeatEditorHeader: {
-      minHeight: 24,
-
-      flexDirection: 'row',
-
-      alignItems: 'center',
-    },
-
-    repeatOptionsRow: {
-      flexDirection: 'row',
-
-      alignItems: 'center',
-
-      flexWrap: 'wrap',
-
-      gap: 7,
-    },
-
-    repeatOption: {
-      minHeight: 44,
-
-      paddingHorizontal: 11,
-
-      borderRadius: 10,
-
-      alignItems: 'center',
-
-      justifyContent: 'center',
-
-      backgroundColor: colors.surfaceSoft,
-    },
-
-    repeatOptionSelected: {
-      backgroundColor: colors.selectionSoft,
-    },
-
-    repeatOptionText: {
-      fontSize: 12,
-
-      fontWeight: '600',
-
-      color: colors.textSecondary,
-    },
-
-    repeatOptionTextSelected: {
-      color: colors.selectionText,
-
-      fontWeight: '700',
-    },
-
     /* NOTES */
 
     notesInput: {
@@ -2190,6 +2079,41 @@ const createStyles = (colors) => {
       fontSize: 14,
 
       color: colors.text,
+    },
+
+    trackingSection: {
+      alignSelf: 'stretch',
+      marginTop: 14,
+      paddingTop: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderSoft,
+    },
+
+    trackingRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+
+    trackingContent: {
+      flex: 1,
+      paddingVertical: 8,
+    },
+
+    trackingPrimary: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '600',
+    },
+
+    trackingSecondary: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+      marginTop: 3,
     },
 
     /* DELETE */

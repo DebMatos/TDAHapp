@@ -1,6 +1,6 @@
 // Only persist recognised protocol codes, never server messages or payloads.
 const DATA_CODES = new Set(['23502', '23503', '23514', '22P02', '22001', '22003']);
-const AUTH_CODES = new Set(['42501', 'PGRST301', 'PGRST302', 'PGRST303']);
+const AUTH_CODES = new Set(['42501', 'PGRST301', 'PGRST302', 'PGRST303', 'SESSION_UNAVAILABLE']);
 const TRANSIENT_CODES = new Set(['40001', '40P01', '53300', '57P01', '57014']);
 
 export const classifyTaskSyncError = (error) => {

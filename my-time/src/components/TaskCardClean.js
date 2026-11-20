@@ -1,12 +1,10 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 
-import { DAY_MINUTES } from '../constants/timeline';
-
 import {
   formatTimeFromMinutes,
   timeToMinutes,
   formatDuration,
-  snapMinutes,
+  getDraggedTimelineStart,
 } from '../utils/time';
 
 import {
@@ -28,8 +26,6 @@ const LONG_PRESS_DELAY_MS = 350;
 /* -------------------------------------------------------
    HELPERS
 ------------------------------------------------------- */
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 /* -------------------------------------------------------
    COMPONENTE
@@ -121,15 +117,6 @@ export default function TaskCardClean({
   const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
 
 
-const priorityColor =
-  task.priority === 'high'
-    ? colors.priority.high
-    : task.priority === 'medium'
-      ? colors.priority.medium
-      : task.priority === 'low'
-        ? colors.priority.low
-        : null;
-
   /* -------------------------------------------------------
      DRAG
   ------------------------------------------------------- */
@@ -170,20 +157,18 @@ const priorityColor =
           dragY.setValue(0);
         },
 
-        onPanResponderMove: (_, gesture) => {
+        onPanResponderMove: (event, gesture) => {
           if (isDragActive.current) {
-            dragY.setValue(gesture.dy);
+            const pointerY = event.nativeEvent.pageY ?? gesture.moveY;
+            dragY.setValue(pointerY - initialTouch.current.y);
           }
         },
 
-        onPanResponderRelease: (_, gesture) => {
+        onPanResponderRelease: (event, gesture) => {
           if (isDragActive.current) {
-            const finalY = top + gesture.dy;
-            const finalMins = clamp(
-              snapMinutes(getMinuteFromY(finalY)),
-              0,
-              DAY_MINUTES - duration,
-            );
+            const pointerY = event.nativeEvent.pageY ?? gesture.moveY;
+            const deltaY = pointerY - initialTouch.current.y;
+            const finalMins = getDraggedTimelineStart(startMinutes, deltaY, ppm, duration);
 
             dragY.setValue(0);
             onChangeStart(task.id, finalMins);
@@ -196,7 +181,7 @@ const priorityColor =
           resetAll();
         },
       }),
-    [dragY, top, getMinuteFromY, duration, onChangeStart, task.id, resetAll],
+    [dragY, startMinutes, ppm, duration, onChangeStart, task.id, resetAll],
   );
 
   /* -------------------------------------------------------
@@ -476,14 +461,6 @@ const priorityColor =
   </Text>
 
 
-{priorityColor && (
-  <Ionicons
-    name="flag-outline"
-    size={12}
-    color={priorityColor}
-    style={styles.priorityFlag}
-  />
-)}
 </View>
 
         {hasRoomForMeta && (
@@ -717,11 +694,5 @@ cardTopRow: {
   alignItems: 'center',
 },
 
-
-priorityFlag: {
-  marginLeft: 8,
-  marginRight: 4,
-  flexShrink: 0,
-},
 
 });

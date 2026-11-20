@@ -34,6 +34,10 @@ function harness(colors = lightColors, overrides = {}) {
     useTheme: () => ({ colors, isDark: colors === darkColors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates,
     getFloatingButtonStyles: () => ({ floatingButton: {} }), KeyboardAvoidingView: 'keyboardAvoiding',
     formatTimeInput: times.formatTimeInput, isValidTime: times.isValidTime, ...categories,
+    formatTrackingMinutes: minutes => `${Math.max(0, Math.round(minutes))} min`,
+    getTrackingComparisonLabel: (recorded, estimated) => recorded === estimated
+      ? 'Dentro do previsto'
+      : `${Math.abs(recorded - estimated)} min ${recorded < estimated ? 'abaixo' : 'acima'} do previsto`,
     Animated: { Value: class { setValue() {} }, View: 'animated', spring: (value, config) => ({ value, config }),
       parallel: children => { geometry.push(children); return { start() {}, stop() {} }; } },
     Dimensions: { get: () => ({ height: 780 }) }, Keyboard: { dismiss() {},
@@ -81,10 +85,7 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
       assert.ok(h.button(`Editar ${field}`));
       assert.equal(h.render().some(n => n.type === 'button' && n.props.accessibilityLabel === option), false);
     }
-    h.button('Editar repetição').props.onPress();
-    const repeat = h.render().find(n => n.type === 'button' && nodes(n).some(child => child.children.includes('Todos os dias')));
-    assert.ok(repeat); repeat.props.onPress();
-    assert.ok(h.button('Editar repetição'));
+    assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Editar repetição'), false);
     assert.equal(h.saved.length, 0);
   });
 }
@@ -237,7 +238,9 @@ test('calendar is between schedule and category in the form scroll and expands t
   const children = form.children.flat(Infinity).filter(n => n && typeof n === 'object');
   const calendarIndex = children.findIndex(n => n.type === 'calendar');
   assert.ok(calendarIndex > 0);
-  assert.ok(nodes(children[calendarIndex - 1]).some(n => n.props.accessibilityLabel === 'Editar data'));
+  assert.ok(children.slice(0, calendarIndex).some(child =>
+    nodes(child).some(n => n.props.accessibilityLabel === 'Editar data')
+  ));
   assert.equal(children[calendarIndex + 1].props.accessibilityLabel, 'Editar categoria');
   const animationCount = h.geometry.length;
   children[calendarIndex].props.onSelect('05/04/2028');
@@ -247,10 +250,10 @@ test('calendar is between schedule and category in the form scroll and expands t
 
 test('completed tasks hide the start tracking action', () => {
   const h = harness(lightColors, { onStartTracking: () => {} });
-  assert.ok(h.button('Começar tarefa'));
+  assert.ok(h.button('Iniciar tarefa'));
   h.button('Editar estado').props.onPress();
   h.button('Concluída').props.onPress();
-  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Iniciar tarefa'), false);
 });
 
 test('a task already completed when opening details has no start button', () => {
@@ -267,10 +270,10 @@ test('a task already completed when opening details has no start button', () => 
       notes: '',
     },
   });
-  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Iniciar tarefa'), false);
 });
 
-test('completed task without sessions shows no misleading zero-minute comparison', () => {
+test('completed task without sessions shows zero total and natural comparison', () => {
   const h = harness(lightColors, {
     onStartTracking: () => {},
     trackedDurationMs: null,
@@ -286,9 +289,10 @@ test('completed task without sessions shows no misleading zero-minute comparison
     },
   });
   const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
-  assert.doesNotMatch(content, /Tempo registado:/);
-  assert.doesNotMatch(content, /face ao estimado/);
-  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+  assert.match(content, /Tempo registado: /);
+  assert.match(content, /0 min/);
+  assert.match(content, /30 min abaixo do previsto/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Iniciar tarefa'), false);
 });
 
 test('completed task shows recorded time and variance instead of start control', () => {
@@ -309,8 +313,30 @@ test('completed task shows recorded time and variance instead of start control',
   const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
   assert.match(content, /Tempo registado: /);
   assert.match(content, /40 min/);
-  assert.match(content, /10 min/);
-  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Começar tarefa'), false);
+  assert.match(content, /10 min acima do previsto/);
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Iniciar tarefa'), false);
+});
+
+test('paused task shows recorded time and a continue action instead of start', () => {
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    trackedDurationMs: 25 * 60 * 1000,
+  });
+  const content = h.render().flatMap(n => n.children).filter(x => typeof x === 'string').join(' ');
+  assert.match(content, /Tempo registado: /);
+  assert.match(content, /25 min/);
+  assert.ok(h.button('Continuar tarefa'));
+  assert.equal(h.render().some(n => n.props.accessibilityLabel === 'Iniciar tarefa'), false);
+});
+
+test('tracking total opens session history through the provided action', () => {
+  let opened = 0;
+  const h = harness(lightColors, {
+    onStartTracking: () => {},
+    onOpenSessionHistory: () => { opened += 1; },
+  });
+  h.button('Abrir histórico de sessões').props.onPress();
+  assert.equal(opened, 1);
 });
 
 test('the same time picker edits start and end while preserving overnight duration and save payload', async () => {

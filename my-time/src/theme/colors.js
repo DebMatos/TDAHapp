@@ -7,8 +7,8 @@ const categoryColors = {
 };
 
 export const lightColors = {
-  background: '#FAF9F6',
-  surface: '#FFFDFC',
+  background: '#EAE7E1',
+  surface: '#F5F2ED',
   surfaceSoft: '#F6F3EE',
   surfaceMuted: '#EFECE6',
 

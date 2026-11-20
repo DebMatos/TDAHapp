@@ -50,6 +50,10 @@ test('retomar cria uma nova sessão e acumula duração', async () => {
   setNow('2026-11-15T14:30:00Z');
   assert.equal(await service.getTrackedDurationMs('t1'), 25 * 60 * 1000);
   assert.equal(getSaved().length, 2);
+  assert.deepEqual(
+    Array.from(await service.getTaskSessions('t1'), (session) => session.id),
+    ['s-1', 's-2'],
+  );
 });
 
 test('não permite duas tarefas a contar em simultâneo, incluindo pedidos concorrentes', async () => {

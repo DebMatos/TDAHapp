@@ -55,14 +55,15 @@ const toDatabase = (task, userId) => ({
    READ
 ------------------------------------------------------- */
 
-export const loadTasks = async (userId) => {
+export const loadTasks = async (userId, signal) => {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
     .order('position', {
       ascending: true,
-    });
+    })
+    .abortSignal(signal);
 
   if (error) {
     throw error;
@@ -80,29 +81,30 @@ export const loadTasks = async (userId) => {
 export const createTask = async (
   userId,
   task,
+  signal,
 ) => {
   const canonicalTask =
     normalizeTask(task);
-console.log('[Sync] Prioridade enviada:', canonicalTask.priority);
-  const { data, error } =
+  const { error } =
     await supabase
       .from('tasks')
-      .insert(
+      .upsert(
         toDatabase(
           canonicalTask,
           userId,
         ),
+        {
+          onConflict: 'id',
+          ignoreDuplicates: true,
+        },
       )
-      .select('*')
-      .single();
+      .abortSignal(signal);
 
   if (error) {
     throw error;
   }
 
-  return normalizeTask(
-    fromDatabase(data),
-  );
+  return canonicalTask;
 };
 
 /* -------------------------------------------------------
@@ -112,6 +114,7 @@ console.log('[Sync] Prioridade enviada:', canonicalTask.priority);
 export const updateTask = async (
   userId,
   task,
+  signal,
 ) => {
   const canonicalTask =
     normalizeTask(task);
@@ -134,6 +137,7 @@ export const updateTask = async (
       .update(changes)
       .eq('id', id)
       .eq('user_id', userId)
+      .abortSignal(signal)
       .select('*')
       .single();
 
@@ -153,12 +157,14 @@ export const updateTask = async (
 export const deleteTask = async (
   userId,
   taskId,
+  signal,
 ) => {
   const { error } = await supabase
     .from('tasks')
     .delete()
     .eq('id', taskId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .abortSignal(signal);
 
   if (error) {
     throw error;
