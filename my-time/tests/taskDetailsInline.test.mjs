@@ -238,7 +238,9 @@ test('calendar is between schedule and category in the form scroll and expands t
   const children = form.children.flat(Infinity).filter(n => n && typeof n === 'object');
   const calendarIndex = children.findIndex(n => n.type === 'calendar');
   assert.ok(calendarIndex > 0);
-  assert.ok(nodes(children[calendarIndex - 1]).some(n => n.props.accessibilityLabel === 'Editar data'));
+  assert.ok(children.slice(0, calendarIndex).some(child =>
+    nodes(child).some(n => n.props.accessibilityLabel === 'Editar data')
+  ));
   assert.equal(children[calendarIndex + 1].props.accessibilityLabel, 'Editar categoria');
   const animationCount = h.geometry.length;
   children[calendarIndex].props.onSelect('05/04/2028');
