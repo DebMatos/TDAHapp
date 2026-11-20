@@ -91,18 +91,16 @@ export default function TaskSessionHistoryScreen({ navigation, route }) {
               <Text style={styles.dateTitle}>{group.label}</Text>
               {group.sessions.map((session) => (
                 <View key={session.id} style={styles.sessionRow}>
-                  <View style={styles.sessionDot} />
-                  <Text style={styles.sessionText}>
-                    {session.startLabel} → {session.endLabel} · {formatTrackingMinutes(session.durationMinutes)}
+                  <Text style={styles.sessionTime}>
+                    {session.startLabel} → {session.endLabel}
+                  </Text>
+                  <Text style={styles.sessionDuration}>
+                    {formatTrackingMinutes(session.durationMinutes)}
                   </Text>
                 </View>
               ))}
             </View>
           ))
-        )}
-
-        {!loading && !failed && history.groups.length > 0 && (
-          <Text style={styles.footerTotal}>Total: {formatTrackingMinutes(history.totalMinutes)}</Text>
         )}
       </ScrollView>
     </View>
@@ -124,10 +122,9 @@ const createStyles = (colors) => StyleSheet.create({
   centerState: { alignItems: 'center', gap: 10, paddingVertical: 24 },
   stateText: { color: colors.textMuted, fontSize: 14, lineHeight: 21 },
   group: { marginBottom: 24 },
-  dateTitle: { color: colors.text, fontSize: 15, fontWeight: '700', textTransform: 'capitalize', marginBottom: 12 },
-  sessionRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sessionDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted },
-  sessionText: { flex: 1, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  footerTotal: { color: colors.text, fontSize: 15, fontWeight: '700', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSoft, paddingTop: 16 },
+  dateTitle: { color: colors.text, fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  sessionRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  sessionTime: { flex: 1, color: colors.textSecondary, fontSize: 14, lineHeight: 20, fontVariant: ['tabular-nums'] },
+  sessionDuration: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, fontWeight: '600', fontVariant: ['tabular-nums'], textAlign: 'right' },
   pressed: { opacity: 0.7 },
 });

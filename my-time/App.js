@@ -12,7 +12,7 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { setTaskSyncOnline } from './src/data/taskRepository';
+import { setTaskSyncOnline, setTaskSyncSessionReady } from './src/data/taskRepository';
 import { syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
@@ -68,6 +68,9 @@ function AppContent() {
       setTaskSyncOnline(false);
     };
   }, [session?.user?.id]);
+  useEffect(() => {
+    setTaskSyncSessionReady(Boolean(session?.user?.id && session?.access_token));
+  }, [session?.user?.id, session?.access_token]);
   useEffect(() => {
     if (!session?.user?.id) return;
 

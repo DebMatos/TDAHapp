@@ -10,8 +10,9 @@ const historySource = fs.readFileSync(new URL('../src/utils/taskSessionHistory.j
 const history = new Function(
   'getSessionDurationMs',
   'getTaskDurationMs',
+  'roundTimestampToMinuteMs',
   `${historySource}; return { buildTaskSessionHistory, formatTrackingMinutes, getTrackingComparisonLabel };`,
-)(model.getSessionDurationMs, model.getTaskDurationMs);
+)(model.getSessionDurationMs, model.getTaskDurationMs, model.roundTimestampToMinuteMs);
 
 test('history deduplicates sessions and includes a running session in the dynamic total', () => {
   const sessions = [
@@ -34,4 +35,19 @@ test('duration and completed comparison use natural Portuguese copy', () => {
   assert.equal(history.getTrackingComparisonLabel(28, 80), '52 min abaixo do previsto');
   assert.equal(history.getTrackingComparisonLabel(95, 80), '15 min acima do previsto');
   assert.equal(history.getTrackingComparisonLabel(80, 80), 'Dentro do previsto');
+});
+
+test('visible times and duration use the same rounded endpoints', () => {
+  const result = history.buildTaskSessionHistory([{
+    id: 'rounded',
+    taskId: 't1',
+    startedAt: '2026-11-19T21:54:20.000Z',
+    endedAt: '2026-11-19T22:03:40.000Z',
+  }], 't1');
+  const session = result.groups[0].sessions[0];
+  assert.equal(session.startLabel, '21:54');
+  assert.equal(session.endLabel, '22:04');
+  assert.equal(session.durationMinutes, 10);
+  assert.equal(result.totalMinutes, 10);
+  assert.equal(result.groups[0].label, '19 de novembro');
 });

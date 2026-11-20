@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../src/domain/taskSessionModel.js', import.meta.url), 'utf8');
-const names = ['normalizeTaskSession', 'createTaskSession', 'stopTaskSession', 'getSessionDurationMs', 'getTaskDurationMs'];
+const names = ['normalizeTaskSession', 'createTaskSession', 'stopTaskSession', 'roundTimestampToMinuteMs', 'getSessionDurationMs', 'getTaskDurationMs'];
 const transformed = source.replaceAll('export const ', 'const ') + '\n' + names.map(name => `globalThis.${name} = ${name};`).join('\n');
 const context = vm.createContext({ Date, TypeError, RangeError, Error });
 vm.runInContext(transformed, context);
@@ -39,4 +39,42 @@ test('rejeita datas inválidas e fim anterior ao início', () => {
 test('sessões ativas não produzem duração negativa', () => {
   const session = createTaskSession({ id: 's1', taskId: 't1', startedAt: '2026-11-15T14:12:00Z' });
   assert.equal(getSessionDurationMs(session, '2026-11-15T14:10:00Z'), 0);
+});
+
+test('arredonda início e fim antes de calcular a duração', () => {
+  const session = {
+    id: 'rounded',
+    taskId: 't1',
+    startedAt: '2026-11-19T21:54:20Z',
+    endedAt: '2026-11-19T22:03:40Z',
+  };
+  assert.equal(getSessionDurationMs(session), 10 * 60 * 1000);
+});
+
+test('sessões inferiores a um minuto podem resultar em zero minutos', () => {
+  const session = {
+    id: 'short',
+    taskId: 't1',
+    startedAt: '2026-11-19T10:00:10Z',
+    endedAt: '2026-11-19T10:00:20Z',
+  };
+  assert.equal(getSessionDurationMs(session), 0);
+});
+
+test('soma durações individuais arredondadas sem voltar a arredondar o total', () => {
+  const sessions = [
+    { id: 'a', taskId: 't1', startedAt: '2026-11-19T10:00:20Z', endedAt: '2026-11-19T10:00:40Z' },
+    { id: 'b', taskId: 't1', startedAt: '2026-11-19T11:00:20Z', endedAt: '2026-11-19T11:00:40Z' },
+  ];
+  assert.equal(getTaskDurationMs(sessions, 't1'), 2 * 60 * 1000);
+});
+
+test('calcula corretamente uma sessão que atravessa a meia-noite', () => {
+  const session = {
+    id: 'midnight',
+    taskId: 't1',
+    startedAt: '2026-11-19T23:59:20Z',
+    endedAt: '2026-11-20T00:00:40Z',
+  };
+  assert.equal(getSessionDurationMs(session), 2 * 60 * 1000);
 });

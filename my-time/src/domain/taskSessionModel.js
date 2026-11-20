@@ -14,6 +14,9 @@ const parseTimestamp = (value, field) => {
   return timestamp;
 };
 
+export const roundTimestampToMinuteMs = (value, field = 'timestamp') =>
+  Math.round(parseTimestamp(value, field) / 60000) * 60000;
+
 export const normalizeTaskSession = (session) => {
   if (!session || typeof session !== 'object') {
     throw new TypeError('Sessão inválida.');
@@ -58,10 +61,10 @@ export const stopTaskSession = (session, endedAt = new Date().toISOString()) => 
 
 export const getSessionDurationMs = (session, now = new Date().toISOString()) => {
   const current = normalizeTaskSession(session);
-  const start = Date.parse(current.startedAt);
+  const start = roundTimestampToMinuteMs(current.startedAt, 'startedAt');
   const end = current.endedAt === null
-    ? parseTimestamp(now, 'now')
-    : Date.parse(current.endedAt);
+    ? roundTimestampToMinuteMs(now, 'now')
+    : roundTimestampToMinuteMs(current.endedAt, 'endedAt');
 
   return Math.max(0, end - start);
 };

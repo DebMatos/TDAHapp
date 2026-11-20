@@ -26,6 +26,22 @@ current time, not selected appearance preferences. Priority has its own
 muted red/ochre/green palette. Category accents, category surfaces and timeline
 segments remain unchanged. No new border, shadow or glow is introduced.
 
+The light application canvas uses warm stone `#EAE7E1`, with primary surfaces
+at `#F5F2ED`. The active tracking panel uses that warm surface with the existing
+`now` gold as its subtle outline and a low, diffuse shadow derived from the bee
+floating button; its Android elevation is lower than the bee button. The dark
+panel retains its existing surface, neutral border, and shadowless presentation.
+Tracking controls keep their semantic `danger` and `completed` fills. In light
+mode the stop icon uses `onAction` and the pause/play icon uses `text` for the
+stronger contrast on each fill; dark-mode icons retain `text`. Geometry and
+behavior are identical in both themes.
+
+The active tracking panel shows a timestamp-derived `MM:SS` chronometer, keeping
+total minutes beyond one hour. It recalculates from stored session boundaries and
+the current instant on every tick; pausing therefore freezes at the persisted end
+timestamp and resuming adds the new live interval. Historical totals and planned
+durations retain their minute-only presentation and rounded calculation.
+
 ## Typography
 
 Retain the application’s platform font and existing task-sheet hierarchy.
@@ -79,6 +95,14 @@ rejections are labelled blocked but remain in FIFO order; retries are still
 allowed and never silently discard or skip work. Correcting the displayed task
 alone does not replace an earlier rejected operation. No queue-resolution UI is
 provided yet.
+
+Task synchronization starts only after both network reachability and an authenticated
+session are confirmed. Pending work resumes on reconnection or a new valid access
+token. Duplicate online events do not bypass the current delay. Remote auth failures
+wait for a session event; a locally unavailable session also receives the same slow,
+bounded fallback used for retryable transport and unknown failures: one timer at 5,
+15, 30, then 60 seconds (remaining at 60 seconds), reset after a confirmed send. The
+FIFO queue and local task commit are never cleared by a failed attempt.
 
 Task forms use the same pressed opacity (0.7), accessible labels for icon actions
 and fields, and explicit disabled/busy semantics. Small form controls use at least
@@ -201,7 +225,12 @@ neutral natural-language comparison below the recorded total. The section never
 repeats planned duration and uses no status color, card background or outline.
 
 The session-history screen groups unique sessions chronologically by local civil
-date, derives every individual and total duration from the existing session model,
-and treats an open session as ending at the current instant. It is read-only, uses
-the same neutral typography in light and dark themes, and provides loading, empty
-and safe local-read failure states.
+date and renders each one as a simple aligned time-and-duration row, without bullets,
+cards, per-row dividers, or a repeated footer total. Session start and end timestamps
+are rounded independently to the nearest minute in the shared session model; the
+individual duration is their difference and the task total is the direct sum of
+those durations. The same rounded endpoints drive the visible times, TaskDetails,
+the active tracker, and history totals while persisted timestamps remain unchanged.
+Open sessions use the current instant as their end. The screen is read-only, uses
+neutral typography in light and dark themes, and provides loading, empty and safe
+local-read failure states.

@@ -23,6 +23,7 @@ import { updateTaskSyncStatus } from './taskSyncStatus';
 // Serializa operações para evitar gravações concorrentes.
 let writeQueue = Promise.resolve();
 let syncOnline = null;
+let syncSessionReady = false;
 
 const enqueueWrite = (operation) => {
   const result = writeQueue.then(operation);
@@ -89,7 +90,9 @@ const getAuthenticatedUserId = async () => {
   }
 
   if (!session?.user?.id) {
-    throw new Error('Sessão indisponível');
+    const unavailable = new Error('Sessão indisponível');
+    unavailable.code = 'SESSION_UNAVAILABLE';
+    throw unavailable;
   }
 
   return session.user.id;
@@ -382,7 +385,7 @@ let retryAttempt = 0;
 let activeSyncController = null;
 
 const SYNC_OPERATION_TIMEOUT_MS = 15_000;
-const SYNC_RETRY_DELAYS_MS = [500, 1_000, 2_000, 5_000, 10_000, 30_000];
+const SYNC_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
 
 const clearRetryTimer = () => {
   if (retryTimer === null) return;
@@ -394,7 +397,7 @@ const isRetryableFailure = (failure) =>
   failure.category === 'transient' || failure.category === 'unknown';
 
 const scheduleRetry = () => {
-  if (!syncOnline || retryTimer !== null) return;
+  if (!syncOnline || !syncSessionReady || retryTimer !== null) return;
   const delay = SYNC_RETRY_DELAYS_MS[
     Math.min(retryAttempt, SYNC_RETRY_DELAYS_MS.length - 1)
   ];
@@ -450,6 +453,7 @@ export const syncOperationWithTimeout = async (
 };
 
 export const setTaskSyncOnline = (online) => {
+  const wasOnline = syncOnline === true;
   syncOnline = online === true;
   if (!syncOnline) {
     clearRetryTimer();
@@ -458,14 +462,31 @@ export const setTaskSyncOnline = (online) => {
     updateTaskSyncStatus({ sending: false, pulling: false });
     return;
   }
+  if (wasOnline) return;
   clearRetryTimer();
+  if (!syncSessionReady) return;
   syncPendingTasks().catch((error) => {
     console.warn('[Sync] Falha ao recuperar ligação:', error);
   });
 };
 
+export const setTaskSyncSessionReady = (ready) => {
+  syncSessionReady = ready === true;
+  if (!syncSessionReady) {
+    clearRetryTimer();
+    activeSyncController?.abort('session');
+    updateTaskSyncStatus({ sending: false });
+    return;
+  }
+  if (!syncOnline) return;
+  clearRetryTimer();
+  syncPendingTasks().catch((error) => {
+    console.warn('[Sync] Falha ao recuperar sessão:', error);
+  });
+};
+
 export const syncPendingTasks = () => {
-  if (syncOnline === false) return Promise.resolve(0);
+  if (syncOnline !== true || !syncSessionReady) return Promise.resolve(0);
   if (syncPromise) {
     syncRequested = true;
     return syncPromise;
@@ -474,11 +495,11 @@ export const syncPendingTasks = () => {
   updateTaskSyncStatus({ sending: true, sendFailed: false });
   syncPromise = (async () => {
     const userId = await getAuthenticatedUserId();
-    if (syncOnline === false) return 0;
+    if (!syncOnline || !syncSessionReady) return 0;
     let synced = 0;
 
     while (true) {
-      if (syncOnline === false) break;
+      if (!syncOnline || !syncSessionReady) break;
       // Ler a próxima operação sem interferir
       // com gravações locais em curso.
       const operation = await enqueueWrite(async () => {
@@ -572,10 +593,10 @@ export const syncPendingTasks = () => {
       });
       const retryWasRequested = syncRequested;
       syncRequested = false;
-      if (isRetryableFailure(failure)) {
+      if (isRetryableFailure(failure) || error?.code === 'SESSION_UNAVAILABLE') {
         // A newly queued operation must not be forgotten when the current
         // FIFO head fails. Backoff also prevents a tight retry loop.
-        if (retryWasRequested || syncOnline) scheduleRetry();
+        if (retryWasRequested || syncOnline && syncSessionReady) scheduleRetry();
       }
     },
   );

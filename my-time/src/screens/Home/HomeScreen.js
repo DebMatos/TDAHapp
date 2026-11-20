@@ -55,6 +55,8 @@ import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
 } from '../../utils/timelineDate';
+import { roundTimestampToMinuteMs } from '../../domain/taskSessionModel';
+import { getChronometerDurationMs } from '../../utils/trackingChronometer';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
@@ -319,6 +321,7 @@ export default function TimelineScreen() {
   const [trackedTaskId, setTrackedTaskId] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [trackedDurationMs, setTrackedDurationMs] = useState(0);
+  const [trackingSessions, setTrackingSessions] = useState([]);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackingNow, setTrackingNow] = useState(Date.now());
   const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
@@ -346,14 +349,19 @@ export default function TimelineScreen() {
   const refreshTracking = useCallback(async (preferredTaskId = null) => {
     const active = await taskExecution.getActiveSession();
     const taskId = active?.taskId ?? preferredTaskId;
-    const duration = taskId
-      ? await taskExecution.getTrackedDurationMs(taskId)
-      : 0;
+    const timestamp = new Date().toISOString();
+    const [duration, sessions] = taskId
+      ? await Promise.all([
+          taskExecution.getTrackedDurationMs(taskId, timestamp),
+          taskExecution.getTaskSessions(taskId),
+        ])
+      : [0, []];
     setActiveSession(active);
     setTrackedTaskId(taskId ?? null);
     setTrackedDurationMs(duration);
-    setTrackingBaselineAt(Date.now());
-    setTrackingNow(Date.now());
+    setTrackingSessions(sessions);
+    setTrackingBaselineAt(Date.parse(timestamp));
+    setTrackingNow(Date.parse(timestamp));
   }, []);
 
   useEffect(() => {
@@ -431,8 +439,17 @@ export default function TimelineScreen() {
 
   const trackedTask = tasks.find((task) => task.id === trackedTaskId) ?? null;
   const liveDurationMs = activeSession
-    ? trackedDurationMs + Math.max(0, trackingNow - trackingBaselineAt)
+    ? trackedDurationMs + Math.max(
+        0,
+        roundTimestampToMinuteMs(new Date(trackingNow).toISOString()) -
+          roundTimestampToMinuteMs(new Date(trackingBaselineAt).toISOString()),
+      )
     : trackedDurationMs;
+  const chronometerDurationMs = getChronometerDurationMs(
+    trackingSessions,
+    trackedTaskId,
+    new Date(trackingNow).toISOString(),
+  );
 
 
   const visibleTasks = useMemo(() => {
@@ -1034,7 +1051,7 @@ export default function TimelineScreen() {
         completedTasks={totalCompletedTasks}
         totalTasks={visibleTasks.length}
       />
-     
+
       <TaskBanner
         notice={!modalVisible && !detailsTask ? banner : null}
         onDismiss={dismissBanner}
@@ -1136,13 +1153,7 @@ export default function TimelineScreen() {
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.hourText,
-
-                      isDense && styles.hourTextOverview,
-                    ]}
-                  >
+                  <Text style={[styles.hourText, isDense && styles.hourTextOverview]}>
                     {!hideText ? String(displayHour).padStart(2, '0') : ''}
                   </Text>
 
@@ -1152,9 +1163,7 @@ export default function TimelineScreen() {
                         styles.hourDot,
                         {
                           backgroundColor:
-                            i === 48
-                              ? colors.timeOfDay[5]
-                              : getRailColor(displayHour, colors),
+                            i === 48 ? colors.timeOfDay[5] : getRailColor(displayHour, colors),
                         },
                       ]}
                     />
@@ -1215,8 +1224,14 @@ export default function TimelineScreen() {
                 <View style={styles.nowDot} />
 
                 <Image
-                  source={require('../../../assets/abelha.png')}
-                  style={styles.nowBeeImage}
+                  source={
+                    isDark
+                      ? require('../../../assets/pirilampo.png')
+                      : require('../../../assets/abelha.png')
+                  }
+
+                      style={[styles.nowBeeImage, isDark && styles.fireflyIcon]}
+
                 />
               </View>
             )}
@@ -1230,16 +1245,20 @@ export default function TimelineScreen() {
           activeOpacity={0.8}
         >
           <Image
-            style={buttonStyles.icon}
-            source={require('../../../assets/abelha.png')}
-          />
+    style={[buttonStyles.icon, isDark && buttonStyles.fireflyIcon]}
+    source={
+      isDark
+        ? require('../../../assets/pirilampo.png')
+        : require('../../../assets/abelha.png')
+    }
+  />
         </TouchableOpacity>
       </View>
 
       <ActiveTaskBar
         task={trackedTask}
         running={Boolean(activeSession)}
-        durationMs={liveDurationMs}
+        durationMs={chronometerDurationMs}
         busy={trackingBusy}
         onToggle={() => handleTrackingAction(trackedTaskId, activeSession ? 'pause' : 'start')}
         onFinish={() => handleFinishTracking(trackedTaskId)}
@@ -1259,9 +1278,12 @@ export default function TimelineScreen() {
         banner={banner}
         onDismissBanner={dismissBanner}
         initialMinutes={targetSlotMinutes}
-        initialDate={getDateKey(getCivilDateForTimelineSlot(
-          selectedTimelineDate, targetSlotMinutes ?? TIMELINE_START_MINUTES,
-        ))}
+        initialDate={getDateKey(
+          getCivilDateForTimelineSlot(
+            selectedTimelineDate,
+            targetSlotMinutes ?? TIMELINE_START_MINUTES,
+          ),
+        )}
         onClose={() => {
           setTaskError(null);
           setModalVisible(false);

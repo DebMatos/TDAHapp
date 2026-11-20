@@ -255,7 +255,7 @@ export default function TaskDetailsModal({
 
   const trackedMinutes = trackedDurationMs === null
     ? null
-    : Math.round(Math.max(0, trackedDurationMs) / 60000);
+    : Math.max(0, trackedDurationMs) / 60000;
   const displayedTrackedMinutes = trackedMinutes ?? 0;
 
   const [savedSnapshot, setSavedSnapshot] = useState(null);

@@ -335,7 +335,6 @@ const createStyles = (colors) =>
       paddingHorizontal: 11,
       paddingVertical: 7,
       borderRadius: 10,
-      backgroundColor: colors.selectionSoft,
     },
     iconButton: {
       width: 40,

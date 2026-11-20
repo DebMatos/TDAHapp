@@ -20,10 +20,10 @@ const baseStyles = StyleSheet.create({
     position: 'absolute', top: 0, bottom: 0, left: AXIS_WIDTH - 0.5,
     width: 1, zIndex: 2,
   },
-  railSegment: { position: 'absolute', left: 0, width: 1 },
+  railSegment: { position: 'absolute', left: 0, width: 2},
   hourDot: {
-    width: 4, height: 4, borderRadius: 2,
-    marginLeft: -2, marginRight: -2, zIndex: 3,
+    width: 5, height: 5, borderRadius: 2.5,
+    marginLeft: -2, marginRight: -1, zIndex: 3,
   },
   halfHourLine: {
     backgroundColor: 'transparent', borderBottomWidth: 1, borderStyle: 'dashed',
@@ -38,6 +38,11 @@ const baseStyles = StyleSheet.create({
   nowBeeImage: {
     position: 'absolute', right: -6, top: -10,
     width: 20, height: 20, resizeMode: 'contain',
+    transform: [{ rotate: '90deg' }],
+  },
+    fireflyIcon: {
+    position: 'absolute', right: -8, top: -15,
+    width: 30, height: 30, resizeMode: 'contain',
     transform: [{ rotate: '90deg' }],
   },
 });

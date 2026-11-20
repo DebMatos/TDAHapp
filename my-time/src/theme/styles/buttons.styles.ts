@@ -8,6 +8,7 @@ const baseStyles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   icon: { resizeMode: 'contain', width: 24, height: 24 },
+  fireflyIcon: { resizeMode: 'contain', width: 36, height: 36  },
 });
 
 const lightFloatingButton = StyleSheet.create({
