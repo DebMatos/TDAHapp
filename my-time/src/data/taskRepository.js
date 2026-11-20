@@ -426,7 +426,6 @@ export const syncOperationWithTimeout = async (
       error.name = 'AbortError';
       reject(error);
     }, timeoutMs);
-    timeoutId?.unref?.();
   });
   const aborted = new Promise((_, reject) => {
     controller.signal.addEventListener('abort', () => {
