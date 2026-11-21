@@ -101,7 +101,10 @@ foreground, or after receipt of a valid access token. Each session check and rem
 request has a 15-second deadline. Send and read failures retry independently at 5,
 15, 30, then 60 seconds (remaining at 60 seconds), with the delay reset after a
 successful operation. Duplicate online events respect the current delay. Validation
-and conflict errors keep the head of the FIFO queue available for review. Failed
+and conflict errors keep the first operation for the affected task available for review.
+Unsent changes for the same task are compacted on local save and become eligible
+after five seconds of inactivity, capped at 20 seconds from the first edit. Other
+tasks retain their own deadlines. A started request retains its payload. Failed
 or cancelled attempts preserve pending operations and local task edits.
 
 Task forms use the same pressed opacity (0.7), accessible labels for icon actions

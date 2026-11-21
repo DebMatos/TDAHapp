@@ -112,6 +112,34 @@ const makeOperation = (type, data) => ({
   ...data,
 });
 
+const SEND_IDLE_MS = 5_000;
+const SEND_MAX_WAIT_MS = 20_000;
+const operationTaskId = (operation) => operation.task?.id ?? operation.taskId ?? operation.id;
+const isUnsent = (operation) => Number.isFinite(operation.queuedAt) &&
+  operation.startedAt == null && !operation.sync;
+
+const enqueueTaskOperation = (queue, operation, now) => {
+  const taskId = operationTaskId(operation);
+  const index = queue.findLastIndex(item => operationTaskId(item) === taskId);
+  const previous = queue[index];
+  const queued = { ...operation, queuedAt: now, sendAfter: now + SEND_IDLE_MS };
+  if (!previous || !isUnsent(previous) || previous.type === 'delete' || operation.type === 'create') {
+    queue.push(queued);
+    return;
+  }
+  if (previous.type === 'create' && operation.type === 'delete') {
+    queue.splice(index, 1);
+    return;
+  }
+  queue[index] = {
+    ...queued,
+    id: previous.id,
+    type: previous.type === 'create' ? 'create' : operation.type,
+    queuedAt: previous.queuedAt,
+    sendAfter: Math.min(queued.sendAfter, previous.queuedAt + SEND_MAX_WAIT_MS),
+  };
+};
+
 // Guarda tarefas e operação pendente no mesmo registo.
 const commit = async (buildNextState) => {
 
@@ -119,7 +147,12 @@ const commit = async (buildNextState) => {
     const state = await getState();
     const nextState = buildNextState(state);
 
-    return saveState(nextState);
+    const pendingOps = [...state.pendingOps];
+    const now = Date.now();
+    for (const operation of nextState.pendingOps.slice(state.pendingOps.length)) {
+      enqueueTaskOperation(pendingOps, operation, now);
+    }
+    return saveState({ ...nextState, pendingOps });
   });
   // A gravação local já terminou.
   // Sincronizar em segundo plano, sem bloquear a aplicação.
@@ -410,6 +443,7 @@ let syncPromise = null;
 let syncRequested = null;
 let activeSyncController = null;
 let sessionVersion = 0;
+let sendWakeTimer = null;
 
 const syncDiagnosticState = () => ({
   syncPromise: syncPromise !== null,
@@ -474,6 +508,45 @@ const createRetry = (source, retry) => {
 
 const sendRetry = createRetry('Envio', () => syncPendingTasks({ automatic: true, retryAuth: true }));
 const pullRetry = createRetry('Leitura', () => pullRemoteTasks({ automatic: true }));
+
+const clearSendWake = () => {
+  clearTimeout(sendWakeTimer);
+  sendWakeTimer = null;
+};
+
+const scheduleSendWake = (time) => {
+  if (!Number.isFinite(time) || !syncOnline || !syncSessionReady) return;
+  sendWakeTimer = setTimeout(() => {
+    sendWakeTimer = null;
+    syncPendingTasks({ automatic: true }).catch(error => {
+      console.warn('[Sync] Falha no envio agendado:', error);
+    });
+  }, Math.max(0, time - Date.now()));
+  sendWakeTimer?.unref?.();
+};
+
+const selectTaskOperation = (pendingOps, now, { automatic, retryAuth }) => {
+  const seen = new Set();
+  let wakeAt = Infinity;
+  for (const item of pendingOps) {
+    const taskId = operationTaskId(item);
+    if (seen.has(taskId)) continue;
+    seen.add(taskId);
+    const category = item.sync?.category;
+    if (automatic && (category === 'validation' || category === 'conflict' ||
+        category === 'auth' && !retryAuth)) {
+      // Legacy queue items retain their previous ordering and retry behavior.
+      if (!Number.isFinite(item.queuedAt)) break;
+      continue;
+    }
+    if (isUnsent(item) && item.sendAfter > now) {
+      wakeAt = Math.min(wakeAt, item.sendAfter);
+      continue;
+    }
+    return { item };
+  }
+  return { wakeAt };
+};
 
 const shouldRetry = (error) => {
   if (error?.code === 'SYNC_CANCELLED') return false;
@@ -542,6 +615,7 @@ export const resumeTaskSync = () => {
 };
 
 const stopTaskSync = (reason) => {
+  clearSendWake();
   sendRetry.clear();
   pullRetry.clear();
   activeSyncController?.abort(reason);
@@ -594,6 +668,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
   }
   if (automatic && sendRetry.scheduled) return Promise.resolve(0);
   sendRetry.clear();
+  clearSendWake();
 
   const controller = new AbortController();
   const { signal } = controller;
@@ -602,6 +677,8 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
   let attemptedSessionVersion = sessionVersion;
   let userId;
   let queueConfirmed = false;
+  let wakeAt = Infinity;
+  let recordedFailure;
   const assertSameIdentity = () => assertSyncIdentity(signal, identityRevision, userId);
   syncPromise = (async () => {
     let synced = 0;
@@ -610,32 +687,44 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
       assertSameIdentity();
       // Ler a próxima operação sem interferir
       // com gravações locais em curso.
-      const operation = await enqueueWrite(async () => {
+      const selection = await enqueueWrite(async () => {
+        assertSameIdentity();
         const state = await getState();
+        assertSameIdentity();
         recordQueueState(state);
         updateTaskSyncStatus({
           pending: state.pendingOps.length,
           failureCategory: state.pendingOps[0]?.sync?.category ?? null,
         });
-        return state.pendingOps[0] ?? null;
+        const picked = selectTaskOperation(state.pendingOps, Date.now(), { automatic, retryAuth });
+        if (userId !== undefined && isUnsent(picked.item ?? {})) {
+          const claimed = { ...picked.item, startedAt: Date.now() };
+          await persistState({
+            ...state,
+            pendingOps: state.pendingOps.map(item => item.id === claimed.id ? claimed : item),
+          });
+          return { item: claimed };
+        }
+        return { ...picked, empty: state.pendingOps.length === 0 };
       });
 
       assertSameIdentity();
+      const { item: operation } = selection;
       if (!operation) {
-        queueConfirmed = true;
+        queueConfirmed = selection.empty;
+        wakeAt = selection.wakeAt;
         break;
       }
-      const headFailure = operation.sync?.category;
-      if (automatic && (headFailure === 'validation' || headFailure === 'conflict' ||
-          headFailure === 'auth' && !retryAuth)) break;
 
       if (userId === undefined) {
         attemptedSessionVersion = sessionVersion;
         userId = await traceSync('send-session', () => runSyncStep(getAuthenticatedUserId, signal));
         assertSameIdentity();
+        continue;
       }
 
       // Preserve the operation and record only safe, actionable metadata.
+      recordedFailure = null;
       try {
         attemptedSessionVersion = sessionVersion;
         await traceSync('send', reportHttp =>
@@ -668,6 +757,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
                 : item),
             });
           });
+          recordedFailure = operation;
         } catch {
           // Metadata persistence must not remove work or hide the send error.
           console.warn('[Sync] Não foi possível guardar o diagnóstico da operação.');
@@ -721,6 +811,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
       if (queueConfirmed) sendRetry.reset();
       updateTaskSyncStatus({ sending: false, sendFailed: false, sendConfirmed: queueConfirmed && !signal.aborted });
       if (requested) tryAgain(requested);
+      else scheduleSendWake(wakeAt);
     },
     (error) => {
       const requested = release();
@@ -739,6 +830,8 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
         tryAgain({ automatic: true, retryAuth: true });
       } else if (shouldRetry(error)) {
         sendRetry.schedule();
+      } else if (Number.isFinite(recordedFailure?.queuedAt)) {
+        tryAgain({ automatic: true });
       }
     },
   );

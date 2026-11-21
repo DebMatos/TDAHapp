@@ -27,9 +27,9 @@ const repositorySource = stripImports(read('data/taskRepository.js'))
   .replace('let syncOnline = null;', 'let syncOnline = true;')
   .replace('let syncSessionReady = false;', 'let syncSessionReady = true;');
 
-function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = validSession, loadRemote = async () => [] } = {}) {
+function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = validSession, loadRemote = async () => [], initialState } = {}) {
   const task = model.createTask({ id: 'a', title: 'A', notes: 'private note' });
-  let state = { tasks: [task], pendingOps: withPendingOperations ? [
+  let state = initialState ? structuredClone(initialState) : { tasks: [task], pendingOps: withPendingOperations ? [
     { id: 'first', type: 'update', task },
     { id: 'second', type: 'delete', taskId: 'b' },
   ] : [] };
@@ -52,7 +52,7 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = 
     (...args) => syncImplementation(...args), classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
   const diagnostics = loadDiagnostics(diagnosticsEnabled);
-  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, resumeTaskSync, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
+  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, resumeTaskSync, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks, createTaskAndLoadTasks, deleteTask };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
   return { repository, sent, state: () => state, observed: () => observed, status, diagnostics,
     setError: value => { error = value; },
     setSyncImplementation: value => { syncImplementation = value; },
@@ -60,7 +60,8 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = 
     failStorage: () => { failStorage = true; } };
 }
 
-test('diagnostics expose an unfinished session check while local edits continue', async () => {
+test('diagnostics expose an unfinished session check while local edits continue', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
   let resolveSession;
   const h = setup({
     diagnosticsEnabled: true,
@@ -70,6 +71,8 @@ test('diagnostics expose an unfinished session check while local edits continue'
   let history;
   const unsubscribe = h.diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
   await h.repository.updateTaskAndLoadTasks('a', { title: 'private edit' });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(5_000);
   const firstRun = h.repository.syncPendingTasks();
   await until(() => Boolean(resolveSession));
 
@@ -199,7 +202,8 @@ test('auth failure stops FIFO without marking data as permanently invalid', asyn
   assert.match(h.status.getTaskSyncMessage(h.observed()), /sessão/);
 });
 
-test('local update enters the shared queue and reaches the remote sync operation', async () => {
+test('local update enters the shared queue and reaches the remote sync operation', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
   const h = setup({ withPendingOperations: false });
   let sentOperation;
   h.setError(null);
@@ -207,6 +211,8 @@ test('local update enters the shared queue and reaches the remote sync operation
     sentOperation = structuredClone(operation);
   });
   await h.repository.updateTaskAndLoadTasks('a', { title: 'Alterada' });
+  await new Promise(setImmediate);
+  t.mock.timers.tick(5_000);
   await until(() => h.state().pendingOps.length === 0);
   assert.equal(sentOperation.type, 'update');
   assert.equal(sentOperation.task.title, 'Alterada');
@@ -339,7 +345,7 @@ test('online permanent rejection does not enter an automatic retry loop', async 
 });
 
 test('a hung send session times out, preserves local edits and retries the queue in order', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
   let finishOldSession;
   let sessionChecks = 0;
   const h = setup({
@@ -522,4 +528,78 @@ test('going offline during pull revalidation invalidates the already received re
   h.release();
   await new Promise(setImmediate);
   assert.deepEqual(h.state().tasks.map(task => task.id), ['a']);
+});
+
+test('each task has its own deadline and creation sends its final schedule', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
+  const h = setup({ withPendingOperations: false });
+  const sent = [];
+  h.setSyncImplementation(async (_id, operation) => { sent.push(operation); });
+  const flush = () => new Promise(setImmediate);
+  await h.repository.createTaskAndLoadTasks({ id: 'run', title: 'Correr', startTime: '17:00' });
+  await flush();
+  t.mock.timers.tick(2_000);
+  await h.repository.updateTaskAndLoadTasks('a', { title: 'Compras' });
+  await flush();
+  t.mock.timers.tick(2_000);
+  await h.repository.updateTaskAndLoadTasks('run', { startTime: '18:00', durationMinutes: 60 });
+  await flush();
+  assert.equal(h.state().pendingOps.length, 2);
+  t.mock.timers.tick(3_000);
+  await flush();
+  assert.deepEqual(sent.map(op => op.task.id), ['a']);
+  t.mock.timers.tick(2_000);
+  await flush();
+  assert.deepEqual(sent.map(op => op.type), ['update', 'create']);
+  assert.equal(sent[1].task.startTime, '18:00');
+  assert.equal(sent[1].task.durationMinutes, 60);
+  assert.equal(h.state().pendingOps.length, 0);
+});
+
+test('offline compacted operations survive restart and have a capped deadline', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
+  const h = setup({ withPendingOperations: false });
+  h.repository.setTaskSyncOnline(false);
+  const first = Date.now();
+  await h.repository.updateTaskAndLoadTasks('a', { title: 'First' });
+  for (let i = 0; i < 4; i += 1) {
+    t.mock.timers.tick(4_000);
+    await h.repository.updateTaskAndLoadTasks('a', { title: `Edit ${i}` });
+  }
+  const state = h.state();
+  assert.equal(state.pendingOps.length, 1);
+  assert.equal(state.pendingOps[0].sendAfter, first + 20_000);
+  const restarted = setup({ initialState: state });
+  restarted.setError(null);
+  assert.equal(await restarted.repository.syncPendingTasks(), 0);
+  t.mock.timers.tick(4_000);
+  await until(() => restarted.observed().sendConfirmed);
+  assert.equal(restarted.sent.length, 1);
+  assert.equal(restarted.state().tasks[0].title, 'Edit 3');
+});
+
+test('started operations stay immutable and a never-sent creation can be cancelled', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
+  const h = setup({ withPendingOperations: false });
+  let finish;
+  const flush = () => new Promise(setImmediate);
+  h.setSyncImplementation(async (_id, op) => {
+    if (op.type === 'create') await new Promise(resolve => { finish = resolve; });
+  });
+  await h.repository.createTaskAndLoadTasks({ id: 'discard', title: 'Discard' });
+  await h.repository.deleteTask('discard');
+  assert.equal(h.state().pendingOps.length, 0);
+  await h.repository.createTaskAndLoadTasks({ id: 'run', title: 'Original' });
+  await flush();
+  t.mock.timers.tick(5_000);
+  await until(() => Boolean(finish));
+  const [started] = h.state().pendingOps;
+  assert.ok(started.startedAt);
+  await h.repository.updateTaskAndLoadTasks('run', { title: 'Final' });
+  assert.deepEqual(h.state().pendingOps.map(op => [op.type, op.task.title]), [
+    ['create', 'Original'], ['update', 'Final'],
+  ]);
+  finish();
+  await flush();
+  assert.deepEqual(h.state().pendingOps.map(op => op.type), ['update']);
 });
