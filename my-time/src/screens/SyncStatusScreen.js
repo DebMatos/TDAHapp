@@ -49,7 +49,6 @@ const DIAGNOSTIC_PHASES = {
   'send-started': 'Processamento da fila iniciado',
   'send-requested': 'Envio pedido durante tentativa',
   'send-request-consumed': 'Pedido de novo envio processado',
-  'send-timeout': 'Tempo limite de envio atingido',
   'send-released': 'Processamento da fila libertado',
   'pull-started': 'Verificação remota iniciada',
   'pull-released': 'Verificação remota libertada',

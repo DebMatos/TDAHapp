@@ -4,6 +4,9 @@ import {
   normalizeTasks,
 } from '../domain/taskModel';
 
+const remoteTaskError = (error, status) =>
+  Object.assign(new Error(error.message), error, { status: status ?? error.status });
+
 const fromDatabase = (row) => ({
   id: row.id,
   title: row.title,
@@ -67,7 +70,7 @@ export const loadTasks = async (userId, signal, reportHttp) => {
 
   reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return normalizeTasks(
@@ -104,7 +107,7 @@ export const createTask = async (
 
   reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return canonicalTask;
@@ -147,7 +150,7 @@ export const updateTask = async (
 
   reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return normalizeTask(
@@ -174,7 +177,7 @@ export const deleteTask = async (
 
   reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 };
 

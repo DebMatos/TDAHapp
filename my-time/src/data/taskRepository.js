@@ -123,7 +123,7 @@ const commit = async (buildNextState) => {
   });
   // A gravação local já terminou.
   // Sincronizar em segundo plano, sem bloquear a aplicação.
-  syncPendingTasks().catch((error) => {
+  syncPendingTasks({ automatic: true }).catch((error) => {
     console.warn('[Sync] Falha na sincronização:', error);
   });
 
@@ -144,16 +144,11 @@ export const loadTasks = async () => {
 let pullPromise = null;
 let activePullController = null;
 
-const recoverRemoteTasks = async (signal) => {
-  const identityRevision = getSessionIdentity().revision;
-  const userId = await traceSync('pull-session', getAuthenticatedUserId);
+const recoverRemoteTasks = async (signal, identityRevision) => {
+  const userId = await traceSync('pull-session', () =>
+    runSyncStep(getAuthenticatedUserId, signal));
   const assertSameIdentity = () => {
-    const identity = getSessionIdentity();
-    if (identity.revision !== identityRevision ||
-        identity.userId !== undefined && identity.userId !== userId) {
-      recordSyncTransition('pull-identity-changed');
-      throw new Error('Sessão alterada durante a recuperação de tarefas');
-    }
+    assertSyncIdentity(signal, identityRevision, userId);
   };
   assertSameIdentity();
 
@@ -161,13 +156,14 @@ const recoverRemoteTasks = async (signal) => {
   // a pending delete was confirmed and removed while the request was in flight.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const revision = await enqueueWrite(() => tasksRevision);
-    const remoteTasks = await traceSync('pull', reportHttp => loadRemoteTasks(userId, signal, reportHttp), {
-      attempt: attempt + 1,
-    });
+    const remoteTasks = await traceSync('pull', reportHttp => runSyncStep(
+      requestSignal => loadRemoteTasks(userId, requestSignal, reportHttp), signal,
+    ), { attempt: attempt + 1 });
     // Session refresh may use the network: never await it inside writeQueue.
-    if (await traceSync('pull-revalidate', getAuthenticatedUserId, { attempt: attempt + 1 }) !== userId) {
+    if (await traceSync('pull-revalidate', () =>
+      runSyncStep(getAuthenticatedUserId, signal), { attempt: attempt + 1 }) !== userId) {
       recordSyncTransition('pull-identity-changed');
-      throw new Error('Sessão alterada durante a recuperação de tarefas');
+      throw syncAbortError('session');
     }
     assertSameIdentity();
 
@@ -203,25 +199,41 @@ const recoverRemoteTasks = async (signal) => {
   throw new Error('Recuperação adiada devido a alterações locais concorrentes');
 };
 
-export const pullRemoteTasks = () => {
-  if (syncOnline === false) return loadTasks();
-  if (pullPromise) return pullPromise;
+export const pullRemoteTasks = ({ automatic = false } = {}) => {
+  if (!syncOnline || !syncSessionReady) return loadTasks();
+  if (pullPromise) {
+    if (activePullController.signal.aborted) {
+      return pullPromise.catch(() => {}).then(() => pullRemoteTasks({ automatic }));
+    }
+    return pullPromise;
+  }
+  if (automatic && pullRetry.scheduled) return loadTasks();
+  pullRetry.clear();
   const controller = new AbortController();
+  const attemptedSessionVersion = sessionVersion;
+  const identityRevision = getSessionIdentity().revision;
   activePullController = controller;
-  updateTaskSyncStatus({ pulling: true, pullFailed: false });
-  pullPromise = recoverRemoteTasks(controller.signal).then(tasks => {
+  pullPromise = recoverRemoteTasks(controller.signal, identityRevision).then(tasks => {
+    assertSyncIdentity(controller.signal, identityRevision);
+    pullRetry.reset();
     updateTaskSyncStatus({ pullConfirmed: true });
     return tasks;
   }).catch(error => {
-    updateTaskSyncStatus({ pullFailed: true });
-    recordSyncTransition('pull-failed');
+    if (error?.code !== 'SYNC_CANCELLED') {
+      updateTaskSyncStatus({ pullFailed: true });
+      recordSyncTransition('pull-failed');
+      if (shouldRetry(error) || sessionRenewedAfterAuthError(error, attemptedSessionVersion)) {
+        pullRetry.schedule();
+      }
+    }
     throw error;
   }).finally(() => {
-    updateTaskSyncStatus({ pulling: false });
-    if (activePullController === controller) activePullController = null;
+    activePullController = null;
     pullPromise = null;
+    updateTaskSyncStatus({ pulling: false });
     recordSyncTransition('pull-released');
   });
+  updateTaskSyncStatus({ pulling: true, pullFailed: false });
   recordSyncTransition('pull-started');
   return pullPromise;
 };
@@ -395,18 +407,18 @@ export const saveTasks = async (tasks) => {
 /* SYNC */
 
 let syncPromise = null;
-let syncRequested = false;
-let retryTimer = null;
-let retryAttempt = 0;
+let syncRequested = null;
 let activeSyncController = null;
+let sessionVersion = 0;
 
 const syncDiagnosticState = () => ({
   syncPromise: syncPromise !== null,
-  syncRequested,
-  retryTimer: retryTimer !== null,
+  syncRequested: syncRequested !== null,
+  retryTimer: sendRetry.scheduled,
   syncOnline,
   syncSessionReady,
   pullPromise: pullPromise !== null,
+  pullRetryTimer: pullRetry.scheduled,
 });
 
 const recordSyncTransition = (phase, details) => {
@@ -427,75 +439,114 @@ const traceSync = (phase, run, details) =>
 const SYNC_OPERATION_TIMEOUT_MS = 15_000;
 const SYNC_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
 
-const clearRetryTimer = () => {
-  if (retryTimer === null) return;
-  clearTimeout(retryTimer);
-  retryTimer = null;
-  recordSyncTransition('retry-cleared');
+const createRetry = (source, retry) => {
+  let timer = null;
+  let attempt = 0;
+  const clear = () => {
+    if (timer === null) return;
+    clearTimeout(timer);
+    timer = null;
+    recordSyncTransition('retry-cleared', { source });
+  };
+  return {
+    get scheduled() {
+      return timer !== null;
+    },
+    clear,
+    reset() {
+      clear();
+      attempt = 0;
+    },
+    schedule() {
+      if (!syncOnline || !syncSessionReady || timer !== null) return;
+      const delay = SYNC_RETRY_DELAYS_MS[Math.min(attempt, SYNC_RETRY_DELAYS_MS.length - 1)];
+      attempt += 1;
+      timer = setTimeout(() => {
+        timer = null;
+        recordSyncTransition('retry-triggered', { source, attempt });
+        retry().catch(error => console.warn('[Sync] Nova tentativa adiada:', error));
+      }, delay);
+      recordSyncTransition('retry-scheduled', { source, attempt, durationMs: delay });
+      timer?.unref?.();
+    },
+  };
 };
 
-const isRetryableFailure = (failure) =>
-  failure.category === 'transient' || failure.category === 'unknown';
+const sendRetry = createRetry('Envio', () => syncPendingTasks({ automatic: true, retryAuth: true }));
+const pullRetry = createRetry('Leitura', () => pullRemoteTasks({ automatic: true }));
 
-const scheduleRetry = () => {
-  if (!syncOnline || !syncSessionReady || retryTimer !== null) return;
-  const delay = SYNC_RETRY_DELAYS_MS[
-    Math.min(retryAttempt, SYNC_RETRY_DELAYS_MS.length - 1)
-  ];
-  retryAttempt += 1;
-  retryTimer = setTimeout(() => {
-    retryTimer = null;
-    recordSyncTransition('retry-triggered', { attempt: retryAttempt });
-    syncPendingTasks().catch((error) => {
-      console.warn('[Sync] Nova tentativa adiada:', error);
-    });
-  }, delay);
-  recordSyncTransition('retry-scheduled', { durationMs: delay, attempt: retryAttempt });
-  retryTimer?.unref?.();
+const shouldRetry = (error) => {
+  if (error?.code === 'SYNC_CANCELLED') return false;
+  const { category } = classifyTaskSyncError(error);
+  return category === 'transient' || category === 'unknown' || error?.code === 'SESSION_UNAVAILABLE';
 };
 
-export const syncOperationWithTimeout = async (
-  userId,
-  operation,
-  timeoutMs = SYNC_OPERATION_TIMEOUT_MS,
-  reportHttp,
-) => {
-  const controller = new AbortController();
-  activeSyncController = controller;
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      if (taskSyncDiagnosticsEnabled) {
-        recordSyncTransition('send-timeout', { operationId: getDiagnosticOperationId(operation), durationMs: timeoutMs });
-      }
-      controller.abort();
-      const error = new Error('Tempo limite da sincronização excedido');
-      error.name = 'AbortError';
-      reject(error);
-    }, timeoutMs);
-  });
-  const aborted = new Promise((_, reject) => {
-    controller.signal.addEventListener('abort', () => {
-      const error = new Error(
-        controller.signal.reason === 'offline'
-          ? 'Sincronização interrompida por falta de ligação'
-          : 'Sincronização cancelada',
-      );
-      error.name = 'AbortError';
-      reject(error);
-    }, { once: true });
-  });
+const sessionRenewedAfterAuthError = (error, version) =>
+  syncSessionReady && sessionVersion !== version && classifyTaskSyncError(error).category === 'auth';
 
-  try {
-    return await Promise.race([
-      syncOperation(userId, operation, { signal: controller.signal, reportHttp }),
-      timeout,
-      aborted,
-    ]);
-  } finally {
-    clearTimeout(timeoutId);
-    if (activeSyncController === controller) activeSyncController = null;
+const syncAbortError = (reason) => {
+  const message = reason === 'timeout' ? 'Tempo limite da sincronização excedido'
+    : reason === 'session' ? 'Sessão alterada durante a sincronização'
+      : 'Sincronização interrompida por falta de ligação';
+  const error = new Error(message);
+  error.name = 'AbortError';
+  error.code = reason === 'timeout' ? 'SYNC_TIMEOUT' : 'SYNC_CANCELLED';
+  return error;
+};
+
+const assertSyncActive = (signal) => {
+  if (signal?.aborted) throw syncAbortError(signal.reason);
+};
+
+const assertSyncIdentity = (signal, revision, userId) => {
+  assertSyncActive(signal);
+  const identity = getSessionIdentity();
+  if (identity.revision !== revision ||
+      userId !== undefined && identity.userId !== undefined && identity.userId !== userId) {
+    throw syncAbortError('session');
   }
+};
+
+const runSyncStep = async (run, parentSignal, timeoutMs = SYNC_OPERATION_TIMEOUT_MS) => {
+  assertSyncActive(parentSignal);
+  const controller = new AbortController();
+  let rejectStopped;
+  const stopped = new Promise((_, reject) => { rejectStopped = reject; });
+  const stop = (reason) => {
+    rejectStopped(syncAbortError(reason));
+    controller.abort(reason);
+  };
+  const cancel = () => stop(parentSignal.reason);
+  parentSignal?.addEventListener('abort', cancel, { once: true });
+  const timer = setTimeout(() => stop('timeout'), timeoutMs);
+  try {
+    return await Promise.race([stopped, run(controller.signal)]);
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener('abort', cancel);
+  }
+};
+
+export const syncOperationWithTimeout = (userId, operation, timeoutMs, reportHttp, signal) =>
+  runSyncStep(requestSignal =>
+    syncOperation(userId, operation, { signal: requestSignal, reportHttp }), signal, timeoutMs);
+
+export const resumeTaskSync = () => {
+  if (!syncOnline || !syncSessionReady) return;
+  syncPendingTasks({ automatic: true, retryAuth: true }).catch(error => {
+    console.warn('[Sync] Falha ao retomar envio:', error);
+  });
+  pullRemoteTasks({ automatic: true }).catch(error => {
+    console.warn('[Sync] Falha ao retomar leitura:', error);
+  });
+};
+
+const stopTaskSync = (reason) => {
+  sendRetry.clear();
+  pullRetry.clear();
+  activeSyncController?.abort(reason);
+  activePullController?.abort(reason);
+  updateTaskSyncStatus({ sending: false, pulling: false, sendConfirmed: false, pullConfirmed: false });
 };
 
 export const setTaskSyncOnline = (online, source, network) => {
@@ -507,80 +558,101 @@ export const setTaskSyncOnline = (online, source, network) => {
     connected: network?.isConnected ?? null,
   });
   if (!syncOnline) {
-    clearRetryTimer();
-    activeSyncController?.abort('offline');
-    activePullController?.abort('offline');
-    updateTaskSyncStatus({ sending: false, pulling: false });
+    stopTaskSync('offline');
     return;
   }
   if (wasOnline) return;
-  clearRetryTimer();
-  if (!syncSessionReady) return;
-  syncPendingTasks().catch((error) => {
-    console.warn('[Sync] Falha ao recuperar ligação:', error);
-  });
+  resumeTaskSync();
 };
 
 export const setTaskSyncSessionReady = (ready) => {
   syncSessionReady = ready === true;
+  sessionVersion += 1;
   recordSyncTransition('session-readiness');
   if (!syncSessionReady) {
-    clearRetryTimer();
-    activeSyncController?.abort('session');
-    updateTaskSyncStatus({ sending: false });
+    stopTaskSync('session');
     return;
   }
-  if (!syncOnline) return;
-  clearRetryTimer();
-  syncPendingTasks().catch((error) => {
-    console.warn('[Sync] Falha ao recuperar sessão:', error);
-  });
+  resumeTaskSync();
 };
 
-export const syncPendingTasks = () => {
+export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) => {
   if (syncOnline !== true || !syncSessionReady) {
     recordSyncTransition('send-waiting');
     return Promise.resolve(0);
   }
   if (syncPromise) {
-    syncRequested = true;
+    if (activeSyncController.signal.aborted) {
+      return syncPromise.catch(() => {}).then(() => syncPendingTasks({ automatic, retryAuth }));
+    }
+    syncRequested = {
+      automatic: automatic && (syncRequested?.automatic ?? true),
+      retryAuth: retryAuth || (syncRequested?.retryAuth ?? false),
+    };
     recordSyncTransition('send-requested');
     return syncPromise;
   }
+  if (automatic && sendRetry.scheduled) return Promise.resolve(0);
+  sendRetry.clear();
 
-  updateTaskSyncStatus({ sending: true, sendFailed: false });
+  const controller = new AbortController();
+  const { signal } = controller;
+  activeSyncController = controller;
+  const identityRevision = getSessionIdentity().revision;
+  let attemptedSessionVersion = sessionVersion;
+  let userId;
+  let queueConfirmed = false;
+  const assertSameIdentity = () => assertSyncIdentity(signal, identityRevision, userId);
   syncPromise = (async () => {
-    const userId = await traceSync('send-session', getAuthenticatedUserId);
-    if (!syncOnline || !syncSessionReady) return 0;
     let synced = 0;
 
     while (true) {
-      if (!syncOnline || !syncSessionReady) break;
+      assertSameIdentity();
       // Ler a próxima operação sem interferir
       // com gravações locais em curso.
       const operation = await enqueueWrite(async () => {
         const state = await getState();
         recordQueueState(state);
+        updateTaskSyncStatus({
+          pending: state.pendingOps.length,
+          failureCategory: state.pendingOps[0]?.sync?.category ?? null,
+        });
         return state.pendingOps[0] ?? null;
       });
 
+      assertSameIdentity();
       if (!operation) {
+        queueConfirmed = true;
         break;
+      }
+      const headFailure = operation.sync?.category;
+      if (automatic && (headFailure === 'validation' || headFailure === 'conflict' ||
+          headFailure === 'auth' && !retryAuth)) break;
+
+      if (userId === undefined) {
+        attemptedSessionVersion = sessionVersion;
+        userId = await traceSync('send-session', () => runSyncStep(getAuthenticatedUserId, signal));
+        assertSameIdentity();
       }
 
       // Preserve the operation and record only safe, actionable metadata.
       try {
+        attemptedSessionVersion = sessionVersion;
         await traceSync('send', reportHttp =>
-          syncOperationWithTimeout(userId, operation, SYNC_OPERATION_TIMEOUT_MS, reportHttp), {
+          syncOperationWithTimeout(userId, operation, SYNC_OPERATION_TIMEOUT_MS, reportHttp, signal), {
           operation,
           attempt: (Number.isSafeInteger(operation.sync?.attempts) && operation.sync.attempts >= 0
             ? operation.sync.attempts : 0) + 1,
         });
       } catch (error) {
         const failure = classifyTaskSyncError(error);
+        assertSameIdentity();
+        if (error?.code === 'SYNC_CANCELLED') throw error;
         try {
           await enqueueWrite(async () => {
+            assertSameIdentity();
             const state = await getState();
+            assertSameIdentity();
             await saveState({
               ...state,
               pendingOps: state.pendingOps.map(item => item.id === operation.id
@@ -600,12 +672,15 @@ export const syncPendingTasks = () => {
           // Metadata persistence must not remove work or hide the send error.
           console.warn('[Sync] Não foi possível guardar o diagnóstico da operação.');
         }
+        assertSameIdentity();
         throw error;
       }
 
       // Remover apenas a operação confirmada.
       await traceSync('acknowledge', () => enqueueWrite(async () => {
+        assertSameIdentity();
         const state = await getState();
+        assertSameIdentity();
 
         const nextState = {
           ...state,
@@ -617,53 +692,53 @@ export const syncPendingTasks = () => {
         await saveState(nextState);
       }), { operation });
 
+      sendRetry.reset();
       synced += 1;
     }
 
     return synced;
   })();
+  updateTaskSyncStatus({ sending: true, sendFailed: false });
   recordSyncTransition('send-started');
 
-  // Libertar o bloqueio após sucesso ou erro.
   const currentPromise = syncPromise;
+  const release = () => {
+    const requested = syncRequested;
+    activeSyncController = null;
+    syncPromise = null;
+    syncRequested = null;
+    recordSyncTransition('send-released');
+    if (requested) recordSyncTransition('send-request-consumed');
+    return requested;
+  };
+  const tryAgain = (options) => syncPendingTasks(options).catch(error => {
+    console.warn('[Sync] Falha na nova tentativa:', error);
+  });
 
   currentPromise.then(
     () => {
-      if (syncPromise !== currentPromise) return;
-
-      syncPromise = null;
-      recordSyncTransition('send-released');
-      clearRetryTimer();
-      retryAttempt = 0;
-      updateTaskSyncStatus({ sending: false, sendFailed: false, sendConfirmed: true });
-
-      if (syncRequested) {
-        syncRequested = false;
-        recordSyncTransition('send-request-consumed');
-
-        syncPendingTasks().catch((error) => {
-          console.warn('[Sync] Falha na nova tentativa:', error);
-        });
-      }
+      const requested = release();
+      if (queueConfirmed) sendRetry.reset();
+      updateTaskSyncStatus({ sending: false, sendFailed: false, sendConfirmed: queueConfirmed && !signal.aborted });
+      if (requested) tryAgain(requested);
     },
     (error) => {
-      if (syncPromise !== currentPromise) return;
-
-      syncPromise = null;
-      recordSyncTransition('send-released');
+      const requested = release();
+      if (error?.code === 'SYNC_CANCELLED' || signal.aborted) {
+        updateTaskSyncStatus({ sending: false });
+        if (requested) tryAgain(requested);
+        return;
+      }
       const failure = classifyTaskSyncError(error);
       updateTaskSyncStatus({
         sending: false,
         sendFailed: true,
         failureCategory: failure.category,
       });
-      const retryWasRequested = syncRequested;
-      syncRequested = false;
-      if (retryWasRequested) recordSyncTransition('send-request-consumed');
-      if (isRetryableFailure(failure) || error?.code === 'SESSION_UNAVAILABLE') {
-        // A newly queued operation must not be forgotten when the current
-        // FIFO head fails. Backoff also prevents a tight retry loop.
-        if (retryWasRequested || syncOnline && syncSessionReady) scheduleRetry();
+      if (sessionRenewedAfterAuthError(error, attemptedSessionVersion)) {
+        tryAgain({ automatic: true, retryAuth: true });
+      } else if (shouldRetry(error)) {
+        sendRetry.schedule();
       }
     },
   );

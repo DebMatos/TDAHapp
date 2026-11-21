@@ -59,3 +59,14 @@ test('remote task creation is idempotent and ignores an existing primary key', a
   assert.equal(captured.row.user_id, 'user-1');
   assert.deepEqual(captured.options, { onConflict: 'id', ignoreDuplicates: true });
 });
+
+test('remote task errors carry the PostgREST response status into the sync classifier', async () => {
+  const response = { error: { message: 'JWT expired' }, status: 401 };
+  const query = {
+    delete() { return this; },
+    eq() { return this; },
+    abortSignal: async () => response,
+  };
+  const deleteTask = new Function('supabase', `${executable}; return deleteTask;`)({ from: () => query });
+  await assert.rejects(deleteTask('user-1', 'task-1'), { message: 'JWT expired', status: 401 });
+});

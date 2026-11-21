@@ -22,7 +22,12 @@ const loadDiagnostics = (enabled = false) => new Function(
   `${diagnosticsSource}; return { ${diagnosticsExports.join(', ')} };`,
 )(enabled, classifyTaskSyncError);
 
-function setup({ withPendingOperations = true, diagnosticsEnabled, getSession } = {}) {
+const validSession = async () => ({ data: { session: { user: { id: 'u' } } } });
+const repositorySource = stripImports(read('data/taskRepository.js'))
+  .replace('let syncOnline = null;', 'let syncOnline = true;')
+  .replace('let syncSessionReady = false;', 'let syncSessionReady = true;');
+
+function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = validSession, loadRemote = async () => [] } = {}) {
   const task = model.createTask({ id: 'a', title: 'A', notes: 'private note' });
   let state = { tasks: [task], pendingOps: withPendingOperations ? [
     { id: 'first', type: 'update', task },
@@ -42,15 +47,12 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession } 
   const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => structuredClone(state), async next => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
-    async () => { remoteLoads += 1; return []; }, { auth: { getSession: getSession ?? (async () => ({ data: { session: { user: { id: 'u' } } } })) } },
+    (...args) => { remoteLoads += 1; return loadRemote(...args); }, { auth: { getSession } },
     () => ({ userId: 'u', revision: 0 }),
     (...args) => syncImplementation(...args), classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
-  const repositorySource = stripImports(read('data/taskRepository.js'))
-    .replace('let syncOnline = null;', 'let syncOnline = true;')
-    .replace('let syncSessionReady = false;', 'let syncSessionReady = true;');
   const diagnostics = loadDiagnostics(diagnosticsEnabled);
-  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
+  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, resumeTaskSync, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
   return { repository, sent, state: () => state, observed: () => observed, status, diagnostics,
     setError: value => { error = value; },
     setSyncImplementation: value => { syncImplementation = value; },
@@ -67,15 +69,14 @@ test('diagnostics expose an unfinished session check while local edits continue'
   });
   let history;
   const unsubscribe = h.diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
-  const firstRun = h.repository.syncPendingTasks();
   await h.repository.updateTaskAndLoadTasks('a', { title: 'private edit' });
-  h.repository.setTaskSyncOnline(false);
-  h.repository.setTaskSyncOnline(true, 'Primeiro plano', { isConnected: true, isInternetReachable: true });
+  const firstRun = h.repository.syncPendingTasks();
+  await until(() => Boolean(resolveSession));
 
   const waiting = history.find(entry => entry.phase === 'send-session');
   assert.equal(waiting.outcome, 'pending');
-  assert.equal(history[0].state.syncRequested, true);
-  assert.equal(history[0].state.syncPromise, true);
+  assert.ok(history.some(entry => entry.phase === 'send-requested' && entry.state.syncRequested));
+  assert.equal(waiting.state.syncPromise, true);
   assert.equal(history.find(entry => entry.phase === 'queue').pending, 1);
   assert.deepEqual(h.sent, []);
 
@@ -281,6 +282,31 @@ test('losing connectivity aborts an active task synchronization', async () => {
   assert.equal(h.state().pendingOps.length, 2);
 });
 
+test('rapid reconnection starts a new FIFO attempt and ignores the cancelled send result', async () => {
+  const h = setup();
+  const attempted = [];
+  let finishCancelled;
+  let finishRetried;
+  h.setSyncImplementation(async (_userId, op) => {
+    attempted.push(op.id);
+    const attempt = attempted.length;
+    if (attempt === 1) await new Promise(resolve => { finishCancelled = resolve; });
+    if (attempt === 2) await new Promise(resolve => { finishRetried = resolve; });
+  });
+  const sending = h.repository.syncPendingTasks();
+  await until(() => Boolean(finishCancelled));
+  h.repository.setTaskSyncOnline(false);
+  h.repository.setTaskSyncOnline(true);
+  await assert.rejects(sending, { code: 'SYNC_CANCELLED' });
+  await until(() => Boolean(finishRetried));
+  finishCancelled();
+  await new Promise(setImmediate);
+  assert.deepEqual(h.state().pendingOps.map(op => op.id), ['first', 'second']);
+  finishRetried();
+  await until(() => h.observed().sendConfirmed);
+  assert.deepEqual(attempted, ['first', 'first', 'second']);
+});
+
 test('online transient failure retries automatically and drains the FIFO queue', async () => {
   const h = setup();
   h.setError({ status: 503 });
@@ -305,6 +331,98 @@ test('online permanent rejection does not enter an automatic retry loop', async 
   await new Promise(resolve => setTimeout(resolve, 650));
   assert.deepEqual(h.sent, ['first']);
   assert.equal(h.state().pendingOps[0].sync.state, 'blocked');
+  await h.repository.updateTaskAndLoadTasks('a', { title: 'Nova alteração local' });
+  h.repository.resumeTaskSync();
+  await until(() => !h.observed().sending);
+  assert.deepEqual(h.sent, ['first']);
+  assert.equal(h.state().pendingOps.length, 3);
+});
+
+test('a hung send session times out, preserves local edits and retries the queue in order', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finishOldSession;
+  let sessionChecks = 0;
+  const h = setup({
+    getSession: () => ++sessionChecks === 1
+      ? new Promise(resolve => { finishOldSession = resolve; })
+      : validSession(),
+  });
+  h.setError(null);
+  const sending = h.repository.syncPendingTasks();
+  await until(() => Boolean(finishOldSession));
+  await h.repository.updateTaskAndLoadTasks('a', { title: 'Guardada localmente' });
+  const pendingIds = h.state().pendingOps.map(op => op.id);
+  t.mock.timers.tick(15_000);
+  await assert.rejects(sending, { code: 'SYNC_TIMEOUT' });
+  assert.equal(h.observed().sending, false);
+  assert.equal(h.state().tasks[0].title, 'Guardada localmente');
+  assert.deepEqual(h.state().pendingOps.map(op => op.id), pendingIds);
+  assert.deepEqual(h.sent, []);
+
+  t.mock.timers.tick(5_000);
+  await until(() => h.observed().sendConfirmed);
+  assert.deepEqual(h.sent, pendingIds);
+  finishOldSession(await validSession());
+  await new Promise(setImmediate);
+  assert.deepEqual(h.sent, pendingIds);
+  assert.equal(h.state().pendingOps.length, 0);
+});
+
+test('a hung remote read times out and retries independently of a completed send', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finishOldRead;
+  let firstSignal;
+  const recovered = model.createTask({ id: 'fresh', title: 'Fresh read' });
+  const late = model.createTask({ id: 'late', title: 'Late response' });
+  const h = setup({
+    loadRemote: async (_userId, signal) => {
+      if (firstSignal) return [recovered];
+      firstSignal = signal;
+      return new Promise(resolve => { finishOldRead = resolve; });
+    },
+  });
+  h.setError(null);
+  const pulling = h.repository.pullRemoteTasks();
+  await until(() => Boolean(finishOldRead));
+  assert.equal(await h.repository.syncPendingTasks(), 2);
+  t.mock.timers.tick(15_000);
+  await assert.rejects(pulling, { code: 'SYNC_TIMEOUT' });
+  assert.equal(firstSignal.aborted, true);
+  assert.equal(h.observed().pulling, false);
+
+  t.mock.timers.tick(5_000);
+  await until(() => h.observed().pullConfirmed && !h.observed().pulling);
+  finishOldRead([late]);
+  await new Promise(setImmediate);
+  assert.deepEqual(h.state().tasks.map(task => task.id), ['a', 'fresh']);
+  assert.equal(h.remoteLoads(), 2);
+});
+
+test('foreground rechecks the FIFO head after an auth failure with existing connectivity', async () => {
+  const h = setup();
+  h.setError({ status: 401 });
+  await assert.rejects(h.repository.syncPendingTasks(), { status: 401 });
+  h.setError(null);
+  h.repository.resumeTaskSync();
+  await until(() => h.observed().sendConfirmed);
+  assert.deepEqual(h.sent, ['first', 'first', 'second']);
+});
+
+test('a token renewal during an in-flight 401 is picked up without another session event', async () => {
+  const h = setup();
+  const attempted = [];
+  let rejectFirst;
+  h.setSyncImplementation(async (_userId, op) => {
+    attempted.push(op.id);
+    if (attempted.length === 1) await new Promise((_, reject) => { rejectFirst = reject; });
+  });
+  const sending = h.repository.syncPendingTasks();
+  await until(() => Boolean(rejectFirst));
+  h.repository.setTaskSyncSessionReady(true);
+  rejectFirst({ status: 401 });
+  await assert.rejects(sending, { status: 401 });
+  await until(() => h.observed().sendConfirmed);
+  assert.deepEqual(attempted, ['first', 'first', 'second']);
 });
 
 function setupPull() {
@@ -330,9 +448,9 @@ function setupPull() {
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => structuredClone(state), async next => (state = structuredClone(next)),
     async () => [model.createTask({ id: 'remote', title: 'Remote' })], { auth }, getSessionIdentity,
-    async () => { throw Error('offline'); }, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
+    async () => {}, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
   const diagnostics = loadDiagnostics();
-  const repository = new Function(...names, ...diagnosticsExports, `${stripImports(read('data/taskRepository.js'))};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
+  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask, setTaskSyncOnline };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
   return { repository, emit, identity: getSessionIdentity, waiting: () => authWaiting,
     release: () => releaseAuth(), state: () => state };
 }
@@ -393,4 +511,15 @@ test('P1: normal token refresh keeps identity revision and allows pull', async (
   h.release();
   await pull;
   assert.equal(h.state().tasks.length, 2);
+});
+
+test('going offline during pull revalidation invalidates the already received response', async () => {
+  const h = setupPull();
+  const pulling = h.repository.pullRemoteTasks();
+  await until(h.waiting);
+  h.repository.setTaskSyncOnline(false);
+  await assert.rejects(pulling, { code: 'SYNC_CANCELLED' });
+  h.release();
+  await new Promise(setImmediate);
+  assert.deepEqual(h.state().tasks.map(task => task.id), ['a']);
 });

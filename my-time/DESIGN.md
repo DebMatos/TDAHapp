@@ -103,12 +103,13 @@ alone does not replace an earlier rejected operation. No queue-resolution UI is
 provided yet.
 
 Task synchronization starts only after both network reachability and an authenticated
-session are confirmed. Pending work resumes on reconnection or a new valid access
-token. Duplicate online events do not bypass the current delay. Remote auth failures
-wait for a session event; a locally unavailable session also receives the same slow,
-bounded fallback used for retryable transport and unknown failures: one timer at 5,
-15, 30, then 60 seconds (remaining at 60 seconds), reset after a confirmed send. The
-FIFO queue and local task commit are never cleared by a failed attempt.
+session are confirmed. Pending work resumes on reconnection, on return to the
+foreground, or after receipt of a valid access token. Each session check and remote
+request has a 15-second deadline. Send and read failures retry independently at 5,
+15, 30, then 60 seconds (remaining at 60 seconds), with the delay reset after a
+successful operation. Duplicate online events respect the current delay. Validation
+and conflict errors keep the head of the FIFO queue available for review. Failed
+or cancelled attempts preserve pending operations and local task edits.
 
 Task forms use the same pressed opacity (0.7), accessible labels for icon actions
 and fields, and explicit disabled/busy semantics. Small form controls use at least

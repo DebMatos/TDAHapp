@@ -12,7 +12,7 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { setTaskSyncOnline, setTaskSyncSessionReady } from './src/data/taskRepository';
+import { resumeTaskSync, setTaskSyncOnline, setTaskSyncSessionReady } from './src/data/taskRepository';
 import { syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
@@ -52,10 +52,19 @@ function AppContent() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const unsubscribe = NetInfo.addEventListener((state) => {
+    let active = true;
+    let networkRevision = 0;
+    let activityRevision = 0;
+    const applyNetwork = (state, source) => {
       updateTaskSyncConnectivity(state);
       const online = state.isConnected === true && state.isInternetReachable === true;
-      setTaskSyncOnline(online, 'NetInfo', state);
+      setTaskSyncOnline(online, source, state);
+      return online;
+    };
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (!active) return;
+      networkRevision += 1;
+      const online = applyNetwork(state, 'NetInfo');
       if (online) {
         syncTaskSessions().catch((error) => {
           console.warn('[Sessions] Falha ao sincronizar na reconexão:', error);
@@ -63,33 +72,31 @@ function AppContent() {
       }
     });
 
+    const subscription = AppState.addEventListener('change', (state) => {
+      const activity = ++activityRevision;
+      if (state !== 'active') return;
+      const revision = networkRevision;
+      NetInfo.refresh().then((network) => {
+        if (!active || activity !== activityRevision) return;
+        if (revision === networkRevision) applyNetwork(network, 'Primeiro plano');
+        // A listener may already have supplied newer connectivity during refresh.
+        resumeTaskSync();
+      }).catch((error) => {
+        if (active && activity === activityRevision) resumeTaskSync();
+        console.warn('[Sync] Não foi possível verificar a ligação:', error);
+      });
+    });
+
     return () => {
+      active = false;
       unsubscribe();
+      subscription.remove();
       setTaskSyncOnline(false, 'Fim da subscrição');
     };
   }, [session?.user?.id]);
   useEffect(() => {
     setTaskSyncSessionReady(Boolean(session?.user?.id && session?.access_token));
   }, [session?.user?.id, session?.access_token]);
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      NetInfo.fetch().then((network) => {
-        updateTaskSyncConnectivity(network);
-        setTaskSyncOnline(
-          network.isConnected === true && network.isInternetReachable === true,
-          'Primeiro plano',
-          network,
-        );
-      }).catch((error) => {
-        console.warn('[Sync] Não foi possível verificar a ligação:', error);
-      });
-    });
-
-    return () => subscription.remove();
-  }, [session?.user?.id]);
   useEffect(() => {
     if (!session?.user?.id) return;
 
