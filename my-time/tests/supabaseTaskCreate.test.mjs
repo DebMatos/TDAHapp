@@ -9,6 +9,7 @@ const source = fs.readFileSync(
 const executable = source
   .replace(/import\s+[\s\S]*?\sfrom\s*['"][^'"]+['"];?/g, '')
   .replace(/export const /g, 'const ');
+const runSyncRequest = (_userId, signal, build) => build().abortSignal(signal);
 
 test('remote task creation is idempotent and ignores an existing primary key', async () => {
   let captured;
@@ -47,11 +48,12 @@ test('remote task creation is idempotent and ignores an existing primary key', a
     ...task,
   });
   const createTask = new Function(
-    'supabase',
+    'syncDataClient',
+    'runSyncRequest',
     'normalizeTask',
     'normalizeTasks',
     `${executable}; return createTask;`,
-  )(supabase, normalizeTask, tasks => tasks);
+  )(supabase, runSyncRequest, normalizeTask, tasks => tasks);
 
   const task = normalizeTask({ id: 'task-same-id', title: 'Sem duplicar' });
   assert.deepEqual(await createTask('user-1', task, new AbortController().signal), task);
@@ -67,6 +69,6 @@ test('remote task errors carry the PostgREST response status into the sync class
     eq() { return this; },
     abortSignal: async () => response,
   };
-  const deleteTask = new Function('supabase', `${executable}; return deleteTask;`)({ from: () => query });
+  const deleteTask = new Function('syncDataClient', 'runSyncRequest', `${executable}; return deleteTask;`)({ from: () => query }, runSyncRequest);
   await assert.rejects(deleteTask('user-1', 'task-1'), { message: 'JWT expired', status: 401 });
 });

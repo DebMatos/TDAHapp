@@ -16,7 +16,7 @@ import {
   loadTasks as loadRemoteTasks,
 } from '../repositories/supabaseTaskRepository';
 
-import { supabase, getSessionIdentity } from '../lib/supabase';
+import { getSessionIdentity } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
 import { classifyTaskSyncError } from '../services/taskSyncErrors';
 import { updateTaskSyncStatus } from './taskSyncStatus';
@@ -130,25 +130,6 @@ export const loadTasksSnapshot = () => {
   });
 };
 
-const getAuthenticatedUserId = async () => {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!session?.user?.id) {
-    const unavailable = new Error('Sessão indisponível');
-    unavailable.code = 'SESSION_UNAVAILABLE';
-    throw unavailable;
-  }
-
-  return session.user.id;
-};
-
 const makeOperation = (type, data) => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   type,
@@ -222,9 +203,7 @@ export const loadTasks = async () => {
 let pullPromise = null;
 let activePullController = null;
 
-const recoverRemoteTasks = async (signal, identityRevision) => {
-  const userId = await traceSync('pull-session', () =>
-    runSyncStep(getAuthenticatedUserId, signal));
+const recoverRemoteTasks = async (signal, { userId, revision: identityRevision }) => {
   const assertSameIdentity = () => {
     assertSyncIdentity(signal, identityRevision, userId);
   };
@@ -234,15 +213,10 @@ const recoverRemoteTasks = async (signal, identityRevision) => {
   // a pending delete was confirmed and removed while the request was in flight.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const revision = await enqueueWrite(() => tasksRevision);
+    assertSameIdentity();
     const remoteTasks = await traceSync('pull', reportHttp => runSyncStep(
       requestSignal => loadRemoteTasks(userId, requestSignal, reportHttp), signal,
     ), { attempt: attempt + 1 });
-    // Session refresh may use the network: never await it inside writeQueue.
-    if (await traceSync('pull-revalidate', () =>
-      runSyncStep(getAuthenticatedUserId, signal), { attempt: attempt + 1 }) !== userId) {
-      recordSyncTransition('pull-identity-changed');
-      throw syncAbortError('session');
-    }
     assertSameIdentity();
 
     const result = await traceSync('reconcile', () => enqueueWrite(async () => {
@@ -289,16 +263,16 @@ export const pullRemoteTasks = ({ automatic = false } = {}) => {
   pullRetry.clear();
   const controller = new AbortController();
   const attemptedSessionVersion = sessionVersion;
-  const identityRevision = getSessionIdentity().revision;
+  const identity = getSessionIdentity();
   activePullController = controller;
-  pullPromise = recoverRemoteTasks(controller.signal, identityRevision).then(tasks => {
-    assertSyncIdentity(controller.signal, identityRevision);
+  pullPromise = recoverRemoteTasks(controller.signal, identity).then(tasks => {
+    assertSyncIdentity(controller.signal, identity.revision, identity.userId);
     pullRetry.reset();
     updateTaskSyncStatus({ pullConfirmed: true });
     return tasks;
   }).catch(error => {
     if (error?.code !== 'SYNC_CANCELLED') {
-      updateTaskSyncStatus({ pullFailed: true });
+      updateTaskSyncStatus({ pullFailed: true, pullNeedsReauth: error?.code === 'SESSION_REAUTH_REQUIRED' });
       recordSyncTransition('pull-failed');
       if (shouldRetry(error) || sessionRenewedAfterAuthError(error, attemptedSessionVersion)) {
         pullRetry.schedule();
@@ -311,7 +285,7 @@ export const pullRemoteTasks = ({ automatic = false } = {}) => {
     updateTaskSyncStatus({ pulling: false });
     recordSyncTransition('pull-released');
   });
-  updateTaskSyncStatus({ pulling: true, pullFailed: false });
+  updateTaskSyncStatus({ pulling: true, pullFailed: false, pullNeedsReauth: false });
   recordSyncTransition('pull-started');
   return pullPromise;
 };
@@ -515,7 +489,8 @@ const recordQueueState = ({ pendingOps }) => {
 const traceSync = (phase, run, details) =>
   traceTaskSyncDiagnostic(phase, syncDiagnosticState, run, details);
 
-const SYNC_OPERATION_TIMEOUT_MS = 15_000;
+// The transport enforces separate token and data deadlines.
+const SYNC_OPERATION_TIMEOUT_MS = 60_000;
 const SYNC_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
 
 const createRetry = (source, retry) => {
@@ -619,8 +594,7 @@ const assertSyncActive = (signal) => {
 const assertSyncIdentity = (signal, revision, userId) => {
   assertSyncActive(signal);
   const identity = getSessionIdentity();
-  if (identity.revision !== revision ||
-      userId !== undefined && identity.userId !== undefined && identity.userId !== userId) {
+  if (!userId || taskUserId !== userId || identity.revision !== revision || identity.userId !== userId) {
     throw syncAbortError('session');
   }
 };
@@ -665,7 +639,8 @@ const stopTaskSync = (reason) => {
   pullRetry.clear();
   activeSyncController?.abort(reason);
   activePullController?.abort(reason);
-  updateTaskSyncStatus({ sending: false, pulling: false, sendConfirmed: false, pullConfirmed: false });
+  updateTaskSyncStatus({ sending: false, pulling: false, sendConfirmed: false, pullConfirmed: false,
+    sendNeedsReauth: false, pullNeedsReauth: false });
 };
 
 export const setTaskSyncOnline = (online, source, network) => {
@@ -718,9 +693,8 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
   const controller = new AbortController();
   const { signal } = controller;
   activeSyncController = controller;
-  const identityRevision = getSessionIdentity().revision;
+  const { userId, revision: identityRevision } = getSessionIdentity();
   let attemptedSessionVersion = sessionVersion;
-  let userId;
   let queueConfirmed = false;
   let wakeAt = Infinity;
   let recordedFailure;
@@ -742,7 +716,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
           failureCategory: state.pendingOps[0]?.sync?.category ?? null,
         });
         const picked = selectTaskOperation(state.pendingOps, Date.now(), { automatic, retryAuth });
-        if (userId !== undefined && isUnsent(picked.item ?? {})) {
+        if (isUnsent(picked.item ?? {})) {
           const claimed = { ...picked.item, startedAt: Date.now() };
           const owner = state[STATE_OWNER];
           assertTaskOwner(owner);
@@ -762,13 +736,6 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
         queueConfirmed = selection.empty;
         wakeAt = selection.wakeAt;
         break;
-      }
-
-      if (userId === undefined) {
-        attemptedSessionVersion = sessionVersion;
-        userId = await traceSync('send-session', () => runSyncStep(getAuthenticatedUserId, signal));
-        assertSameIdentity();
-        continue;
       }
 
       // Preserve the operation and record only safe, actionable metadata.
@@ -836,7 +803,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
 
     return synced;
   })();
-  updateTaskSyncStatus({ sending: true, sendFailed: false });
+  updateTaskSyncStatus({ sending: true, sendFailed: false, sendNeedsReauth: false });
   recordSyncTransition('send-started');
 
   const currentPromise = syncPromise;
@@ -872,6 +839,7 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
       updateTaskSyncStatus({
         sending: false,
         sendFailed: true,
+        sendNeedsReauth: error?.code === 'SESSION_REAUTH_REQUIRED',
         failureCategory: failure.category,
       });
       if (sessionRenewedAfterAuthError(error, attemptedSessionVersion)) {

@@ -97,8 +97,10 @@ provided yet.
 
 Task synchronization starts only after both network reachability and an authenticated
 session are confirmed. Pending work resumes on reconnection, on return to the
-foreground, or after receipt of a valid access token. Each session check and remote
-request has a 15-second deadline. Send and read failures retry independently at 5,
+foreground, or after receipt of a valid access token. Authentication events track
+account identity. The sync transport resolves the SDK token once per remote query,
+with 8 seconds per refresh HTTP attempt, 45 seconds to obtain a token, and a
+separate 15-second data deadline. Send and read failures retry independently at 5,
 15, 30, then 60 seconds (remaining at 60 seconds), with the delay reset after a
 successful operation. Duplicate online events respect the current delay. Validation
 and conflict errors keep the first operation for the affected task available for review.

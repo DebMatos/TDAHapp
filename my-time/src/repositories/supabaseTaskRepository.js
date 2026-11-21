@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { runSyncRequest, supabase, syncDataClient } from '../lib/supabase';
 import {
   normalizeTask,
   normalizeTasks,
@@ -59,14 +59,13 @@ const toDatabase = (task, userId) => ({
 ------------------------------------------------------- */
 
 export const loadTasks = async (userId, signal, reportHttp) => {
-  const { data, error, status } = await supabase
+  const { data, error, status } = await runSyncRequest(userId, signal, () => syncDataClient
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
     .order('position', {
       ascending: true,
-    })
-    .abortSignal(signal);
+    }));
 
   reportHttp?.(status);
   if (error) {
@@ -91,7 +90,7 @@ export const createTask = async (
   const canonicalTask =
     normalizeTask(task);
   const { error, status } =
-    await supabase
+    await runSyncRequest(userId, signal, () => syncDataClient
       .from('tasks')
       .upsert(
         toDatabase(
@@ -102,8 +101,7 @@ export const createTask = async (
           onConflict: 'id',
           ignoreDuplicates: true,
         },
-      )
-      .abortSignal(signal);
+      ));
 
   reportHttp?.(status);
   if (error) {
@@ -139,14 +137,13 @@ export const updateTask = async (
   } = row;
 
   const { data, error, status } =
-    await supabase
+    await runSyncRequest(userId, signal, () => syncDataClient
       .from('tasks')
       .update(changes)
       .eq('id', id)
       .eq('user_id', userId)
-      .abortSignal(signal)
       .select('*')
-      .single();
+      .single());
 
   reportHttp?.(status);
   if (error) {
@@ -168,12 +165,11 @@ export const deleteTask = async (
   signal,
   reportHttp,
 ) => {
-  const { error, status } = await supabase
+  const { error, status } = await runSyncRequest(userId, signal, () => syncDataClient
     .from('tasks')
     .delete()
     .eq('id', taskId)
-    .eq('user_id', userId)
-    .abortSignal(signal);
+    .eq('user_id', userId));
 
   reportHttp?.(status);
   if (error) {

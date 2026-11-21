@@ -19,7 +19,7 @@ import {
   setTaskSyncSessionReady,
 } from './src/data/taskRepository';
 import { setTaskSessionRepositoryUser } from './src/repositories/localTaskSessionRepository';
-import { syncTaskSessions } from './src/services/taskSessionSyncService';
+import { setTaskSessionSyncOnline, syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -43,23 +43,19 @@ function AppContent() {
 
   useEffect(() => {
     let active = true;
-    let authRevision = 0;
+    let receivedChange = false;
     const applySession = (nextSession) => {
       const userId = nextSession?.user?.id ?? null;
       setTaskRepositoryUser(userId);
       setTaskSessionRepositoryUser(userId);
       setSession(nextSession);
     };
-    const initialRevision = authRevision;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (active && authRevision === initialRevision) applySession(session);
-    });
-
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      authRevision += 1;
-      if (active) applySession(nextSession);
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!active || (event === 'INITIAL_SESSION' && receivedChange)) return;
+      if (event !== 'INITIAL_SESSION') receivedChange = true;
+      applySession(nextSession);
     });
 
     return () => {
@@ -74,17 +70,20 @@ function AppContent() {
     let active = true;
     let networkRevision = 0;
     let activityRevision = 0;
+    let wasOnline = false;
     const applyNetwork = (state, source) => {
       updateTaskSyncConnectivity(state);
       const online = state.isConnected === true && state.isInternetReachable === true;
       setTaskSyncOnline(online, source, state);
-      return online;
+      setTaskSessionSyncOnline(online);
+      const reconnected = online && !wasOnline;
+      wasOnline = online;
+      return reconnected;
     };
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (!active) return;
       networkRevision += 1;
-      const online = applyNetwork(state, 'NetInfo');
-      if (online) {
+      if (applyNetwork(state, 'NetInfo')) {
         syncTaskSessions().catch((error) => {
           console.warn('[Sessions] Falha ao sincronizar na reconexão:', error);
         });
@@ -100,8 +99,12 @@ function AppContent() {
         if (revision === networkRevision) applyNetwork(network, 'Primeiro plano');
         // A listener may already have supplied newer connectivity during refresh.
         resumeTaskSync();
+        syncTaskSessions().catch(() => {});
       }).catch((error) => {
-        if (active && activity === activityRevision) resumeTaskSync();
+        if (active && activity === activityRevision) {
+          resumeTaskSync();
+          syncTaskSessions().catch(() => {});
+        }
         console.warn('[Sync] Não foi possível verificar a ligação:', error);
       });
     });
@@ -111,6 +114,7 @@ function AppContent() {
       unsubscribe();
       subscription.remove();
       setTaskSyncOnline(false, 'Fim da subscrição');
+      setTaskSessionSyncOnline(false);
     };
   }, [session?.user?.id]);
   useEffect(() => {
@@ -122,7 +126,7 @@ function AppContent() {
     syncTaskSessions().catch((error) => {
       console.warn('[Sessions] Falha na sincronização inicial:', error);
     });
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session?.access_token]);
 
   if (!fontsLoaded || session === undefined) {
     return (

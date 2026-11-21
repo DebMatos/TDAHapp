@@ -22,13 +22,12 @@ const loadDiagnostics = (enabled = false) => new Function(
   `${diagnosticsSource}; return { ${diagnosticsExports.join(', ')} };`,
 )(enabled, classifyTaskSyncError);
 
-const validSession = async () => ({ data: { session: { user: { id: 'u' } } } });
 const repositorySource = stripImports(read('data/taskRepository.js'))
   .replace('let syncOnline = null;', 'let syncOnline = true;')
   .replace('let syncSessionReady = false;', 'let syncSessionReady = true;')
   .replace('let taskUserId = null;', "let taskUserId = 'u';");
 
-function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = validSession, loadRemote = async () => [], initialState } = {}) {
+function setup({ withPendingOperations = true, diagnosticsEnabled, loadRemote = async () => [], initialState } = {}) {
   const task = model.createTask({ id: 'a', title: 'A', notes: 'private note' });
   let state = initialState ? structuredClone(initialState) : { tasks: [task], pendingOps: withPendingOperations ? [
     { id: 'first', type: 'update', task },
@@ -48,7 +47,7 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = 
   const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'discardUnownedTaskState', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => {}, async () => structuredClone(state), async (_userId, next) => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
-    (...args) => { remoteLoads += 1; return loadRemote(...args); }, { auth: { getSession } },
+    (...args) => { remoteLoads += 1; return loadRemote(...args); }, {},
     () => ({ userId: 'u', revision: 0 }),
     (...args) => syncImplementation(...args), classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
@@ -61,13 +60,17 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = 
     failStorage: () => { failStorage = true; } };
 }
 
-test('diagnostics expose an unfinished session check while local edits continue', async (t) => {
+test('diagnostics expose an unfinished send while local edits continue', async (t) => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
   let resolveSession;
   const h = setup({
     diagnosticsEnabled: true,
     withPendingOperations: false,
-    getSession: () => new Promise(resolve => { resolveSession = resolve; }),
+  });
+  h.setSyncImplementation(async (_userId, _operation, { reportHttp }) => {
+    await new Promise(resolve => { resolveSession = resolve; });
+    reportHttp(403);
+    throw { code: '42501', message: 'private server error' };
   });
   let history;
   const unsubscribe = h.diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
@@ -77,7 +80,7 @@ test('diagnostics expose an unfinished session check while local edits continue'
   const firstRun = h.repository.syncPendingTasks();
   await until(() => Boolean(resolveSession));
 
-  const waiting = history.find(entry => entry.phase === 'send-session');
+  const waiting = history.find(entry => entry.phase === 'send');
   assert.equal(waiting.outcome, 'pending');
   assert.ok(history.some(entry => entry.phase === 'send-requested' && entry.state.syncRequested));
   assert.equal(waiting.state.syncPromise, true);
@@ -85,11 +88,7 @@ test('diagnostics expose an unfinished session check while local edits continue'
   assert.deepEqual(h.sent, []);
 
   const operationId = h.state().pendingOps[0].id;
-  h.setSyncImplementation(async (_userId, _operation, { reportHttp }) => {
-    reportHttp(403);
-    throw { code: '42501', message: 'private server error' };
-  });
-  resolveSession({ data: { session: { user: { id: 'u' } } } });
+  resolveSession();
   await assert.rejects(firstRun, error => error.code === '42501');
   const failed = history.find(entry => entry.phase === 'send');
   assert.equal(failed.operationId, operationId);
@@ -345,21 +344,23 @@ test('online permanent rejection does not enter an automatic retry loop', async 
   assert.equal(h.state().pendingOps.length, 3);
 });
 
-test('a hung send session times out, preserves local edits and retries the queue in order', async (t) => {
+test('a hung transport preserves local edits and retries the queue in order', async (t) => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
   let finishOldSession;
-  let sessionChecks = 0;
-  const h = setup({
-    getSession: () => ++sessionChecks === 1
-      ? new Promise(resolve => { finishOldSession = resolve; })
-      : validSession(),
+  const h = setup();
+  h.setSyncImplementation(async (_userId, operation) => {
+    if (!finishOldSession) {
+      await new Promise(resolve => { finishOldSession = resolve; });
+      return;
+    }
+    h.sent.push(operation.id);
   });
   h.setError(null);
   const sending = h.repository.syncPendingTasks();
   await until(() => Boolean(finishOldSession));
   await h.repository.updateTaskAndLoadTasks('a', { title: 'Guardada localmente' });
   const pendingIds = h.state().pendingOps.map(op => op.id);
-  t.mock.timers.tick(15_000);
+  t.mock.timers.tick(60_000);
   await assert.rejects(sending, { code: 'SYNC_TIMEOUT' });
   assert.equal(h.observed().sending, false);
   assert.equal(h.state().tasks[0].title, 'Guardada localmente');
@@ -369,7 +370,7 @@ test('a hung send session times out, preserves local edits and retries the queue
   t.mock.timers.tick(5_000);
   await until(() => h.observed().sendConfirmed);
   assert.deepEqual(h.sent, pendingIds);
-  finishOldSession(await validSession());
+  finishOldSession();
   await new Promise(setImmediate);
   assert.deepEqual(h.sent, pendingIds);
   assert.equal(h.state().pendingOps.length, 0);
@@ -392,7 +393,7 @@ test('a hung remote read times out and retries independently of a completed send
   const pulling = h.repository.pullRemoteTasks();
   await until(() => Boolean(finishOldRead));
   assert.equal(await h.repository.syncPendingTasks(), 2);
-  t.mock.timers.tick(15_000);
+  t.mock.timers.tick(60_000);
   await assert.rejects(pulling, { code: 'SYNC_TIMEOUT' });
   assert.equal(firstSignal.aborted, true);
   assert.equal(h.observed().pulling, false);
@@ -434,32 +435,31 @@ test('a token renewal during an in-flight 401 is picked up without another sessi
 
 function setupPull() {
   let state = { tasks: [model.createTask({ id: 'a', title: 'Original' })], pendingOps: [] };
-  let authCalls = 0, authWaiting = false, releaseAuth, authListener;
+  let readWaiting = false, releaseRead, authListener;
   const auth = {
     onAuthStateChange: listener => { authListener = listener; },
-    getSession: async () => {
-      if (++authCalls === 2) {
-        authWaiting = true;
-        await new Promise(resolve => { releaseAuth = resolve; });
-      }
-      return { data: { session: { user: { id: 'u' } } } };
-    },
   };
   // Execute the actual synchronous identity tracker, without creating a client.
   const lib = read('lib/supabase.js');
-  const tracker = lib.slice(lib.indexOf('// Track identity'), lib.indexOf("if (Platform.OS !== 'web')"));
+  const tracker = lib.slice(lib.indexOf('// Track identity'), lib.indexOf('// Sync queries'));
   const getSessionIdentity = new Function('supabase', `${tracker.replace(/export const /g, 'const ')};return getSessionIdentity;`)({ auth });
   const emit = (event, userId) => authListener(event, userId ? { user: { id: userId } } : null);
   emit('INITIAL_SESSION', 'u');
   const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'discardUnownedTaskState', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => {}, async () => structuredClone(state), async (_userId, next) => (state = structuredClone(next)),
-    async () => [model.createTask({ id: 'remote', title: 'Remote' })], { auth }, getSessionIdentity,
+    async () => {
+      if (!readWaiting) {
+        readWaiting = true;
+        await new Promise(resolve => { releaseRead = resolve; });
+      }
+      return [model.createTask({ id: 'remote', title: 'Remote' })];
+    }, { auth }, getSessionIdentity,
     async () => {}, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
   const diagnostics = loadDiagnostics();
   const repository = new Function(...names, ...diagnosticsExports, `${repositorySource};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask, setTaskSyncOnline };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
-  return { repository, emit, identity: getSessionIdentity, waiting: () => authWaiting,
-    release: () => releaseAuth(), state: () => state };
+  return { repository, emit, identity: getSessionIdentity, waiting: () => readWaiting,
+    release: () => releaseRead(), state: () => state };
 }
 
 const until = async predicate => {
@@ -471,7 +471,7 @@ const until = async predicate => {
 };
 
 for (const action of ['create', 'update', 'delete']) {
-  test(`P1: ${action} completes while pull session revalidation is suspended`, async () => {
+  test(`P1: ${action} completes while the remote read is suspended`, async () => {
     const h = setupPull();
     const pull = h.repository.pullRemoteTasks();
     await until(h.waiting);
@@ -487,11 +487,12 @@ for (const action of ['create', 'update', 'delete']) {
   });
 }
 
-test('P1: sign-out during revalidation rejects remote response', async () => {
+test('P1: switching accounts during a read rejects the old response', async () => {
   const h = setupPull();
   const pull = h.repository.pullRemoteTasks();
   await until(h.waiting);
   h.emit('SIGNED_OUT', null);
+  h.emit('SIGNED_IN', 'other-account');
   h.release();
   await assert.rejects(pull, /Sessão alterada/);
   assert.deepEqual(h.state().tasks.map(task => task.id), ['a']);
@@ -520,7 +521,7 @@ test('P1: normal token refresh keeps identity revision and allows pull', async (
   assert.equal(h.state().tasks.length, 2);
 });
 
-test('going offline during pull revalidation invalidates the already received response', async () => {
+test('going offline during a read invalidates a late response', async () => {
   const h = setupPull();
   const pulling = h.repository.pullRemoteTasks();
   await until(h.waiting);

@@ -32,9 +32,7 @@ const ROWS = [
 ];
 
 const DIAGNOSTIC_PHASES = {
-  'send-session': 'Obter sessão para envio',
-  'pull-session': 'Obter sessão para leitura',
-  'pull-revalidate': 'Revalidar sessão após leitura',
+  'auth-refresh': 'Renovar sessão do Supabase',
   'pull': 'Ler tarefas remotas',
   'reconcile': 'Conciliar dados locais e remotos',
   'acknowledge': 'Confirmar envio na fila local',

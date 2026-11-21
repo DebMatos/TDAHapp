@@ -50,6 +50,9 @@ export const subscribeTaskSyncStatus = (listener) => {
 };
 
 export const getTaskSyncMessage = (state) => {
+  if (state.sendNeedsReauth || state.pullNeedsReauth) {
+    return 'A sessão terminou. Volta a iniciar sessão para sincronizar.';
+  }
   if (state.pending > 0 && !state.sending) {
     if (state.failureCategory === 'validation') {
       return 'Alterações guardadas neste dispositivo. O servidor rejeitou os dados de uma tarefa; a sincronização está bloqueada até o problema ser corrigido.';
