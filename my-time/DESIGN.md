@@ -69,24 +69,17 @@ field names, timings, protocol results and state transitions. Task content and
 session credentials are excluded.
 
 Offline takes priority over activity, then errors, then confirmed synchronization.
-Checking and queued work use neutral, non-rotating icons. Rotation occurs only
-while sending or pulling and respects reduced-motion preferences. Error details
-remain available offline. Colors come from `src/theme/colors.js`.
+Checking and queued work use neutral, non-rotating icons. Active synchronization
+uses one two-second turn and respects reduced-motion preferences. Remote errors
+remain available in the icon and the synchronization screen, including offline.
+Colors come from `src/theme/colors.js`.
 
 ## Components
 
-`TaskBanner` owns non-modal, floating task feedback without layout space. It sits
-above the timeline near its bottom, or near the top inside an open task modal.
-It never adds another modal or dims the interface. The host passes through touches
-outside the banner. Local errors have priority over remote notices and remain
-until dismissed or another local attempt starts. Informational notices expire
-after six seconds; important errors require manual dismissal. No routine success
-notifications are shown.
+`TaskBanner` owns floating local task feedback without taking layout space. The
+host passes through touches outside the banner. Local errors appear immediately
+and remain until dismissed or a new local attempt starts.
 
-`taskSyncNotices.js` emits at most one remote notice per failure episode. Automatic
-retries do not repeat it; confirmed recovery re-arms the next episode. Offline
-failures are left in the header panel without an extra banner. Dismissing a banner
-does not clear synchronization error details in the panel.
 Keep the task form open on local failure; close only after successful persistence.
 Do not display raw server errors or task identifiers to users.
 

@@ -41,8 +41,6 @@ import TaskBanner from '../../components/TaskBanner';
 import ActiveTaskBar from '../../components/ActiveTaskBar';
 import * as taskExecution from '../../services/taskExecutionService';
 import { syncTaskSessions } from '../../services/taskSessionSyncService';
-import { subscribeTaskSyncStatus } from '../../data/taskSyncStatus';
-import { createTaskSyncNoticeTracker } from '../../data/taskSyncNotices';
 import CreateTaskModal from '../../components/modals/CreateTaskModal';
 import { useTheme } from '../../theme/ThemeContext';
 import {
@@ -248,20 +246,8 @@ export default function TimelineScreen() {
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
   const [taskError, setTaskError] = useState(null);
-  const [syncNotice, setSyncNotice] = useState(null);
-  const banner = taskError ?? syncNotice;
-  const dismissBanner = () => {
-    if (taskError) setTaskError(null);
-    else setSyncNotice(null);
-  };
-  useEffect(() => {
-    const track = createTaskSyncNoticeTracker();
-    return subscribeTaskSyncStatus((status) => {
-      const event = track(status);
-      if (event?.kind === 'notice') setSyncNotice(event.notice);
-      if (event?.kind === 'clear') setSyncNotice(null);
-    });
-  }, []);
+  const banner = taskError;
+  const dismissBanner = () => setTaskError(null);
   const showTaskError = (title, error) => {
     setTaskError({
       title,

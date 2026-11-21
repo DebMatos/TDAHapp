@@ -37,9 +37,9 @@ export default function TaskSyncStatus() {
   useEffect(() => {
     rotation.setValue(0);
     if (mode !== 'syncing' || reduceMotion) return;
-    const animation = Animated.loop(Animated.timing(rotation, {
-      toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true,
-    }));
+    const animation = Animated.timing(rotation, {
+      toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true,
+    });
     animation.start();
     return () => { animation.stop(); rotation.setValue(0); };
   }, [mode, reduceMotion, rotation]);
