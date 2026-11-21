@@ -1,12 +1,38 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeTaskSession } from '../domain/taskSessionModel';
 
-const STORAGE_KEY = '@my_time_task_sessions_local_v1';
+const LEGACY_STORAGE_KEY = '@my_time_task_sessions_local_v1';
+const STORAGE_PREFIX = '@my_time_task_sessions_local_v3:';
+let activeUserId = null;
+
+const storageContext = (requestedUserId = activeUserId) => {
+  if (!requestedUserId) throw new Error('É necessária uma conta para aceder às sessões locais.');
+  if (requestedUserId !== activeUserId) {
+    throw new Error('A conta foi alterada durante a operação local.');
+  }
+  return {
+    userId: requestedUserId,
+    key: `${STORAGE_PREFIX}${encodeURIComponent(requestedUserId)}`,
+  };
+};
+
+export const getTaskSessionRepositoryUser = () => storageContext().userId;
+
+export const setTaskSessionRepositoryUser = (userId) => {
+  activeUserId = typeof userId === 'string' && userId ? userId : null;
+  AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(error => {
+    console.warn('[Sessions] Não foi possível remover dados locais sem proprietário:', error);
+  });
+};
 
 // Todas as alterações são serializadas, incluindo confirmações remotas.
 let queue = Promise.resolve();
-const enqueue = (operation) => {
-  const result = queue.then(operation);
+const enqueue = (operation, userId = activeUserId) => {
+  const context = storageContext(userId);
+  const result = queue.then(() => {
+    storageContext(context.userId);
+    return operation(context);
+  });
   queue = result.catch(() => {});
   return result;
 };
@@ -20,18 +46,18 @@ const normalizeList = (sessions) => {
   return normalized;
 };
 
-const readState = async () => {
-  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+const readState = async (context) => {
+  const stored = await AsyncStorage.getItem(context.key);
   if (stored === null) {
-    return { sessions: [], pendingIds: [], ownerId: null };
+    return { sessions: [], pendingIds: [], ownerId: context.userId };
   }
   const parsed = JSON.parse(stored);
   if (Array.isArray(parsed)) {
     // Migração sem perda: as sessões antigas ainda não foram enviadas.
     const sessions = normalizeList(parsed);
-    return { sessions, pendingIds: sessions.map((item) => item.id), ownerId: null };
+    return { sessions, pendingIds: sessions.map((item) => item.id), ownerId: context.userId };
   }
-  if (!parsed || parsed.schemaVersion !== 2 ||
+  if (!parsed || parsed.schemaVersion !== 3 ||
       !Array.isArray(parsed.sessions) || !Array.isArray(parsed.pendingIds)) {
     throw new Error('Dados locais de sessões inválidos.');
   }
@@ -50,18 +76,20 @@ const readState = async () => {
   };
 };
 
-const persist = async (state) => {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 2, ...state }));
+const persist = async (context, state) => {
+  await AsyncStorage.setItem(context.key, JSON.stringify({ schemaVersion: 3, ...state }));
   return state;
 };
 
-export const loadSessions = () => enqueue(async () => (await readState()).sessions);
+export const loadSessions = (userId) => enqueue(
+  async context => (await readState(context)).sessions, userId,
+);
 
 // Guarda as alterações locais e a respetiva fila na MESMA escrita.
 // Nunca apaga sessões remotas já importadas por usar uma lista desatualizada.
-export const saveSessions = (sessions) => enqueue(async () => {
+export const saveSessions = (sessions, userId) => enqueue(async context => {
   const next = normalizeList(sessions);
-  const state = await readState();
+  const state = await readState(context);
   const previous = new Map(state.sessions.map((item) => [item.id, item]));
   const merged = new Map(previous);
   const pending = new Set(state.pendingIds);
@@ -71,32 +99,30 @@ export const saveSessions = (sessions) => enqueue(async () => {
       merged.set(session.id, session);
     }
   }
-  await persist({ ...state, sessions: [...merged.values()], pendingIds: [...pending] });
+  await persist(context, { ...state, sessions: [...merged.values()], pendingIds: [...pending] });
   return next;
-});
+}, userId);
 
-export const loadSessionSyncState = () => enqueue(readState);
+export const loadSessionSyncState = (userId) => enqueue(readState, userId);
 
-export const claimSessionOwner = (userId) => enqueue(async () => {
+export const claimSessionOwner = (userId) => enqueue(async context => {
   if (typeof userId !== 'string' || !userId) throw new Error('Utilizador inválido.');
-  const state = await readState();
-  if (state.ownerId && state.ownerId !== userId) {
+  if (context.userId !== userId) {
     throw new Error('As sessões locais pertencem a outra conta; sincronização bloqueada.');
   }
-  if (!state.ownerId) await persist({ ...state, ownerId: userId });
 });
 
-export const confirmSyncedSession = (session) => enqueue(async () => {
-  const state = await readState();
+export const confirmSyncedSession = (session, userId) => enqueue(async context => {
+  const state = await readState(context);
   const local = state.sessions.find((item) => item.id === session.id);
   // Se houve uma pausa enquanto o envio decorria, o novo estado continua pendente.
   if (!local || JSON.stringify(local) !== JSON.stringify(normalizeTaskSession(session))) return;
-  await persist({ ...state, pendingIds: state.pendingIds.filter((id) => id !== session.id) });
-});
+  await persist(context, { ...state, pendingIds: state.pendingIds.filter((id) => id !== session.id) });
+}, userId);
 
-export const mergeRemoteSessions = (remoteSessions) => enqueue(async () => {
+export const mergeRemoteSessions = (remoteSessions, userId) => enqueue(async context => {
   const remote = normalizeList(remoteSessions);
-  const state = await readState();
+  const state = await readState(context);
   const merged = new Map(state.sessions.map((item) => [item.id, item]));
   const pending = new Set(state.pendingIds);
   const localActive = state.sessions.find((item) => item.endedAt === null);
@@ -115,11 +141,12 @@ export const mergeRemoteSessions = (remoteSessions) => enqueue(async () => {
     if (previous?.endedAt !== null && previous?.endedAt !== undefined && item.endedAt === null) continue;
     merged.set(item.id, item);
   }
-  await persist({ ...state, sessions: [...merged.values()], pendingIds: [...pending] });
+  await persist(context, { ...state, sessions: [...merged.values()], pendingIds: [...pending] });
   return [...merged.values()];
-});
+}, userId);
 
 export const TASK_SESSION_STORAGE_INFO = {
-  schemaVersion: 2,
-  key: STORAGE_KEY,
+  schemaVersion: 3,
+  keyPrefix: STORAGE_PREFIX,
+  legacyKey: LEGACY_STORAGE_KEY,
 };

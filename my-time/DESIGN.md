@@ -103,9 +103,12 @@ request has a 15-second deadline. Send and read failures retry independently at 
 successful operation. Duplicate online events respect the current delay. Validation
 and conflict errors keep the first operation for the affected task available for review.
 Unsent changes for the same task are compacted on local save and become eligible
-after five seconds of inactivity, capped at 20 seconds from the first edit. Other
+after ten seconds of inactivity, capped at 30 seconds from the first edit. Other
 tasks retain their own deadlines. A started request retains its payload. Failed
 or cancelled attempts preserve pending operations and local task edits.
+Local task and execution-session state is namespaced by authenticated user ID.
+Changing accounts remounts navigation and invalidates queued work from the old
+account. Ownerless legacy storage is deleted instead of being claimed by a user.
 
 Task forms use the same pressed opacity (0.7), accessible labels for icon actions
 and fields, and explicit disabled/busy semantics. Small form controls use at least

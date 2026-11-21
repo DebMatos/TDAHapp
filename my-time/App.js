@@ -12,7 +12,13 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { resumeTaskSync, setTaskSyncOnline, setTaskSyncSessionReady } from './src/data/taskRepository';
+import {
+  resumeTaskSync,
+  setTaskRepositoryUser,
+  setTaskSyncOnline,
+  setTaskSyncSessionReady,
+} from './src/data/taskRepository';
+import { setTaskSessionRepositoryUser } from './src/repositories/localTaskSessionRepository';
 import { syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
@@ -36,17 +42,30 @@ function AppContent() {
   const [session, setSession] = useState(undefined);
 
   useEffect(() => {
+    let active = true;
+    let authRevision = 0;
+    const applySession = (nextSession) => {
+      const userId = nextSession?.user?.id ?? null;
+      setTaskRepositoryUser(userId);
+      setTaskSessionRepositoryUser(userId);
+      setSession(nextSession);
+    };
+    const initialRevision = authRevision;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      if (active && authRevision === initialRevision) applySession(session);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+      authRevision += 1;
+      if (active) applySession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -128,6 +147,7 @@ function AppContent() {
       <SafeAreaProvider>
         {session ? (
           <NavigationContainer
+            key={session.user.id}
             theme={{
               ...navigationTheme,
               colors: {

@@ -7,6 +7,7 @@ import {
 } from '../domain/taskModel';
 
 import {
+  discardUnownedTaskState,
   loadState,
   saveState as persistState,
 } from '../repositories/localTaskRepository';
@@ -30,6 +31,37 @@ import {
 let writeQueue = Promise.resolve();
 let syncOnline = null;
 let syncSessionReady = false;
+let taskUserId = null;
+let taskUserRevision = 0;
+const STATE_OWNER = Symbol('taskStateOwner');
+
+const taskOwner = () => {
+  if (!taskUserId) {
+    const error = new Error('É necessária uma conta para aceder às tarefas locais.');
+    error.code = 'LOCAL_USER_UNAVAILABLE';
+    throw error;
+  }
+  return { userId: taskUserId, revision: taskUserRevision };
+};
+
+const assertTaskOwner = (owner) => {
+  if (owner.userId !== taskUserId || owner.revision !== taskUserRevision) {
+    const error = new Error('A conta foi alterada durante a operação local.');
+    error.code = 'LOCAL_USER_CHANGED';
+    throw error;
+  }
+};
+
+export const setTaskRepositoryUser = (userId) => {
+  const nextUserId = typeof userId === 'string' && userId ? userId : null;
+  if (nextUserId === taskUserId) return;
+  taskUserId = nextUserId;
+  taskUserRevision += 1;
+  discardUnownedTaskState().catch(error => {
+    console.warn('[Tasks] Não foi possível remover dados locais sem proprietário:', error);
+  });
+  if (typeof stopTaskSync === 'function') stopTaskSync('session');
+};
 
 const enqueueWrite = (operation) => {
   const result = writeQueue.then(operation);
@@ -40,12 +72,16 @@ const enqueueWrite = (operation) => {
   return result;
 };
 
-const getState = async () => {
-  const state = await loadState();
+const getState = async (owner = taskOwner()) => {
+  const state = await loadState(owner.userId);
+  assertTaskOwner(owner);
 
-  return state ?? {
+  return {
+    ...(state ?? {
     tasks: [],
     pendingOps: [],
+    }),
+    [STATE_OWNER]: owner,
   };
 };
 
@@ -59,7 +95,11 @@ export const subscribeTasks = (listener) => {
 };
 
 const saveState = async (state) => {
-  const savedState = await persistState(state);
+  const owner = state[STATE_OWNER] ?? taskOwner();
+  assertTaskOwner(owner);
+  const persisted = await persistState(owner.userId, state);
+  assertTaskOwner(owner);
+  const savedState = { ...persisted, [STATE_OWNER]: owner };
   recordQueueState(savedState);
   updateTaskSyncStatus({
     pending: savedState.pendingOps.length,
@@ -77,15 +117,18 @@ const saveState = async (state) => {
   return savedState;
 };
 
-export const loadTasksSnapshot = () => enqueueWrite(async () => {
-  const state = await getState();
-  recordQueueState(state);
-  updateTaskSyncStatus({
-    pending: state.pendingOps.length,
-    failureCategory: state.pendingOps[0]?.sync?.category ?? null,
+export const loadTasksSnapshot = () => {
+  const owner = taskOwner();
+  return enqueueWrite(async () => {
+    const state = await getState(owner);
+    recordQueueState(state);
+    updateTaskSyncStatus({
+      pending: state.pendingOps.length,
+      failureCategory: state.pendingOps[0]?.sync?.category ?? null,
+    });
+    return { tasks: state.tasks, revision: tasksRevision };
   });
-  return { tasks: state.tasks, revision: tasksRevision };
-});
+};
 
 const getAuthenticatedUserId = async () => {
   const {
@@ -112,8 +155,8 @@ const makeOperation = (type, data) => ({
   ...data,
 });
 
-const SEND_IDLE_MS = 5_000;
-const SEND_MAX_WAIT_MS = 20_000;
+const SEND_IDLE_MS = 10_000;
+const SEND_MAX_WAIT_MS = 30_000;
 const operationTaskId = (operation) => operation.task?.id ?? operation.taskId ?? operation.id;
 const isUnsent = (operation) => Number.isFinite(operation.queuedAt) &&
   operation.startedAt == null && !operation.sync;
@@ -142,9 +185,10 @@ const enqueueTaskOperation = (queue, operation, now) => {
 
 // Guarda tarefas e operação pendente no mesmo registo.
 const commit = async (buildNextState) => {
+  const owner = taskOwner();
 
   const savedState = await enqueueWrite(async () => {
-    const state = await getState();
+    const state = await getState(owner);
     const nextState = buildNextState(state);
 
     const pendingOps = [...state.pendingOps];
@@ -166,10 +210,11 @@ const commit = async (buildNextState) => {
 /* READ */
 
 export const loadTasks = async () => {
+  const owner = taskOwner();
   // Aguarda alterações locais ainda em curso.
   await writeQueue;
 
-  const state = await getState();
+  const state = await getState(owner);
 
   return state.tasks;
 };
@@ -699,10 +744,13 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
         const picked = selectTaskOperation(state.pendingOps, Date.now(), { automatic, retryAuth });
         if (userId !== undefined && isUnsent(picked.item ?? {})) {
           const claimed = { ...picked.item, startedAt: Date.now() };
-          await persistState({
+          const owner = state[STATE_OWNER];
+          assertTaskOwner(owner);
+          await persistState(owner.userId, {
             ...state,
             pendingOps: state.pendingOps.map(item => item.id === claimed.id ? claimed : item),
           });
+          assertTaskOwner(owner);
           return { item: claimed };
         }
         return { ...picked, empty: state.pendingOps.length === 0 };
@@ -840,6 +888,6 @@ export const syncPendingTasks = ({ automatic = false, retryAuth = false } = {}) 
 };
 
 export const TASK_STORAGE_INFO = {
-  schemaVersion: 1,
-  key: '@my_time_tasks_local_v1',
+  schemaVersion: 2,
+  keyPrefix: '@my_time_tasks_local_v2:',
 };

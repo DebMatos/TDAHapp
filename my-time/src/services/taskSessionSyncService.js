@@ -33,9 +33,9 @@ const syncOnce = async () => {
   // Obter primeiro a versão remota, sem substituir alterações locais pendentes.
   const remote = await loadRemoteSessions(userId);
   assertIdentity(userId, revision);
-  await mergeRemoteSessions(remote);
+  await mergeRemoteSessions(remote, userId);
 
-  const { sessions, pendingIds } = await loadSessionSyncState();
+  const { sessions, pendingIds } = await loadSessionSyncState(userId);
   const pending = new Set(pendingIds);
   let sent = 0;
   for (const item of sessions) {
@@ -43,7 +43,7 @@ const syncOnce = async () => {
     assertIdentity(userId, revision);
     await upsertRemoteSession(userId, item);
     assertIdentity(userId, revision);
-    await confirmSyncedSession(item);
+    await confirmSyncedSession(item, userId);
     sent += 1;
   }
 

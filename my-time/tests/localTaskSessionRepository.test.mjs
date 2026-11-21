@@ -10,26 +10,30 @@ const stored = new Map();
 const AsyncStorage = {
   getItem: async (key) => stored.get(key) ?? null,
   setItem: async (key, value) => { stored.set(key, value); },
+  removeItem: async (key) => { stored.delete(key); },
 };
 
-const context = vm.createContext({ Date, Error, TypeError, RangeError, JSON, AsyncStorage });
+const context = vm.createContext({ Date, Error, TypeError, RangeError, JSON, AsyncStorage, encodeURIComponent, console });
 vm.runInContext(modelSource.replaceAll('export const ', 'const ') +
   '\nglobalThis.normalizeTaskSession = normalizeTaskSession;', context);
 vm.runInContext(repoSource
   .replace(/^import .*;\s*$/gm, '')
   .replaceAll('export const ', 'const ') +
-  '\nglobalThis.loadSessions = loadSessions; globalThis.saveSessions = saveSessions; globalThis.TASK_SESSION_STORAGE_INFO = TASK_SESSION_STORAGE_INFO;', context);
+  '\nglobalThis.loadSessions = loadSessions; globalThis.saveSessions = saveSessions; globalThis.setTaskSessionRepositoryUser = setTaskSessionRepositoryUser; globalThis.TASK_SESSION_STORAGE_INFO = TASK_SESSION_STORAGE_INFO;', context);
 
-const { loadSessions, saveSessions, TASK_SESSION_STORAGE_INFO } = context;
+const { loadSessions, saveSessions, setTaskSessionRepositoryUser, TASK_SESSION_STORAGE_INFO } = context;
+const key = `${TASK_SESSION_STORAGE_INFO.keyPrefix}${encodeURIComponent('user1')}`;
 const session = { id: 's1', taskId: 't1', startedAt: '2026-11-15T14:12:00Z', endedAt: null };
 
 test('sem dados locais devolve lista vazia', async () => {
   stored.clear();
+  setTaskSessionRepositoryUser('user1');
   assert.equal((await loadSessions()).length, 0);
 });
 
 test('guarda sessões e recupera uma sessão ainda em curso', async () => {
   stored.clear();
+  setTaskSessionRepositoryUser('user1');
   const saved = await saveSessions([session]);
   assert.equal(saved.length, 1);
   const loaded = await loadSessions();
@@ -41,6 +45,7 @@ test('guarda sessões e recupera uma sessão ainda em curso', async () => {
 
 test('preserva múltiplas sessões fechadas e abertas', async () => {
   stored.clear();
+  setTaskSessionRepositoryUser('user1');
   await saveSessions([
     { ...session, endedAt: '2026-11-15T14:32:00Z' },
     { ...session, id: 's2', startedAt: '2026-11-15T14:40:00Z' },
@@ -53,15 +58,36 @@ test('preserva múltiplas sessões fechadas e abertas', async () => {
 
 test('recusa dados malformados sem os apagar', async () => {
   stored.clear();
-  stored.set(TASK_SESSION_STORAGE_INFO.key, '{"sessions":[]}');
+  setTaskSessionRepositoryUser('user1');
+  stored.set(key, '{"sessions":[]}');
   await assert.rejects(loadSessions(), /inválidos/);
-  assert.equal(stored.get(TASK_SESSION_STORAGE_INFO.key), '{"sessions":[]}');
+  assert.equal(stored.get(key), '{"sessions":[]}');
 });
 
 test('não substitui os dados locais quando falha a validação', async () => {
   stored.clear();
+  setTaskSessionRepositoryUser('user1');
   await saveSessions([session]);
-  const before = stored.get(TASK_SESSION_STORAGE_INFO.key);
+  const before = stored.get(key);
   await assert.rejects(saveSessions([{ ...session, startedAt: 'invalid' }]), /startedAt/);
-  assert.equal(stored.get(TASK_SESSION_STORAGE_INFO.key), before);
+  assert.equal(stored.get(key), before);
+});
+
+test('separa sessões por conta', async () => {
+  stored.clear();
+  setTaskSessionRepositoryUser('user1');
+  await saveSessions([session]);
+  setTaskSessionRepositoryUser('user2');
+  assert.equal((await loadSessions()).length, 0);
+  setTaskSessionRepositoryUser('user1');
+  assert.equal((await loadSessions()).length, 1);
+});
+
+test('invalida uma operação que ainda aguardava quando a conta muda', async () => {
+  stored.clear();
+  setTaskSessionRepositoryUser('user1');
+  const pending = loadSessions();
+  setTaskSessionRepositoryUser('user2');
+  await assert.rejects(pending, /conta foi alterada/);
+  assert.equal((await loadSessions()).length, 0);
 });

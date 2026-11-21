@@ -25,7 +25,8 @@ const loadDiagnostics = (enabled = false) => new Function(
 const validSession = async () => ({ data: { session: { user: { id: 'u' } } } });
 const repositorySource = stripImports(read('data/taskRepository.js'))
   .replace('let syncOnline = null;', 'let syncOnline = true;')
-  .replace('let syncSessionReady = false;', 'let syncSessionReady = true;');
+  .replace('let syncSessionReady = false;', 'let syncSessionReady = true;')
+  .replace('let taskUserId = null;', "let taskUserId = 'u';");
 
 function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = validSession, loadRemote = async () => [], initialState } = {}) {
   const task = model.createTask({ id: 'a', title: 'A', notes: 'private note' });
@@ -44,9 +45,9 @@ function setup({ withPendingOperations = true, diagnosticsEnabled, getSession = 
   const status = new Function('console', `${stripImports(read('data/taskSyncStatus.js'))}; return { subscribeTaskSyncStatus, updateTaskSyncStatus, getTaskSyncMessage };`)({ warn() {} });
   let observed;
   status.subscribeTaskSyncStatus(value => { observed = value; });
-  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
+  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'discardUnownedTaskState', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
-    async () => structuredClone(state), async next => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
+    async () => {}, async () => structuredClone(state), async (_userId, next) => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
     (...args) => { remoteLoads += 1; return loadRemote(...args); }, { auth: { getSession } },
     () => ({ userId: 'u', revision: 0 }),
     (...args) => syncImplementation(...args), classifyTaskSyncError,
@@ -72,7 +73,7 @@ test('diagnostics expose an unfinished session check while local edits continue'
   const unsubscribe = h.diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
   await h.repository.updateTaskAndLoadTasks('a', { title: 'private edit' });
   await new Promise(setImmediate);
-  t.mock.timers.tick(5_000);
+  t.mock.timers.tick(10_000);
   const firstRun = h.repository.syncPendingTasks();
   await until(() => Boolean(resolveSession));
 
@@ -212,7 +213,7 @@ test('local update enters the shared queue and reaches the remote sync operation
   });
   await h.repository.updateTaskAndLoadTasks('a', { title: 'Alterada' });
   await new Promise(setImmediate);
-  t.mock.timers.tick(5_000);
+  t.mock.timers.tick(10_000);
   await until(() => h.state().pendingOps.length === 0);
   assert.equal(sentOperation.type, 'update');
   assert.equal(sentOperation.task.title, 'Alterada');
@@ -450,9 +451,9 @@ function setupPull() {
   const getSessionIdentity = new Function('supabase', `${tracker.replace(/export const /g, 'const ')};return getSessionIdentity;`)({ auth });
   const emit = (event, userId) => authListener(event, userId ? { user: { id: userId } } : null);
   emit('INITIAL_SESSION', 'u');
-  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
+  const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'discardUnownedTaskState', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
-    async () => structuredClone(state), async next => (state = structuredClone(next)),
+    async () => {}, async () => structuredClone(state), async (_userId, next) => (state = structuredClone(next)),
     async () => [model.createTask({ id: 'remote', title: 'Remote' })], { auth }, getSessionIdentity,
     async () => {}, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
   const diagnostics = loadDiagnostics();
@@ -545,7 +546,7 @@ test('each task has its own deadline and creation sends its final schedule', asy
   await h.repository.updateTaskAndLoadTasks('run', { startTime: '18:00', durationMinutes: 60 });
   await flush();
   assert.equal(h.state().pendingOps.length, 2);
-  t.mock.timers.tick(3_000);
+  t.mock.timers.tick(8_000);
   await flush();
   assert.deepEqual(sent.map(op => op.task.id), ['a']);
   t.mock.timers.tick(2_000);
@@ -562,20 +563,20 @@ test('offline compacted operations survive restart and have a capped deadline', 
   h.repository.setTaskSyncOnline(false);
   const first = Date.now();
   await h.repository.updateTaskAndLoadTasks('a', { title: 'First' });
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 6; i += 1) {
     t.mock.timers.tick(4_000);
     await h.repository.updateTaskAndLoadTasks('a', { title: `Edit ${i}` });
   }
   const state = h.state();
   assert.equal(state.pendingOps.length, 1);
-  assert.equal(state.pendingOps[0].sendAfter, first + 20_000);
+  assert.equal(state.pendingOps[0].sendAfter, first + 30_000);
   const restarted = setup({ initialState: state });
   restarted.setError(null);
   assert.equal(await restarted.repository.syncPendingTasks(), 0);
-  t.mock.timers.tick(4_000);
+  t.mock.timers.tick(6_000);
   await until(() => restarted.observed().sendConfirmed);
   assert.equal(restarted.sent.length, 1);
-  assert.equal(restarted.state().tasks[0].title, 'Edit 3');
+  assert.equal(restarted.state().tasks[0].title, 'Edit 5');
 });
 
 test('started operations stay immutable and a never-sent creation can be cancelled', async (t) => {
@@ -591,7 +592,7 @@ test('started operations stay immutable and a never-sent creation can be cancell
   assert.equal(h.state().pendingOps.length, 0);
   await h.repository.createTaskAndLoadTasks({ id: 'run', title: 'Original' });
   await flush();
-  t.mock.timers.tick(5_000);
+  t.mock.timers.tick(10_000);
   await until(() => Boolean(finish));
   const [started] = h.state().pendingOps;
   assert.ok(started.startedAt);

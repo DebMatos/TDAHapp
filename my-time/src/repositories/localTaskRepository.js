@@ -2,10 +2,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeTasks } from '../domain/taskModel';
 
-const STORAGE_KEY = '@my_time_tasks_local_v1';
+const LEGACY_STORAGE_KEY = '@my_time_tasks_local_v1';
+const STORAGE_PREFIX = '@my_time_tasks_local_v2:';
 
-export const loadState = async () => {
-  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+const storageKey = (userId) => {
+  if (typeof userId !== 'string' || !userId) {
+    throw new Error('É necessária uma conta para aceder às tarefas locais.');
+  }
+  return `${STORAGE_PREFIX}${encodeURIComponent(userId)}`;
+};
+
+export const discardUnownedTaskState = () =>
+  AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+
+export const loadState = async (userId) => {
+  const stored = await AsyncStorage.getItem(storageKey(userId));
 
   if (stored === null) {
     return null;
@@ -35,21 +46,27 @@ export const loadState = async () => {
   };
 };
 
-export const saveState = async (state) => {
+export const saveState = async (userId, state) => {
   const normalized = {
     tasks: normalizeTasks(state.tasks),
     pendingOps: state.pendingOps,
   };
 
   await AsyncStorage.setItem(
-    STORAGE_KEY,
+    storageKey(userId),
     JSON.stringify(normalized),
   );
 
   return normalized;
 };
 
-export const loadTasks = async () => {
-  const state = await loadState();
+export const loadTasks = async (userId) => {
+  const state = await loadState(userId);
   return state?.tasks ?? null;
+};
+
+export const TASK_STORAGE_INFO = {
+  schemaVersion: 2,
+  keyPrefix: STORAGE_PREFIX,
+  legacyKey: LEGACY_STORAGE_KEY,
 };
