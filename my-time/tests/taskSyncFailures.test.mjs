@@ -8,9 +8,22 @@ const moduleFromSource = source => import(`data:text/javascript;base64,${Buffer.
 const model = await moduleFromSource(read('domain/taskModel.js'));
 const { classifyTaskSyncError } = await moduleFromSource(read('services/taskSyncErrors.js'));
 const stripImports = source => source.replace(/import\s+[\s\S]*?\sfrom\s*['"][^'"]+['"];?/g, '').replace(/export const /g, 'const ');
+const diagnosticsSource = stripImports(read('data/taskSyncDiagnostics.js'));
+const diagnosticsExports = [
+  'getDiagnosticOperationId',
+  'recordTaskSyncTransition',
+  'taskSyncDiagnosticsEnabled',
+  'traceTaskSyncDiagnostic',
+  'subscribeTaskSyncDiagnostics',
+];
+const loadDiagnostics = (enabled = false) => new Function(
+  '__DEV__',
+  'classifyTaskSyncError',
+  `${diagnosticsSource}; return { ${diagnosticsExports.join(', ')} };`,
+)(enabled, classifyTaskSyncError);
 
-function setup({ withPendingOperations = true } = {}) {
-  const task = model.createTask({ id: 'a', title: 'A' });
+function setup({ withPendingOperations = true, diagnosticsEnabled, getSession } = {}) {
+  const task = model.createTask({ id: 'a', title: 'A', notes: 'private note' });
   let state = { tasks: [task], pendingOps: withPendingOperations ? [
     { id: 'first', type: 'update', task },
     { id: 'second', type: 'delete', taskId: 'b' },
@@ -29,20 +42,100 @@ function setup({ withPendingOperations = true } = {}) {
   const names = ['normalizeTask', 'normalizeTasks', 'updateTaskModel', 'toggleTaskCompletion', 'loadState', 'persistState', 'loadRemoteTasks', 'supabase', 'getSessionIdentity', 'syncOperation', 'classifyTaskSyncError', 'updateTaskSyncStatus', 'console'];
   const values = [model.normalizeTask, model.normalizeTasks, model.updateTask, model.toggleTaskCompletion,
     async () => structuredClone(state), async next => { if (failStorage) throw Error('disk'); state = structuredClone(next); return state; },
-    async () => { remoteLoads += 1; return []; }, { auth: { getSession: async () => ({ data: { session: { user: { id: 'u' } } } }) } },
+    async () => { remoteLoads += 1; return []; }, { auth: { getSession: getSession ?? (async () => ({ data: { session: { user: { id: 'u' } } } })) } },
     () => ({ userId: 'u', revision: 0 }),
     (...args) => syncImplementation(...args), classifyTaskSyncError,
     status.updateTaskSyncStatus, { warn() {}, log() {} }];
   const repositorySource = stripImports(read('data/taskRepository.js'))
     .replace('let syncOnline = null;', 'let syncOnline = true;')
     .replace('let syncSessionReady = false;', 'let syncSessionReady = true;');
-  const repository = new Function(...names, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks };`)(...values);
-  return { repository, sent, state: () => state, observed: () => observed, status,
+  const diagnostics = loadDiagnostics(diagnosticsEnabled);
+  const repository = new Function(...names, ...diagnosticsExports, `${repositorySource}; return { syncPendingTasks, syncOperationWithTimeout, setTaskSyncOnline, setTaskSyncSessionReady, pullRemoteTasks, loadTasksSnapshot, updateTaskAndLoadTasks };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
+  return { repository, sent, state: () => state, observed: () => observed, status, diagnostics,
     setError: value => { error = value; },
     setSyncImplementation: value => { syncImplementation = value; },
     remoteLoads: () => remoteLoads,
     failStorage: () => { failStorage = true; } };
 }
+
+test('diagnostics expose an unfinished session check while local edits continue', async () => {
+  let resolveSession;
+  const h = setup({
+    diagnosticsEnabled: true,
+    withPendingOperations: false,
+    getSession: () => new Promise(resolve => { resolveSession = resolve; }),
+  });
+  let history;
+  const unsubscribe = h.diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
+  const firstRun = h.repository.syncPendingTasks();
+  await h.repository.updateTaskAndLoadTasks('a', { title: 'private edit' });
+  h.repository.setTaskSyncOnline(false);
+  h.repository.setTaskSyncOnline(true, 'Primeiro plano', { isConnected: true, isInternetReachable: true });
+
+  const waiting = history.find(entry => entry.phase === 'send-session');
+  assert.equal(waiting.outcome, 'pending');
+  assert.equal(history[0].state.syncRequested, true);
+  assert.equal(history[0].state.syncPromise, true);
+  assert.equal(history.find(entry => entry.phase === 'queue').pending, 1);
+  assert.deepEqual(h.sent, []);
+
+  const operationId = h.state().pendingOps[0].id;
+  h.setSyncImplementation(async (_userId, _operation, { reportHttp }) => {
+    reportHttp(403);
+    throw { code: '42501', message: 'private server error' };
+  });
+  resolveSession({ data: { session: { user: { id: 'u' } } } });
+  await assert.rejects(firstRun, error => error.code === '42501');
+  const failed = history.find(entry => entry.phase === 'send');
+  assert.equal(failed.operationId, operationId);
+  assert.equal(failed.outcome, 'failed');
+  assert.equal(failed.status, 403);
+  assert.equal(failed.attempt, 1);
+  assert.equal(failed.errorCode, '42501');
+  assert.ok(failed.payload.includes('notes'));
+  assert.doesNotMatch(JSON.stringify(history), /private note|private edit|private server error/);
+  assert.equal(h.state().pendingOps.length, 1);
+  unsubscribe();
+});
+
+test('diagnostics bound history, isolate late HTTP responses and stay off in production', async () => {
+  const diagnostics = loadDiagnostics(true);
+  let history;
+  diagnostics.subscribeTaskSyncDiagnostics(entries => { history = entries; });
+  let report;
+  const result = Promise.reject(new Error('cancelled'));
+  assert.equal(diagnostics.traceTaskSyncDiagnostic('send', () => ({}), reportHttp => {
+    report = reportHttp;
+    return result;
+  }), result);
+  await assert.rejects(result);
+  report(204);
+  assert.equal(history[0].phase, 'late-response');
+  assert.equal(history[0].status, 204);
+  assert.equal(history[1].outcome, 'failed');
+  assert.equal(history[1].status, undefined);
+  for (let index = 0; index < 50; index++) {
+    diagnostics.recordTaskSyncTransition('queue', {}, { pending: index });
+  }
+  assert.equal(history.length, 40);
+  assert.equal(history[0].pending, 49);
+  assert.equal(history.at(-1).pending, 10);
+
+  diagnostics.traceTaskSyncDiagnostic('send-session', () => ({}), () => new Promise(() => {}));
+  for (let index = 0; index < 40; index++) {
+    diagnostics.recordTaskSyncTransition('queue', {}, { pending: index });
+  }
+  assert.equal(history.length, 40);
+  assert.equal(history.at(-1).phase, 'send-session');
+
+  const production = loadDiagnostics();
+  const unsubscribe = production.subscribeTaskSyncDiagnostics(() => assert.fail('production diagnostics'));
+  production.recordTaskSyncTransition('queue', {});
+  await production.traceTaskSyncDiagnostic('send', () => assert.fail('production snapshot'), async (reportHttp) => {
+    assert.equal(reportHttp, undefined);
+  });
+  unsubscribe();
+});
 
 test('classification uses known protocol signals, never messages or attempt count', () => {
   assert.equal(classifyTaskSyncError({ code: '23514' }).state, 'blocked');
@@ -238,7 +331,8 @@ function setupPull() {
     async () => structuredClone(state), async next => (state = structuredClone(next)),
     async () => [model.createTask({ id: 'remote', title: 'Remote' })], { auth }, getSessionIdentity,
     async () => { throw Error('offline'); }, classifyTaskSyncError, () => {}, { warn() {}, log() {} }];
-  const repository = new Function(...names, `${stripImports(read('data/taskRepository.js'))};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask };`)(...values);
+  const diagnostics = loadDiagnostics();
+  const repository = new Function(...names, ...diagnosticsExports, `${stripImports(read('data/taskRepository.js'))};return { pullRemoteTasks, createTaskAndLoadTasks, updateTaskAndLoadTasks, deleteTask };`)(...values, ...diagnosticsExports.map(name => diagnostics[name]));
   return { repository, emit, identity: getSessionIdentity, waiting: () => authWaiting,
     release: () => releaseAuth(), state: () => state };
 }

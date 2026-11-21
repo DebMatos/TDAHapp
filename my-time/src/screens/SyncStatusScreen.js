@@ -12,6 +12,10 @@ import {
 } from '../data/taskSyncStatus';
 import { pullRemoteTasks, syncPendingTasks } from '../data/taskRepository';
 import {
+  subscribeTaskSyncDiagnostics,
+  taskSyncDiagnosticsEnabled,
+} from '../data/taskSyncDiagnostics';
+import {
   TASK_SYNC_PRESENTATIONS,
   getConnectivityPresentation,
   getFailureCategoryLabel,
@@ -26,6 +30,104 @@ const ROWS = [
   { key: 'send', title: 'Envio para o servidor', icon: 'cloud-upload-outline' },
   { key: 'pull', title: 'Verificação remota', icon: 'cloud-download-outline' },
 ];
+
+const DIAGNOSTIC_PHASES = {
+  'send-session': 'Obter sessão para envio',
+  'pull-session': 'Obter sessão para leitura',
+  'pull-revalidate': 'Revalidar sessão após leitura',
+  'pull': 'Ler tarefas remotas',
+  'reconcile': 'Conciliar dados locais e remotos',
+  'acknowledge': 'Confirmar envio na fila local',
+  'send': 'Enviar operação',
+  'queue': 'Estado da fila local',
+  'connectivity': 'Verificar ligação',
+  'session-readiness': 'Atualizar disponibilidade da sessão',
+  'retry-scheduled': 'Nova tentativa agendada',
+  'retry-triggered': 'Nova tentativa iniciada',
+  'retry-cleared': 'Nova tentativa desmarcada',
+  'send-waiting': 'Envio aguarda ligação ou sessão',
+  'send-started': 'Processamento da fila iniciado',
+  'send-requested': 'Envio pedido durante tentativa',
+  'send-request-consumed': 'Pedido de novo envio processado',
+  'send-timeout': 'Tempo limite de envio atingido',
+  'send-released': 'Processamento da fila libertado',
+  'pull-started': 'Verificação remota iniciada',
+  'pull-released': 'Verificação remota libertada',
+  'pull-failed': 'Verificação remota falhou',
+  'pull-revision-changed': 'Repetir leitura após alteração local',
+  'pull-identity-changed': 'Sessão alterada durante a leitura',
+  'late-response': 'Resultado após o fim da tentativa',
+};
+const OPERATION_LABELS = { create: 'Criar', update: 'Editar', delete: 'Apagar' };
+const OUTCOME_LABELS = { pending: 'Em curso', complete: 'Concluído', failed: 'Falhou' };
+const DIAGNOSTIC_TIME = {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+};
+const stateLabel = (value) => value === null ? 'desconhecido' : value ? 'sim' : 'não';
+
+function SyncDiagnostics({ colors, styles }) {
+  const [history, setHistory] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
+  useEffect(() => subscribeTaskSyncDiagnostics(setHistory), []);
+
+  return (
+    <View style={styles.diagnostics}>
+      <Text accessibilityRole="header" style={styles.sectionLabel}>DIAGNÓSTICO DE DESENVOLVIMENTO</Text>
+      <View style={styles.card}>
+        {history.length === 0 && <Text style={styles.diagnosticDetail}>Ainda não há registos nesta execução.</Text>}
+        {history.map((entry, index) => {
+          const expanded = expandedId === entry.id;
+          const time = new Date(entry.startedAt).toLocaleString('pt-PT', DIAGNOSTIC_TIME);
+          const title = [DIAGNOSTIC_PHASES[entry.phase], OPERATION_LABELS[entry.operationType]].filter(Boolean).join(' · ');
+          const result = [
+            time,
+            OUTCOME_LABELS[entry.outcome],
+            entry.status === 0 ? 'Sem resposta HTTP' : entry.status && `HTTP ${entry.status}`,
+            entry.durationMs != null ? `${entry.durationMs} ms` : null,
+          ].filter(Boolean).join(' · ');
+          return (
+            <View key={entry.id} style={index < history.length - 1 && styles.rowBorder}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+                onPress={() => setExpandedId(expanded ? null : entry.id)}
+                style={({ pressed }) => [styles.diagnosticRow, pressed && styles.pressed]}
+              >
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>{title}</Text>
+                  <Text style={styles.rowValue}>{result}</Text>
+                </View>
+                <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
+              </Pressable>
+              {expanded && (
+                <View style={styles.diagnosticDetail}>
+                  {[
+                    entry.source && `Origem · ${entry.source}`,
+                    entry.phase === 'connectivity' && `Rede ligada · ${stateLabel(entry.connected)}`,
+                    entry.phase === 'connectivity' && `Internet acessível · ${stateLabel(entry.reachable)}`,
+                    entry.operationId && `Operação · ${entry.operationId}`,
+                    entry.attempt != null && `Tentativa · ${entry.attempt}`,
+                    entry.pending != null && `Operações na fila · ${entry.pending}`,
+                    entry.payload?.length > 0 && `Campos enviados · ${entry.payload.join(', ')}`,
+                    entry.failureCategory && `Categoria · ${entry.failureCategory}`,
+                    entry.errorCode && `Código · ${entry.errorCode}`,
+                  ].filter(Boolean).map(line => <Text key={line} selectable style={styles.rowValue}>{line}</Text>)}
+                  <Text style={styles.rowTitle}>{entry.stateAfter ? 'Estado inicial → final' : 'Estado'}</Text>
+                  {Object.entries(entry.state).map(([key, value]) => (
+                    <Text key={key} selectable style={styles.rowValue}>
+                      {key} · {stateLabel(value)}
+                      {entry.stateAfter && entry.stateAfter[key] !== value ? ` → ${stateLabel(entry.stateAfter[key])}` : ''}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 export default function SyncStatusScreen() {
   const navigation = useNavigation();
@@ -160,6 +262,7 @@ export default function SyncStatusScreen() {
         {mode === 'offline' && (
           <Text style={styles.helper}>A verificação fica disponível quando a ligação regressar.</Text>
         )}
+        {taskSyncDiagnosticsEnabled && <SyncDiagnostics colors={colors} styles={styles} />}
       </ScrollView>
     </View>
   );
@@ -189,5 +292,8 @@ const createStyles = (colors) => StyleSheet.create({
   retryDisabled: { opacity: 0.48 },
   retryText: { color: colors.onAction, fontSize: 15, fontWeight: '700' },
   helper: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 10 },
+  diagnostics: { marginTop: 28 },
+  diagnosticRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  diagnosticDetail: { paddingBottom: 14, paddingTop: 4 },
   pressed: { opacity: 0.7 },
 });

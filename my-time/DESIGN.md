@@ -62,6 +62,12 @@ state, with theme tokens providing supporting color. Retry lives only on this
 screen, remains disabled offline or while busy, and keeps its dimensions stable.
 The screen is reachable from both the summary overlay and the navigation drawer.
 
+In development builds, the synchronization screen shows an expandable diagnostic
+history below the retry action. It keeps up to 40 entries in memory and retains
+in-progress attempts as newer events arrive. Details show operation identifiers,
+field names, timings, protocol results and state transitions. Task content and
+session credentials are excluded.
+
 Offline takes priority over activity, then errors, then confirmed synchronization.
 Checking and queued work use neutral, non-rotating icons. Rotation occurs only
 while sending or pulling and respects reduced-motion preferences. Error details

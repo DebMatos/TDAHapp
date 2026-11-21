@@ -5,11 +5,11 @@ import {
   deleteTask as deleteRemoteTask,
 } from '../repositories/supabaseTaskRepository';
 
-export const syncOperation = async (userId, operation, { signal } = {}) => {
+export const syncOperation = async (userId, operation, { signal, reportHttp } = {}) => {
   switch (operation.type) {
     case 'create':
       try {
-        await createRemoteTask(userId, operation.task, signal);
+        await createRemoteTask(userId, operation.task, signal, reportHttp);
       } catch (error) {
         // 23505: registo com este ID já existe.
         // Não sobrescrever a tarefa remota.
@@ -20,11 +20,11 @@ export const syncOperation = async (userId, operation, { signal } = {}) => {
       break;
 
     case 'update':
-      await updateRemoteTask(userId, operation.task, signal);
+      await updateRemoteTask(userId, operation.task, signal, reportHttp);
       break;
 
     case 'delete':
-      await deleteRemoteTask(userId, operation.taskId, signal);
+      await deleteRemoteTask(userId, operation.taskId, signal, reportHttp);
       break;
 
     default:

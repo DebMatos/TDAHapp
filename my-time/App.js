@@ -55,7 +55,7 @@ function AppContent() {
     const unsubscribe = NetInfo.addEventListener((state) => {
       updateTaskSyncConnectivity(state);
       const online = state.isConnected === true && state.isInternetReachable === true;
-      setTaskSyncOnline(online);
+      setTaskSyncOnline(online, 'NetInfo', state);
       if (online) {
         syncTaskSessions().catch((error) => {
           console.warn('[Sessions] Falha ao sincronizar na reconexão:', error);
@@ -65,7 +65,7 @@ function AppContent() {
 
     return () => {
       unsubscribe();
-      setTaskSyncOnline(false);
+      setTaskSyncOnline(false, 'Fim da subscrição');
     };
   }, [session?.user?.id]);
   useEffect(() => {
@@ -80,6 +80,8 @@ function AppContent() {
         updateTaskSyncConnectivity(network);
         setTaskSyncOnline(
           network.isConnected === true && network.isInternetReachable === true,
+          'Primeiro plano',
+          network,
         );
       }).catch((error) => {
         console.warn('[Sync] Não foi possível verificar a ligação:', error);

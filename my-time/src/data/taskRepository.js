@@ -19,6 +19,12 @@ import { supabase, getSessionIdentity } from '../lib/supabase';
 import { syncOperation } from '../services/taskSyncService';
 import { classifyTaskSyncError } from '../services/taskSyncErrors';
 import { updateTaskSyncStatus } from './taskSyncStatus';
+import {
+  getDiagnosticOperationId,
+  recordTaskSyncTransition,
+  taskSyncDiagnosticsEnabled,
+  traceTaskSyncDiagnostic,
+} from './taskSyncDiagnostics';
 
 // Serializa operações para evitar gravações concorrentes.
 let writeQueue = Promise.resolve();
@@ -54,6 +60,7 @@ export const subscribeTasks = (listener) => {
 
 const saveState = async (state) => {
   const savedState = await persistState(state);
+  recordQueueState(savedState);
   updateTaskSyncStatus({
     pending: savedState.pendingOps.length,
     failureCategory: savedState.pendingOps[0]?.sync?.category ?? null,
@@ -72,6 +79,7 @@ const saveState = async (state) => {
 
 export const loadTasksSnapshot = () => enqueueWrite(async () => {
   const state = await getState();
+  recordQueueState(state);
   updateTaskSyncStatus({
     pending: state.pendingOps.length,
     failureCategory: state.pendingOps[0]?.sync?.category ?? null,
@@ -138,11 +146,12 @@ let activePullController = null;
 
 const recoverRemoteTasks = async (signal) => {
   const identityRevision = getSessionIdentity().revision;
-  const userId = await getAuthenticatedUserId();
+  const userId = await traceSync('pull-session', getAuthenticatedUserId);
   const assertSameIdentity = () => {
     const identity = getSessionIdentity();
     if (identity.revision !== identityRevision ||
         identity.userId !== undefined && identity.userId !== userId) {
+      recordSyncTransition('pull-identity-changed');
       throw new Error('Sessão alterada durante a recuperação de tarefas');
     }
   };
@@ -152,14 +161,17 @@ const recoverRemoteTasks = async (signal) => {
   // a pending delete was confirmed and removed while the request was in flight.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const revision = await enqueueWrite(() => tasksRevision);
-    const remoteTasks = await loadRemoteTasks(userId, signal);
+    const remoteTasks = await traceSync('pull', reportHttp => loadRemoteTasks(userId, signal, reportHttp), {
+      attempt: attempt + 1,
+    });
     // Session refresh may use the network: never await it inside writeQueue.
-    if (await getAuthenticatedUserId() !== userId) {
+    if (await traceSync('pull-revalidate', getAuthenticatedUserId, { attempt: attempt + 1 }) !== userId) {
+      recordSyncTransition('pull-identity-changed');
       throw new Error('Sessão alterada durante a recuperação de tarefas');
     }
     assertSameIdentity();
 
-    const result = await enqueueWrite(async () => {
+    const result = await traceSync('reconcile', () => enqueueWrite(async () => {
       assertSameIdentity();
       if (revision !== tasksRevision) return null;
 
@@ -181,9 +193,10 @@ const recoverRemoteTasks = async (signal) => {
         tasks: [...state.tasks, ...missingTasks],
       });
       return savedState.tasks;
-    });
+    }), { attempt: attempt + 1 });
 
     if (result !== null) return result;
+    recordSyncTransition('pull-revision-changed');
   }
 
   // Keep local data intact rather than applying a stale response under load.
@@ -201,12 +214,15 @@ export const pullRemoteTasks = () => {
     return tasks;
   }).catch(error => {
     updateTaskSyncStatus({ pullFailed: true });
+    recordSyncTransition('pull-failed');
     throw error;
   }).finally(() => {
     updateTaskSyncStatus({ pulling: false });
     if (activePullController === controller) activePullController = null;
     pullPromise = null;
+    recordSyncTransition('pull-released');
   });
+  recordSyncTransition('pull-started');
   return pullPromise;
 };
 
@@ -384,6 +400,30 @@ let retryTimer = null;
 let retryAttempt = 0;
 let activeSyncController = null;
 
+const syncDiagnosticState = () => ({
+  syncPromise: syncPromise !== null,
+  syncRequested,
+  retryTimer: retryTimer !== null,
+  syncOnline,
+  syncSessionReady,
+  pullPromise: pullPromise !== null,
+});
+
+const recordSyncTransition = (phase, details) => {
+  if (taskSyncDiagnosticsEnabled) recordTaskSyncTransition(phase, syncDiagnosticState(), details);
+};
+
+const recordQueueState = ({ pendingOps }) => {
+  if (!taskSyncDiagnosticsEnabled) return;
+  recordSyncTransition('queue', {
+    pending: pendingOps.length,
+    operationId: getDiagnosticOperationId(pendingOps[0]),
+  });
+};
+
+const traceSync = (phase, run, details) =>
+  traceTaskSyncDiagnostic(phase, syncDiagnosticState, run, details);
+
 const SYNC_OPERATION_TIMEOUT_MS = 15_000;
 const SYNC_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000];
 
@@ -391,6 +431,7 @@ const clearRetryTimer = () => {
   if (retryTimer === null) return;
   clearTimeout(retryTimer);
   retryTimer = null;
+  recordSyncTransition('retry-cleared');
 };
 
 const isRetryableFailure = (failure) =>
@@ -404,10 +445,12 @@ const scheduleRetry = () => {
   retryAttempt += 1;
   retryTimer = setTimeout(() => {
     retryTimer = null;
+    recordSyncTransition('retry-triggered', { attempt: retryAttempt });
     syncPendingTasks().catch((error) => {
       console.warn('[Sync] Nova tentativa adiada:', error);
     });
   }, delay);
+  recordSyncTransition('retry-scheduled', { durationMs: delay, attempt: retryAttempt });
   retryTimer?.unref?.();
 };
 
@@ -415,12 +458,16 @@ export const syncOperationWithTimeout = async (
   userId,
   operation,
   timeoutMs = SYNC_OPERATION_TIMEOUT_MS,
+  reportHttp,
 ) => {
   const controller = new AbortController();
   activeSyncController = controller;
   let timeoutId;
   const timeout = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
+      if (taskSyncDiagnosticsEnabled) {
+        recordSyncTransition('send-timeout', { operationId: getDiagnosticOperationId(operation), durationMs: timeoutMs });
+      }
       controller.abort();
       const error = new Error('Tempo limite da sincronização excedido');
       error.name = 'AbortError';
@@ -441,7 +488,7 @@ export const syncOperationWithTimeout = async (
 
   try {
     return await Promise.race([
-      syncOperation(userId, operation, { signal: controller.signal }),
+      syncOperation(userId, operation, { signal: controller.signal, reportHttp }),
       timeout,
       aborted,
     ]);
@@ -451,9 +498,14 @@ export const syncOperationWithTimeout = async (
   }
 };
 
-export const setTaskSyncOnline = (online) => {
+export const setTaskSyncOnline = (online, source, network) => {
   const wasOnline = syncOnline === true;
   syncOnline = online === true;
+  recordSyncTransition('connectivity', {
+    source,
+    reachable: network?.isInternetReachable ?? null,
+    connected: network?.isConnected ?? null,
+  });
   if (!syncOnline) {
     clearRetryTimer();
     activeSyncController?.abort('offline');
@@ -471,6 +523,7 @@ export const setTaskSyncOnline = (online) => {
 
 export const setTaskSyncSessionReady = (ready) => {
   syncSessionReady = ready === true;
+  recordSyncTransition('session-readiness');
   if (!syncSessionReady) {
     clearRetryTimer();
     activeSyncController?.abort('session');
@@ -485,15 +538,19 @@ export const setTaskSyncSessionReady = (ready) => {
 };
 
 export const syncPendingTasks = () => {
-  if (syncOnline !== true || !syncSessionReady) return Promise.resolve(0);
+  if (syncOnline !== true || !syncSessionReady) {
+    recordSyncTransition('send-waiting');
+    return Promise.resolve(0);
+  }
   if (syncPromise) {
     syncRequested = true;
+    recordSyncTransition('send-requested');
     return syncPromise;
   }
 
   updateTaskSyncStatus({ sending: true, sendFailed: false });
   syncPromise = (async () => {
-    const userId = await getAuthenticatedUserId();
+    const userId = await traceSync('send-session', getAuthenticatedUserId);
     if (!syncOnline || !syncSessionReady) return 0;
     let synced = 0;
 
@@ -503,6 +560,7 @@ export const syncPendingTasks = () => {
       // com gravações locais em curso.
       const operation = await enqueueWrite(async () => {
         const state = await getState();
+        recordQueueState(state);
         return state.pendingOps[0] ?? null;
       });
 
@@ -512,7 +570,12 @@ export const syncPendingTasks = () => {
 
       // Preserve the operation and record only safe, actionable metadata.
       try {
-        await syncOperationWithTimeout(userId, operation);
+        await traceSync('send', reportHttp =>
+          syncOperationWithTimeout(userId, operation, SYNC_OPERATION_TIMEOUT_MS, reportHttp), {
+          operation,
+          attempt: (Number.isSafeInteger(operation.sync?.attempts) && operation.sync.attempts >= 0
+            ? operation.sync.attempts : 0) + 1,
+        });
       } catch (error) {
         const failure = classifyTaskSyncError(error);
         try {
@@ -541,7 +604,7 @@ export const syncPendingTasks = () => {
       }
 
       // Remover apenas a operação confirmada.
-      await enqueueWrite(async () => {
+      await traceSync('acknowledge', () => enqueueWrite(async () => {
         const state = await getState();
 
         const nextState = {
@@ -552,13 +615,14 @@ export const syncPendingTasks = () => {
         };
 
         await saveState(nextState);
-      });
+      }), { operation });
 
       synced += 1;
     }
 
     return synced;
   })();
+  recordSyncTransition('send-started');
 
   // Libertar o bloqueio após sucesso ou erro.
   const currentPromise = syncPromise;
@@ -568,12 +632,14 @@ export const syncPendingTasks = () => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
+      recordSyncTransition('send-released');
       clearRetryTimer();
       retryAttempt = 0;
       updateTaskSyncStatus({ sending: false, sendFailed: false, sendConfirmed: true });
 
       if (syncRequested) {
         syncRequested = false;
+        recordSyncTransition('send-request-consumed');
 
         syncPendingTasks().catch((error) => {
           console.warn('[Sync] Falha na nova tentativa:', error);
@@ -584,6 +650,7 @@ export const syncPendingTasks = () => {
       if (syncPromise !== currentPromise) return;
 
       syncPromise = null;
+      recordSyncTransition('send-released');
       const failure = classifyTaskSyncError(error);
       updateTaskSyncStatus({
         sending: false,
@@ -592,6 +659,7 @@ export const syncPendingTasks = () => {
       });
       const retryWasRequested = syncRequested;
       syncRequested = false;
+      if (retryWasRequested) recordSyncTransition('send-request-consumed');
       if (isRetryableFailure(failure) || error?.code === 'SESSION_UNAVAILABLE') {
         // A newly queued operation must not be forgotten when the current
         // FIFO head fails. Backoff also prevents a tight retry loop.

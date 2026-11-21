@@ -55,8 +55,8 @@ const toDatabase = (task, userId) => ({
    READ
 ------------------------------------------------------- */
 
-export const loadTasks = async (userId, signal) => {
-  const { data, error } = await supabase
+export const loadTasks = async (userId, signal, reportHttp) => {
+  const { data, error, status } = await supabase
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
@@ -65,6 +65,7 @@ export const loadTasks = async (userId, signal) => {
     })
     .abortSignal(signal);
 
+  reportHttp?.(status);
   if (error) {
     throw error;
   }
@@ -82,10 +83,11 @@ export const createTask = async (
   userId,
   task,
   signal,
+  reportHttp,
 ) => {
   const canonicalTask =
     normalizeTask(task);
-  const { error } =
+  const { error, status } =
     await supabase
       .from('tasks')
       .upsert(
@@ -100,6 +102,7 @@ export const createTask = async (
       )
       .abortSignal(signal);
 
+  reportHttp?.(status);
   if (error) {
     throw error;
   }
@@ -115,6 +118,7 @@ export const updateTask = async (
   userId,
   task,
   signal,
+  reportHttp,
 ) => {
   const canonicalTask =
     normalizeTask(task);
@@ -131,7 +135,7 @@ export const updateTask = async (
     ...changes
   } = row;
 
-  const { data, error } =
+  const { data, error, status } =
     await supabase
       .from('tasks')
       .update(changes)
@@ -141,6 +145,7 @@ export const updateTask = async (
       .select('*')
       .single();
 
+  reportHttp?.(status);
   if (error) {
     throw error;
   }
@@ -158,14 +163,16 @@ export const deleteTask = async (
   userId,
   taskId,
   signal,
+  reportHttp,
 ) => {
-  const { error } = await supabase
+  const { error, status } = await supabase
     .from('tasks')
     .delete()
     .eq('id', taskId)
     .eq('user_id', userId)
     .abortSignal(signal);
 
+  reportHttp?.(status);
   if (error) {
     throw error;
   }
