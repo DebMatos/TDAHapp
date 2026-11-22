@@ -1,12 +1,13 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, AppState, Platform} from 'react-native';
+import { View, ActivityIndicator, AppState, Linking, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import AuthScreen from './src/screens/AuthScreen';
+import { parsePasswordRecoveryUrl } from './src/auth/passwordRecovery';
 import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
@@ -40,6 +41,12 @@ function AppContent() {
   });
 
   const [session, setSession] = useState(undefined);
+  const [passwordRecovery, setPasswordRecovery] = useState({
+    active: false,
+    loading: false,
+    error: null,
+  });
+  const [initialLinkChecked, setInitialLinkChecked] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -55,6 +62,9 @@ function AppContent() {
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active || (event === 'INITIAL_SESSION' && receivedChange)) return;
       if (event !== 'INITIAL_SESSION') receivedChange = true;
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery({ active: true, loading: false, error: null });
+      }
       applySession(nextSession);
     });
 
@@ -63,6 +73,70 @@ function AppContent() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const openRecoveryLink = async (url) => {
+      const recovery = parsePasswordRecoveryUrl(url);
+      if (!recovery || !active) return;
+
+      setPasswordRecovery({ active: true, loading: true, error: null });
+      if (recovery.error) {
+        setPasswordRecovery({ active: true, loading: false, error: recovery.error });
+        return;
+      }
+
+      try {
+        const result = recovery.code
+          ? await supabase.auth.exchangeCodeForSession(recovery.code)
+          : await supabase.auth.setSession({
+              access_token: recovery.accessToken,
+              refresh_token: recovery.refreshToken,
+            });
+        if (!active) return;
+        if (result.error) throw result.error;
+        setPasswordRecovery({ active: true, loading: false, error: null });
+      } catch {
+        if (active) {
+          setPasswordRecovery({
+            active: true,
+            loading: false,
+            error: 'Este link de recuperação é inválido ou já expirou.',
+          });
+        }
+      }
+    };
+
+    Linking.getInitialURL()
+      .then(openRecoveryLink)
+      .catch(() => {})
+      .finally(() => {
+        if (active) setInitialLinkChecked(true);
+      });
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      void openRecoveryLink(url);
+    });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  const leavePasswordRecovery = async () => {
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+      setPasswordRecovery({ active: false, loading: false, error: null });
+    } catch {
+      setPasswordRecovery({
+        active: true,
+        loading: false,
+        error: 'Não foi possível terminar a recuperação. Fecha e volta a abrir a aplicação.',
+      });
+    }
+  };
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -128,7 +202,7 @@ function AppContent() {
     });
   }, [session?.user?.id, session?.access_token]);
 
-  if (!fontsLoaded || session === undefined) {
+  if (!fontsLoaded || session === undefined || !initialLinkChecked) {
     return (
       <View
         style={{
@@ -149,7 +223,7 @@ function AppContent() {
   return (
     <RootContainer style={{ flex: 1 }}>
       <SafeAreaProvider>
-        {session ? (
+        {session && !passwordRecovery.active ? (
           <NavigationContainer
             key={session.user.id}
             theme={{
@@ -183,7 +257,15 @@ function AppContent() {
             </Drawer.Navigator>
           </NavigationContainer>
         ) : (
-          <AuthScreen />
+          <AuthScreen
+            passwordRecovery={passwordRecovery}
+            onPasswordRecoveryComplete={() => {
+              setPasswordRecovery({ active: false, loading: false, error: null });
+            }}
+            onCancelPasswordRecovery={() => {
+              void leavePasswordRecovery();
+            }}
+          />
         )}
       </SafeAreaProvider>
     </RootContainer>
