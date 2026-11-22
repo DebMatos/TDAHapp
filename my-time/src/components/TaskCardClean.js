@@ -4,7 +4,7 @@ import {
   formatTimeFromMinutes,
   timeToMinutes,
   formatDuration,
-  getDraggedTimelineStart,
+  getDraggedTimelinePosition,
 } from '../utils/time';
 
 import {
@@ -37,6 +37,7 @@ export default function TaskCardClean({
 
   onChangeStart,
   onDragStateChange,
+  onDragPreview,
 
   onPress,
   onToggle,
@@ -124,6 +125,7 @@ export default function TaskCardClean({
   const longPressTimer = useRef(null);
   const isDragActive = useRef(false);
   const initialTouch = useRef({ x: 0, y: 0 });
+  const dragPosition = useRef(null);
 
   const clearTimer = useCallback(() => {
     if (longPressTimer.current) {
@@ -136,13 +138,15 @@ export default function TaskCardClean({
     clearTimer();
     isDragActive.current = false;
     onDragStateChange?.(false);
+    onDragPreview?.(null);
+    dragPosition.current = null;
 
     Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,
       friction: 6,
     }).start();
-  }, [clearTimer, onDragStateChange, scaleAnim]);
+  }, [clearTimer, onDragPreview, onDragStateChange, scaleAnim]);
 
   const responder = useMemo(
     () =>
@@ -160,7 +164,20 @@ export default function TaskCardClean({
         onPanResponderMove: (event, gesture) => {
           if (isDragActive.current) {
             const pointerY = event.nativeEvent.pageY ?? gesture.moveY;
-            dragY.setValue(pointerY - initialTouch.current.y);
+            const deltaY = pointerY - initialTouch.current.y;
+            const position = getDraggedTimelinePosition(
+              startMinutes,
+              deltaY,
+              ppm,
+              duration,
+              dragPosition.current?.magnetMinute,
+              dragPosition.current?.suppressedMagnetMinute,
+            );
+            const visualDelta = getVisualY(position.minute) - getVisualY(startMinutes);
+
+            dragPosition.current = position;
+            dragY.setValue(visualDelta);
+            onDragPreview?.(position);
           }
         },
 
@@ -168,10 +185,15 @@ export default function TaskCardClean({
           if (isDragActive.current) {
             const pointerY = event.nativeEvent.pageY ?? gesture.moveY;
             const deltaY = pointerY - initialTouch.current.y;
-            const finalMins = getDraggedTimelineStart(startMinutes, deltaY, ppm, duration);
+            const position = dragPosition.current ?? getDraggedTimelinePosition(
+              startMinutes,
+              deltaY,
+              ppm,
+              duration,
+            );
 
             dragY.setValue(0);
-            onChangeStart(task.id, finalMins);
+            onChangeStart(task.id, position.minute);
           }
           resetAll();
         },
@@ -181,7 +203,17 @@ export default function TaskCardClean({
           resetAll();
         },
       }),
-    [dragY, startMinutes, ppm, duration, onChangeStart, task.id, resetAll],
+    [
+      dragY,
+      duration,
+      getVisualY,
+      onChangeStart,
+      onDragPreview,
+      ppm,
+      resetAll,
+      startMinutes,
+      task.id,
+    ],
   );
 
   /* -------------------------------------------------------
@@ -196,6 +228,15 @@ export default function TaskCardClean({
     longPressTimer.current = setTimeout(() => {
       isDragActive.current = true;
       onDragStateChange?.(true);
+      const position = {
+        minute: startMinutes,
+        isMagnetized: false,
+        magnetMinute: startMinutes % 30 === 0 ? startMinutes : null,
+        suppressedMagnetMinute: null,
+      };
+
+      dragPosition.current = position;
+      onDragPreview?.(position);
 
       Animated.spring(scaleAnim, {
         toValue: 1.03,
