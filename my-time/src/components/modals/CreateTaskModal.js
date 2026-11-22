@@ -1,4 +1,6 @@
 import TaskBanner from '../TaskBanner';
+import InlineDatePicker from '../InlineDatePicker';
+import InlineTimePicker from '../InlineTimePicker';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -31,10 +33,8 @@ import { TIMELINE_START_MINUTES } from '../../constants/timeline';
 import {
   formatDateForInput,
   getTodayDateInput,
-  formatDateInput,
   isValidDateInput,
   dateInputToStorageDate,
-  addDaysToDateInput,
   getDateDisplayLabel,
 } from '../../utils/taskDateInput';
 /* -------------------------------------------------------
@@ -115,6 +115,8 @@ export default function CreateTaskModal({
   const isBusy = isSaving || isTransitioning;
   const [dateValue, setDateValue] = useState(getTodayDateInput);
   const [dateEditorVisible, setDateEditorVisible] = useState(false);
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [startMinutes, setStartMinutes] = useState(initialMinutes ?? TIMELINE_START_MINUTES);
   const isDateValid = isValidDateInput(dateValue);
   const isFormValid = Boolean(title.trim()) && isDateValid;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -158,6 +160,8 @@ export default function CreateTaskModal({
     setCategoryId('inbox');
     setDateValue(initialDate ? formatDateForInput(initialDate) : getTodayDateInput());
     setDateEditorVisible(false);
+    setTimePickerVisible(false);
+    setStartMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
     setDurationPickerVisible(false);
     setPriorityPickerVisible(false);
     setCategoryPickerVisible(false);
@@ -166,7 +170,7 @@ export default function CreateTaskModal({
     setIsTransitioning(false);
     setIsHandleActive(false);
     translateY.setValue(0);
-  }, [visible, initialDate, translateY, stopSheetAnimation]);
+  }, [visible, initialDate, initialMinutes, translateY, stopSheetAnimation]);
 
   /* -------------------------------------------------------
      GUARDAR
@@ -187,7 +191,7 @@ export default function CreateTaskModal({
         categoryId,
         priority,
         date: dateInputToStorageDate(dateValue),
-        startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
+        startTime: formatTimeFromMinutes(startMinutes),
       });
     } catch {
       // The parent presents the local error; keep this draft open.
@@ -249,7 +253,7 @@ export default function CreateTaskModal({
       title,
       notes: description,
       date: dateInputToStorageDate(dateValue),
-      startTime: formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES),
+      startTime: formatTimeFromMinutes(startMinutes),
       durationMinutes: duration,
       categoryId,
       priority,
@@ -338,7 +342,7 @@ export default function CreateTaskModal({
     [animatedHeight, translateY, stopSheetAnimation],
   );
 
-  const timeLabel = formatTimeFromMinutes(initialMinutes ?? TIMELINE_START_MINUTES);
+  const timeLabel = formatTimeFromMinutes(startMinutes);
   const dateLabel = isDateValid ? getDateDisplayLabel(dateValue) : 'Data inválida';
 
   /* -------------------------------------------------------
@@ -447,52 +451,28 @@ export default function CreateTaskModal({
 
                   {dateEditorVisible && (
                     <View style={styles.dateEditor}>
-                      <Text style={styles.dateLabel}>Data da tarefa</Text>
-                      <TextInput
-                        accessibilityLabel="Data da tarefa, dia mês e ano"
-                        editable={!isBusy}
+                      <InlineDatePicker
                         value={dateValue}
-                        onChangeText={(value) => setDateValue(formatDateInput(value))}
-                        keyboardType="number-pad"
-                        maxLength={10}
-                        placeholder="DD/MM/AAAA"
-                        placeholderTextColor={colors.placeholder}
-                        style={styles.dateInput}
+                        disabled={isBusy}
+                        onSelect={(date) => {
+                          setDateValue(date);
+                          setDateEditorVisible(false);
+                        }}
+                        onClose={() => setDateEditorVisible(false)}
                       />
-                      {!isDateValid && (
-                        <Text accessibilityRole="alert" style={styles.dateError}>
-                          Introduz uma data válida no formato DD/MM/AAAA.
-                        </Text>
-                      )}
-                      <View style={styles.dateShortcuts}>
-                        <TouchableOpacity
-                          disabled={isBusy}
-                          accessibilityRole="button"
-                          accessibilityState={{
-                            disabled: isBusy,
-                            selected: dateValue === getTodayDateInput(),
-                          }}
-                          onPress={() => setDateValue(getTodayDateInput())}
-                          style={styles.dateShortcut}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.dateShortcutText}>Hoje</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          disabled={isBusy}
-                          accessibilityRole="button"
-                          accessibilityState={{
-                            disabled: isBusy,
-                            selected: dateValue === addDaysToDateInput(getTodayDateInput(), 1),
-                          }}
-                          onPress={() => setDateValue(addDaysToDateInput(getTodayDateInput(), 1))}
-                          style={styles.dateShortcut}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.dateShortcutText}>Amanhã</Text>
-                        </TouchableOpacity>
-                      </View>
                     </View>
+                  )}
+
+                  {timePickerVisible && (
+                    <InlineTimePicker
+                      value={timeLabel}
+                      disabled={isBusy}
+                      onChange={(time, options) => {
+                        const [hours, minutes] = time.split(':').map(Number);
+                        setStartMinutes(hours * 60 + minutes);
+                        if (!options?.keepOpen) setTimePickerVisible(false);
+                      }}
+                    />
                   )}
 
                   {/* ------------------------------------------------
@@ -507,6 +487,27 @@ export default function CreateTaskModal({
                       keyboardShouldPersistTaps="handled"
                       contentContainerStyle={styles.actionsRow}
                     >
+                      {/* DATA */}
+
+                      <TouchableOpacity
+                        style={styles.actionPill}
+                        activeOpacity={0.7}
+                        disabled={isBusy}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Data: ${dateLabel}`}
+                        accessibilityState={{ disabled: isBusy, expanded: dateEditorVisible }}
+                        onPress={() => {
+                          setTimePickerVisible(false);
+                          setDateEditorVisible((value) => !value);
+                        }}
+                      >
+                        <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+
+                        <Text style={styles.actionText}>
+                          {dateLabel}
+                        </Text>
+                      </TouchableOpacity>
+
                       {/* HORA */}
 
                       <TouchableOpacity
@@ -514,15 +515,16 @@ export default function CreateTaskModal({
                         activeOpacity={0.7}
                         disabled={isBusy}
                         accessibilityRole="button"
-                        accessibilityLabel={`Data: ${dateLabel}. Hora: ${timeLabel}`}
-                        accessibilityState={{ disabled: isBusy, expanded: dateEditorVisible }}
-                        onPress={() => setDateEditorVisible((value) => !value || !isDateValid)}
+                        accessibilityLabel={`Hora: ${timeLabel}`}
+                        accessibilityState={{ disabled: isBusy, expanded: timePickerVisible }}
+                        onPress={() => {
+                          setDateEditorVisible(false);
+                          setTimePickerVisible((value) => !value);
+                        }}
                       >
-                        <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                        <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
 
-                        <Text style={styles.actionText}>
-                          {dateLabel}, {timeLabel}
-                        </Text>
+                        <Text style={styles.actionText}>{timeLabel}</Text>
                       </TouchableOpacity>
 
                       {/* DURAÇÃO */}
@@ -814,19 +816,6 @@ const createStyles = (colors) => {
     --------------------------------------------------- */
 
     dateEditor: { marginTop: 8, marginBottom: 4 },
-    dateLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 6 },
-    dateInput: {
-      minHeight: 44,
-      color: colors.text,
-      backgroundColor: colors.input,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      fontSize: 15,
-    },
-    dateError: { color: colors.danger, fontSize: 12, marginTop: 6 },
-    dateShortcuts: { flexDirection: 'row', gap: 8, marginTop: 4 },
-    dateShortcut: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-    dateShortcutText: { color: colors.selectionText, fontSize: 13, fontWeight: '600' },
 
     actionsSection: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
     optionsScroll: { flex: 1 },

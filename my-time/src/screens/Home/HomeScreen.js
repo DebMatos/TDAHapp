@@ -799,7 +799,7 @@ export default function TimelineScreen() {
 
     const rawMinute = getMinuteFromY(contentY);
 
-    let snappedMinute = snapMinutes(rawMinute);
+    let snappedMinute = snapMinutes(rawMinute, 30);
 
     snappedMinute = ((snappedMinute % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
 

@@ -34,7 +34,7 @@ function setup() {
   const events = { expanded: [], closed: 0, saved: [], resets: 0, editor: false };
   const context = {
     title: ' Rascunho ', description: ' Notas sem perda ', duration: 45, categoryId: 'shopping', priority: 'high',
-    initialMinutes: 90, dateValue: '31/12/2026', isDateValid: true, isBusy: false, isHandleActive: false, windowHeight: 780, TASK_DETAILS_HEIGHT_RATIO: 0.78,
+    initialMinutes: 90, startMinutes: 90, dateValue: '31/12/2026', isDateValid: true, isBusy: false, isHandleActive: false, windowHeight: 780, TASK_DETAILS_HEIGHT_RATIO: 0.78,
     transitioned: { current: false }, handleDragged: { current: false }, sheetHeight: { current: 280 },
     dragOriginHeight: { current: 280 }, animatedHeight: { setValue() {} }, translateY: { setValue() {} },
     gestureActions: { current: null }, activeAnimation: { current: null },
@@ -69,6 +69,33 @@ test('direct create uses the chosen civil date and slot time', async () => {
   assert.equal(events.saved.length, 1);
   assert.equal(events.saved[0].date, '2026-12-31');
   assert.equal(events.saved[0].startTime, '01:30');
+});
+
+test('quick create saves the time edited in its shared draft', async () => {
+  const { context, events } = setup();
+  context.startMinutes = 9 * 60 + 17;
+  await handler('handleSave', context)();
+  assert.equal(events.saved[0].startTime, '09:17');
+});
+
+test('Quick Create receives Agora in its draft without closing the shared time picker', () => {
+  let onChangeCode;
+  walk(ast, node => {
+    if (node.type !== 'JSXOpeningElement' || node.name?.name !== 'InlineTimePicker') return;
+    const attribute = node.attributes.find(item => item.type === 'JSXAttribute' && item.name.name === 'onChange');
+    if (attribute) onChangeCode = source.slice(attribute.value.expression.start, attribute.value.expression.end);
+  });
+  assert.ok(onChangeCode);
+  const events = { minutes: null, visibility: [] };
+  const onChange = new Function('setStartMinutes', 'setTimePickerVisible', `return ${onChangeCode}`)(
+    value => { events.minutes = value; },
+    value => { events.visibility.push(value); },
+  );
+  onChange('14:07', { keepOpen: true });
+  assert.equal(events.minutes, 14 * 60 + 7);
+  assert.deepEqual(events.visibility, []);
+  onChange('14:08');
+  assert.deepEqual(events.visibility, [false]);
 });
 
 test('invalid date blocks both save and expand, opens correction field and resets drag', async () => {
@@ -156,6 +183,11 @@ test('Home initial civil date follows the timeline slot across midnight and year
   const initial = new Function('getDateKey', 'getCivilDateForTimelineSlot', 'selectedTimelineDate', 'targetSlotMinutes', 'TIMELINE_START_MINUTES', `return ${code}`);
   assert.equal(initial(dateUtils.getDateKey, timeline.getCivilDateForTimelineSlot, new Date(2026, 11, 31), 90, 420), '2027-01-01');
   assert.equal(initial(dateUtils.getDateKey, timeline.getCivilDateForTimelineSlot, new Date(2026, 11, 31), 540, 420), '2026-12-31');
+});
+
+test('timeline touch rounds only the initial quick-create time to 30 minutes', () => {
+  const home = read('screens/Home/HomeScreen.js');
+  assert.match(home, /snapMinutes\(rawMinute, 30\)/);
 });
 
 test('expansion animates to Details height before transferring the draft', () => {
