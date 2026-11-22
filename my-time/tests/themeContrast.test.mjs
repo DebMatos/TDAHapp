@@ -33,4 +33,7 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
       assert.ok(contrast(text, background) >= 4.5, `${text} on ${background}`);
     }
   });
+  test(`${theme}: active countdown text is legible on the honey label`, () => {
+    assert.ok(contrast(colors.onNow, colors.now) >= 4.5, `${colors.onNow} on ${colors.now}`);
+  });
 }

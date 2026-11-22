@@ -136,6 +136,14 @@ time and duration even when visual text is hidden. Android status-bar icons foll
 the resolved app theme through the existing `expo-status-bar` dependency; no native
 navigation-bar styling or system-theme configuration is changed in this step.
 
+Only today's single relevant pending task shows a contextual countdown. Before its
+start, the next pending card reads “em X min” or “daqui a Xh Ym”; while its planned
+block contains the present, the same card reads “falta/faltam X min”. The active
+label uses the existing `now` honey with the shared `onNow` dark text role. Compact
+cards fall back to inline text rather than overlapping controls, and all other
+cards remain unchanged. The label updates on minute boundaries and is included in
+the relevant card's accessible name.
+
 Task sheets share presentation through `theme/styles/taskSheets.styles.js`:
 surface, backdrop, top corners (22 px), handle (42 × 4), content inset (18 px), and
 44-pixel buttons.

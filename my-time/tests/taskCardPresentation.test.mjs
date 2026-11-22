@@ -17,14 +17,36 @@ const { getCategory } = new Function('lightColors', `${clean(read('config/catego
 const source = read('components/TaskCardClean.js');
 const compiled = babel.transformSync(clean(source).replace('export default function', 'function'), { configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx'] }).code;
 const React = { createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
-function render(colors, task, height) {
+function render(colors, task, height, countdown = null) {
   const component = new Function('React', 'useCallback', 'useMemo', 'useRef', 'DAY_MINUTES', 'formatTimeFromMinutes', 'timeToMinutes', 'formatDuration', 'snapMinutes', 'Animated', 'PanResponder', 'StyleSheet', 'Text', 'TouchableOpacity', 'View', 'getCategory', 'Ionicons', 'useTheme', `${compiled};return TaskCardClean;`)(
     React, fn => fn, fn => fn(), value => ({ current: value }), 1440,
     time.formatTimeFromMinutes, time.timeToMinutes, time.formatDuration, time.snapMinutes,
     { Value: class { constructor(value) { this.value = value; } }, View: 'animated' },
     { create: () => ({ panHandlers: {} }) }, { create: x => x, hairlineWidth: 1, absoluteFill: {} },
     'text', 'button', 'view', getCategory, 'icon', () => ({ colors }));
-  return component({ task, ppm: height / task.durationMinutes, getVisualY: () => 120, getMinuteFromY: () => 540, onPress() {}, onToggle() {} });
+  return component({ task, countdown, ppm: height / task.durationMinutes, getVisualY: () => 120, getMinuteFromY: () => 540, onPress() {}, onToggle() {} });
+}
+
+for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  test(`${name}: only a supplied current countdown receives the honey pill`, () => {
+    const task = { id: 'a', title: 'Example', categoryId: 'work', status: 'pending', durationMinutes: 30, startTime: '09:00' };
+    const countdown = { taskId: 'a', phase: 'current', label: 'faltam 12 min', minutes: 12 };
+    const tree = render(colors, task, 60, countdown);
+    const rendered = nodes(tree);
+
+    assert.ok(rendered.some(node => flattenStyle(node.props.style).backgroundColor === colors.now));
+    assert.ok(rendered.some(node => flattenStyle(node.props.style).color === colors.onNow));
+    assert.match(
+      rendered.find(node => node.props.accessibilityRole === 'button').props.accessibilityLabel,
+      /faltam 12 min/,
+    );
+
+    const withoutCountdown = render(colors, task, 60);
+    assert.equal(
+      nodes(withoutCountdown).some(node => flattenStyle(node.props.style).backgroundColor === colors.now),
+      false,
+    );
+  });
 }
 const nodes = tree => [tree, ...tree.children.flat(Infinity).filter(value => value && typeof value === 'object').flatMap(nodes)];
 const flattenStyle = style => Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean).map(flattenStyle)) : style ?? {};
