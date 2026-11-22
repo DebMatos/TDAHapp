@@ -171,6 +171,25 @@ test('postponement remains relative to original schedule and toggles off without
   assert.equal(h.timePicker().props.value, '09:00');
   assert.equal(h.saved.length, 0);
 });
+test('+1 day advances from the task date across the year boundary and preserves its schedule', async () => {
+  const h = harness(lightColors, {
+    initialValues: {
+      title: 'Futura',
+      date: '2028-12-31',
+      startTime: '23:45',
+      durationMinutes: 30,
+      categoryId: 'inbox',
+      status: 'pending',
+      repeat: 'never',
+      notes: '',
+    },
+  });
+  h.button('+1 dia').props.onPress();
+  await h.button('Guardar tarefa').props.onPress();
+  assert.equal(h.saved[0].date, '2029-01-01');
+  assert.equal(h.saved[0].startTime, '23:45');
+  assert.equal(h.saved[0].durationMinutes, 30);
+});
 test('duration preset closes immediately and custom duration blurs with updated end time', () => {
   const h = harness();
   h.button('Editar duração').props.onPress();
@@ -212,7 +231,7 @@ test('selecting a calendar date resets postponement base without changing time o
   const h = harness();
   h.button('Editar data').props.onPress();
   h.render().find(n => n.type === 'calendar').props.onSelect('31/12/2028');
-  const tomorrow = h.button('Amanhã');
+  const tomorrow = h.button('+1 dia');
   tomorrow.props.onPress();
   h.button('Editar data').props.onPress();
   assert.equal(h.render().find(n => n.type === 'calendar').props.value, '01/01/2029');

@@ -1233,7 +1233,7 @@ export default function TaskDetailsModal({
                       disabled: isBusy,
                       selected: postponeSelection === 'tomorrow',
                     }}
-                    accessibilityLabel="Amanhã"
+                    accessibilityLabel="+1 dia"
                     style={[
                       styles.postponeButton,
 
@@ -1259,7 +1259,7 @@ export default function TaskDetailsModal({
                         postponeSelection === 'tomorrow' && styles.postponeButtonTextSelected,
                       ]}
                     >
-                      Amanhã
+                      +1 dia
                     </Text>
                   </TouchableOpacity>
                   </View>
