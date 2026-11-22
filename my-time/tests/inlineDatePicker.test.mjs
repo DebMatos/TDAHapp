@@ -57,9 +57,10 @@ for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
     assert.equal(h.button('29/02/2024').props.accessibilityState.selected, true);
     assert.equal(h.render().filter(n => n.type === 'button' && /^\d{2}\//.test(n.props.accessibilityLabel)).length, 29);
     assert.equal(h.render().some(n => n.props.accessibilityLabel === '30/02/2024'), false);
-    const grid = h.render().find(n => n.props.style?.flexWrap === 'wrap');
-    assert.equal(grid.children[0].length, 7);
-    const days = grid.children[1];
+    const grid = h.render().find(n => n.type === 'view' && n.props.style?.width === '100%');
+    const rows = grid.children.flat(Infinity);
+    assert.equal(rows[0].children[0].length, 7);
+    const days = rows.slice(1).flatMap(row => row.children[0]);
     assert.equal(days.length % 7, 0);
     assert.deepEqual(days.slice(0, 3).map(n => n.type), ['view', 'view', 'view']);
     assert.equal(days[3].props.accessibilityLabel, '01/02/2024');
