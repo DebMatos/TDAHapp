@@ -13,7 +13,6 @@ const source = read('components/InlineTimePicker.js');
 const clean = source.replace(/import\s+[\s\S]*?\sfrom\s*['"][^'"]+['"];?/g, '').replace('export default function', 'function');
 const compiled = babel.transformSync(clean, { configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx'] }).code;
 const nodes = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...tree.children.flat(Infinity).flatMap(nodes)];
-
 function harness(overrides = {}, colors = themes.darkColors) {
   const slots = [], effects = [], changes = [], changeCalls = [];
   let cursor = 0, keyboardDismissals = 0;
@@ -53,30 +52,45 @@ test('renders only the existing numeric inputs without scroll wheels', () => {
 });
 
 for (const [theme, colors] of [['light', themes.lightColors], ['dark', themes.darkColors]]) {
-  test(`${theme}: numeric fields use themed surfaces and selection`, () => {
+  test(`${theme}: numeric fields share one panel and focus changes only the selected number color`, () => {
     const h = harness({}, colors);
+    const panel = h.render().find(node => node.props.testID === 'time-input-panel');
     const hours = h.find('Editar horas');
-    assert.equal(hours.props.style[0].backgroundColor, colors.surfaceSoft);
-    assert.equal(hours.props.style[0].borderColor, colors.border);
-    assert.equal(hours.props.style[1].backgroundColor, colors.selectionSoft);
+    const minutes = h.find('Editar minutos');
+    assert.equal(panel.props.style.backgroundColor, colors.surfaceSoft);
+    assert.equal(panel.props.style.width, 160);
+    assert.equal(panel.props.style.borderRadius, 12);
+    assert.equal(panel.props.style.overflow, 'hidden');
+    assert.equal(panel.props.style.flexDirection, 'row');
+    assert.equal(panel.props.style.gap, undefined);
+    assert.equal(hours.props.style[0].flex, 1);
+    assert.equal(hours.props.style[0].borderWidth, 0);
+    assert.equal(hours.props.style[0].backgroundColor, 'transparent');
+    assert.equal(hours.props.style[1].backgroundColor, undefined);
+    assert.equal(hours.props.style[1].color, colors.selection);
+    assert.equal(minutes.props.style[1], false);
     assert.equal(hours.props.selectionColor, 'transparent');
+    assert.ok(h.render().some(node => node.props.style?.alignSelf === 'flex-start'));
+
+    minutes.props.onFocus();
+    assert.equal(h.find('Editar horas').props.style[1], false);
+    assert.equal(h.find('Editar minutos').props.style[1].backgroundColor, undefined);
+    assert.equal(h.find('Editar minutos').props.style[1].color, colors.selection);
+
     const now = h.find('Usar hora atual');
     assert.equal(now.props.style[0].backgroundColor, colors.floatingButton.background);
     assert.equal(now.props.style[0].borderColor, theme === 'dark' ? colors.now : colors.floatingButton.border);
   });
 }
 
-test('Agora copies the device time, keeps the picker open and allows a manual adjustment', () => {
+test('Agora copies the device time and confirms it through the existing close path', () => {
   const h = harness();
   h.find('Usar hora atual').props.onPress();
   assert.equal(h.find('Editar horas').props.value, '14');
   assert.equal(h.find('Editar minutos').props.value, '07');
-  assert.deepEqual(h.changeCalls, [['14:07', { keepOpen: true }]]);
-  assert.equal(h.dismissals(), 0);
-  assert.deepEqual(h.find('Editar minutos').props.selection, { start: 0, end: 2 });
-  h.find('Editar minutos').props.onChangeText('08');
-  assert.deepEqual(h.changes, ['14:07', '14:08']);
+  assert.deepEqual(h.changeCalls, [['14:07']]);
   assert.equal(h.dismissals(), 1);
+  assert.deepEqual(h.find('Editar minutos').props.selection, { start: 0, end: 2 });
 });
 
 for (const [digits, expected] of [['241', '02:41'], ['77', '07:07'], ['99', '09:09'], ['086', '08:06'], ['0759', '07:59'], ['236', '23:06'], ['305', '03:05']]) {

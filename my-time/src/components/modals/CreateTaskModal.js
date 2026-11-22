@@ -467,10 +467,10 @@ export default function CreateTaskModal({
                     <InlineTimePicker
                       value={timeLabel}
                       disabled={isBusy}
-                      onChange={(time, options) => {
+                      onChange={(time) => {
                         const [hours, minutes] = time.split(':').map(Number);
                         setStartMinutes(hours * 60 + minutes);
-                        if (!options?.keepOpen) setTimePickerVisible(false);
+                        setTimePickerVisible(false);
                       }}
                     />
                   )}
@@ -511,7 +511,7 @@ export default function CreateTaskModal({
                       {/* HORA */}
 
                       <TouchableOpacity
-                        style={styles.actionPill}
+                        style={[styles.actionPill, timePickerVisible && styles.timePillOpen]}
                         activeOpacity={0.7}
                         disabled={isBusy}
                         accessibilityRole="button"
@@ -844,6 +844,11 @@ const createStyles = (colors) => {
       alignItems: 'center',
 
       gap: 5,
+    },
+
+    timePillOpen: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.selection,
     },
 
     actionText: {

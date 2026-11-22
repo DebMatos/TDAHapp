@@ -192,14 +192,16 @@ date updater owns the postponement base and storage conversion remains unchanged
 
 Details start/end times use the same `InlineTimePicker`, inline after the schedule
 line. It presents its existing paired numeric HH:MM inputs directly, with no scroll
-wheels, alternate selection path or entry animation. The fields use the sheet surface
-and neutral border, with the existing soft green selection state and green native
-cursor/text selection instead of the platform-blue default. Tapping an input selects
+wheels, alternate selection path or entry animation. Hours and minutes remain separate
+inputs inside one compact, left-aligned continuous rounded `surfaceSoft` panel, without internal gaps,
+outlines or dividers. Focus does not alter the panel background; only the selected
+field's digits change from `text` to `selection`. Tapping an input selects
 its digits for replacement; automatic focus transfer keeps the cursor after any
 transferred minute prefix. A valid time closes the picker immediately. No numeric
 input is placed in the header. Its compact “Agora” shortcut uses the floating mascot
 language, copies the device's current hours and minutes into the shared draft, and
-keeps the picker open for manual adjustment without saving the task.
+closes the picker through the normal valid-time path without saving the task. Quick
+Create marks its time pill with a selection-colored hairline while this picker is open.
 Formatting and validation live in `utils/time.js` and are shared with Details.
 Incomplete/invalid typing stays local to the picker. Completing a valid HH:MM
 automatically updates the task draft and both wheels, ends numeric editing and

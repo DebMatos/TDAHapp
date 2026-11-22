@@ -54,7 +54,8 @@ export default function InlineTimePicker({ value, disabled = false, onChange }) 
     const next = `${hours}:${minutes}`;
     setDraft({ hours, minutes });
     setFocusTarget({ field: 'minutes', selectAll: true });
-    latestInput.current.onChange(next, { keepOpen: true });
+    latestInput.current.onChange(next);
+    Keyboard.dismiss();
   };
 
   const inputProps = (field, index) => ({
@@ -99,10 +100,12 @@ export default function InlineTimePicker({ value, disabled = false, onChange }) 
         <Text style={styles.muted} accessibilityLiveRegion="polite">Introduz uma hora entre 00:00 e 23:59.</Text>
       )}
       <View style={styles.controls}>
-        <View style={styles.inputs}>
+        <View style={styles.timeInputPanel} testID="time-input-panel">
           <TextInput {...inputProps('hours', 0)} />
-          <Text style={styles.separator}>:</Text>
           <TextInput {...inputProps('minutes', 1)} />
+          <View pointerEvents="none" style={styles.separatorContainer}>
+            <Text style={styles.separator}>:</Text>
+          </View>
         </View>
         <TouchableOpacity
           accessibilityRole="button"
@@ -130,23 +133,44 @@ export default function InlineTimePicker({ value, disabled = false, onChange }) 
 const createStyles = (colors, isDark) => StyleSheet.create({
   panel: createTaskSheetStyles(colors).pickerPanel,
   muted: { color: colors.textMuted, fontSize: 12, marginBottom: 8, textAlign: 'center' },
-  controls: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 10 },
-  inputs: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: {
-    width: 88,
+  controls: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 10 },
+  timeInputPanel: {
+    width: 160,
     height: 48,
+    flexDirection: 'row',
+    alignItems: 'stretch',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
+    overflow: 'hidden',
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
     color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
     padding: 0,
   },
-  inputFocused: { borderColor: colors.selection },
-  separator: { color: colors.textSecondary, fontSize: 24, fontWeight: '600' },
+  inputFocused: { color: colors.selection },
+  separatorContainer: {
+    position: 'absolute',
+    left: '50%',
+    width: 16,
+    marginLeft: -8,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  separator: {
+    color: colors.textSecondary,
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   nowButton: {
     height: 44,
     minWidth: 44,

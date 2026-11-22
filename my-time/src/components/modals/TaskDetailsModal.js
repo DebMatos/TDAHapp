@@ -1284,10 +1284,10 @@ export default function TaskDetailsModal({
                   key={activeField}
                   value={activeField === 'startTime' ? startTime : endTime}
                   disabled={isBusy}
-                  onChange={(time, options) => {
+                  onChange={(time) => {
                     if (activeField === 'startTime') updateStartTime(time);
                     else updateEndTime(time);
-                    if (!options?.keepOpen) closeInlineEditor();
+                    closeInlineEditor();
                   }}
                 />
               )}

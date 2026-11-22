@@ -119,14 +119,12 @@ test('title and multiline notes blur to labels; opening another field closes pre
   assert.equal(h.saved[0].startTime, '10:30');
   assert.equal(h.saved[0].durationMinutes, 45);
 });
-test('Agora updates the details draft without closing or saving the time picker', () => {
+test('a time selection updates the details draft and closes without saving the task', () => {
   const h = harness();
   h.button('Editar hora de início').props.onPress();
-  h.timePicker().props.onChange('14:07', { keepOpen: true });
-  assert.equal(h.timePicker().props.value, '14:07');
-  assert.equal(h.saved.length, 0);
-  h.timePicker().props.onChange('14:08');
+  h.timePicker().props.onChange('14:07');
   assert.equal(h.timePicker(), undefined);
+  assert.equal(h.saved.length, 0);
 });
 test('calendar toggles, updates only the draft and saves the civil date with the existing schedule', async () => {
   const h = harness();

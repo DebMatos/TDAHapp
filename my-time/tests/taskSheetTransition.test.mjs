@@ -78,7 +78,7 @@ test('quick create saves the time edited in its shared draft', async () => {
   assert.equal(events.saved[0].startTime, '09:17');
 });
 
-test('Quick Create receives Agora in its draft without closing the shared time picker', () => {
+test('Quick Create receives a selected time, closes the picker and exposes its hairline state', () => {
   let onChangeCode;
   walk(ast, node => {
     if (node.type !== 'JSXOpeningElement' || node.name?.name !== 'InlineTimePicker') return;
@@ -91,11 +91,11 @@ test('Quick Create receives Agora in its draft without closing the shared time p
     value => { events.minutes = value; },
     value => { events.visibility.push(value); },
   );
-  onChange('14:07', { keepOpen: true });
+  onChange('14:07');
   assert.equal(events.minutes, 14 * 60 + 7);
-  assert.deepEqual(events.visibility, []);
-  onChange('14:08');
   assert.deepEqual(events.visibility, [false]);
+  assert.match(source, /\{\/\* HORA \*\/\}[\s\S]*?<TouchableOpacity\s+style=\{\[styles\.actionPill, timePickerVisible && styles\.timePillOpen\]\}/);
+  assert.match(source, /timePillOpen:\s*\{\s*borderWidth:\s*StyleSheet\.hairlineWidth,/);
 });
 
 test('invalid date blocks both save and expand, opens correction field and resets drag', async () => {
