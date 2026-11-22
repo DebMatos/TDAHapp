@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,35 +33,38 @@ const friendlyError = (fallback) => {
 function PasswordField({ value, onChangeText, placeholder, autoComplete, visible,
   onToggleVisibility, editable, styles, colors }) {
   return (
-    <View style={styles.passwordField}>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.placeholder}
-        secureTextEntry={!visible}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete={autoComplete}
-        editable={editable}
-        style={styles.passwordInput}
-        accessibilityLabel={placeholder}
-      />
-      <Pressable
-        onPress={onToggleVisibility}
-        disabled={!editable}
-        hitSlop={8}
-        style={({ pressed }) => [styles.visibilityButton, pressed && styles.pressed]}
-        accessibilityRole="button"
-        accessibilityLabel={visible ? `Ocultar ${placeholder.toLowerCase()}` : `Mostrar ${placeholder.toLowerCase()}`}
-        accessibilityState={{ disabled: !editable, expanded: visible }}
-      >
-        <Ionicons
-          name={visible ? 'eye-off-outline' : 'eye-outline'}
-          size={21}
-          color={colors.textMuted}
+    <View style={styles.fieldGroup}>
+      <Text style={styles.fieldLabel}>{placeholder}</Text>
+      <View style={styles.passwordField}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder="••••••••"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete={autoComplete}
+          editable={editable}
+          style={styles.passwordInput}
+          accessibilityLabel={placeholder}
         />
-      </Pressable>
+        <Pressable
+          onPress={onToggleVisibility}
+          disabled={!editable}
+          hitSlop={8}
+          style={({ pressed }) => [styles.visibilityButton, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={visible ? `Ocultar ${placeholder.toLowerCase()}` : `Mostrar ${placeholder.toLowerCase()}`}
+          accessibilityState={{ disabled: !editable, expanded: visible }}
+        >
+          <Ionicons
+            name={visible ? 'eye-off-outline' : 'eye-outline'}
+            size={21}
+            color={colors.textMuted}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -70,7 +74,7 @@ export default function AuthScreen({
   onPasswordRecoveryComplete,
   onCancelPasswordRecovery,
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState('sign-in');
   const [email, setEmail] = useState('');
@@ -261,8 +265,8 @@ export default function AuthScreen({
 
   const renderSignIn = () => (
     <>
-      <Text style={styles.title}>My Time</Text>
-      <Text style={styles.subtitle}>Inicia sessão para guardares as tuas tarefas.</Text>
+      <Text style={styles.title}>Bem-vindo de volta</Text>
+      <Text style={styles.subtitle}>Entra para continuares a organizar o teu dia.</Text>
       <EmailField email={email} setEmail={setEmail} editable={!busy} styles={styles} colors={colors} />
       <PasswordField
         value={password} onChangeText={setPassword} placeholder="Palavra-passe"
@@ -288,6 +292,20 @@ export default function AuthScreen({
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.brand} accessibilityRole="header">
+            <Image
+              source={isDark ? require('../../assets/pirilampo.png') : require('../../assets/abelha.png')}
+              style={styles.mascot}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+              accessible
+              accessibilityLabel={isDark ? 'Pirilampo da My Time' : 'Abelha da My Time'}
+            />
+            <View style={styles.brandCopy}>
+              <Text style={styles.brandName}>My Time</Text>
+              <Text style={styles.brandTagline}>O teu dia, ao teu ritmo.</Text>
+            </View>
+          </View>
           <View style={styles.card}>
             {recoveryMode ? renderRecovery() : mode === 'reset-request' ? renderResetRequest() : renderSignIn()}
           </View>
@@ -299,12 +317,15 @@ export default function AuthScreen({
 
 function EmailField({ email, setEmail, editable, styles, colors }) {
   return (
-    <TextInput
-      value={email} onChangeText={setEmail} placeholder="Email"
-      placeholderTextColor={colors.placeholder} keyboardType="email-address"
-      autoCapitalize="none" autoCorrect={false} autoComplete="email"
-      editable={editable} style={styles.input} accessibilityLabel="Email"
-    />
+    <View style={styles.fieldGroup}>
+      <Text style={styles.fieldLabel}>Email</Text>
+      <TextInput
+        value={email} onChangeText={setEmail} placeholder="nome@exemplo.pt"
+        placeholderTextColor={colors.placeholder} keyboardType="email-address"
+        autoCapitalize="none" autoCorrect={false} autoComplete="email"
+        editable={editable} style={styles.input} accessibilityLabel="Email"
+      />
+    </View>
   );
 }
 
@@ -334,23 +355,30 @@ function SecondaryButton({ onPress, disabled, label, styles }) {
 const createStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   keyboardView: { flex: 1 },
-  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32, backgroundColor: colors.background },
-  card: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 12 },
-  title: { fontSize: 30, fontWeight: '700', color: colors.text },
-  subtitle: { marginBottom: 10, fontSize: 15, lineHeight: 21, color: colors.textMuted },
+  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 32, backgroundColor: colors.background },
+  brand: { width: '100%', maxWidth: 440, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20, paddingHorizontal: 6 },
+  mascot: { width: 66, height: 66 },
+  brandCopy: { flex: 1 },
+  brandName: { fontSize: 24, fontWeight: '700', letterSpacing: 0.2, color: colors.text },
+  brandTagline: { marginTop: 2, fontSize: 14, lineHeight: 19, color: colors.textMuted },
+  card: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSoft, borderRadius: 22, backgroundColor: colors.surface },
+  title: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: colors.text },
+  subtitle: { marginBottom: 8, fontSize: 15, lineHeight: 21, color: colors.textMuted },
   requirement: { marginBottom: 2, fontSize: 13, lineHeight: 18, color: colors.textSecondary },
-  input: { height: 50, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.input, color: colors.text },
-  passwordField: { height: 50, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.input },
+  fieldGroup: { gap: 7 },
+  fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: colors.textSecondary },
+  input: { height: 50, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.input, color: colors.text },
+  passwordField: { height: 50, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.input },
   passwordInput: { flex: 1, height: '100%', paddingLeft: 14, paddingRight: 6, color: colors.text },
   visibilityButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   forgotButton: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingLeft: 12 },
   forgotButtonText: { fontSize: 14, fontWeight: '600', color: colors.action },
   noticePlaceholder: { minHeight: 8 },
-  notice: { minHeight: 48, flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
+  notice: { minHeight: 48, flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
   errorNotice: { borderColor: colors.danger, backgroundColor: colors.surfaceSoft },
   successNotice: { borderColor: colors.success, backgroundColor: colors.surfaceSoft },
   noticeText: { flex: 1, fontSize: 14, lineHeight: 20, color: colors.textSecondary },
-  primaryButton: { height: 50, marginTop: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: colors.action },
+  primaryButton: { height: 50, marginTop: 2, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.action },
   primaryButtonText: { fontSize: 16, fontWeight: '700', color: colors.onAction },
   secondaryButton: { height: 44, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { fontSize: 15, fontWeight: '600', color: colors.action },

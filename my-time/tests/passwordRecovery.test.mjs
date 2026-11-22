@@ -48,6 +48,10 @@ test('auth UI and app shell retain the complete recovery flow', () => {
   assert.match(auth, /updateUser\(\{ password: newPassword \}\)/);
   assert.match(auth, /Se existir uma conta associada a este email/);
   assert.match(auth, /autoComplete="new-password"/);
+  assert.match(auth, /O teu dia, ao teu ritmo\./);
+  assert.match(auth, /Pirilampo da My Time/);
+  assert.match(auth, /Abelha da My Time/);
+  assert.match(auth, /<Text style=\{styles\.fieldLabel\}>Email<\/Text>/);
   assert.match(app, /Linking\.getInitialURL\(\)/);
   assert.match(app, /Linking\.addEventListener\('url'/);
   assert.match(app, /session === undefined \|\| !initialLinkChecked/);

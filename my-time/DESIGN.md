@@ -76,6 +76,14 @@ Colors come from `src/theme/colors.js`.
 
 ## Components
 
+Authentication uses one quiet, centered surface in both themes. The current theme's
+mascot sits beside the My Time wordmark and the line “O teu dia, ao teu ritmo.” above
+the form. Login, account creation, recovery request and new-password states reuse the
+same 22 px surface, visible field labels, 12 px inputs and 14 px primary action. The
+surface uses the existing canvas, surface, border, text and action tokens without
+shadow, glow or authentication-only colors. Functional feedback remains inline and
+uses text as well as semantic color.
+
 `TaskBanner` owns floating local task feedback without taking layout space. The
 host passes through touches outside the banner. Local errors appear immediately
 and remain until dismissed or a new local attempt starts.
