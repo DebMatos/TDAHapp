@@ -160,11 +160,14 @@ keeps its existing standalone modal and gestures. Embedded create details does
 not automatically reopen the keyboard after the drag. Fields and horizontal options
 do not own the sheet gesture. Details keeps its existing expansion/close behavior.
 
-Quick Create date editing is inline with Today/Tomorrow shortcuts and a validated
-DD/MM/YYYY field. The initial civil date comes from the selected timeline slot,
-including slots after midnight. Save and expand carry the chosen civil date and
-slot time explicitly. Expansion preserves raw title/notes and never persists a
-task. Shared date-input helpers interpret stored dates without UTC conversion.
+Quick Create exposes its date and start time as separate compact controls. They open
+the existing inline calendar and time picker without expanding the sheet, updating
+the same draft later transferred to Details. A touch on the timeline rounds only the
+initial start time to the nearest 30 minutes; the picker retains minute precision.
+The initial civil date comes from the selected timeline slot, including slots after
+midnight. Save and expand carry the chosen civil date and time explicitly. Expansion
+preserves raw title/notes and never persists a task. Shared date-input helpers
+interpret stored dates without UTC conversion.
 
 Task Details keeps its title fixed and its date/time/duration in a compact
 horizontal line. Only one inline editor is open at a time. Text editors close on
@@ -188,17 +191,17 @@ another editor closes it. Remounting starts at the selected month. The existing
 date updater owns the postponement base and storage conversion remains unchanged.
 
 Details start/end times use the same `InlineTimePicker`, inline after the schedule
-line. Its independent hour (00–23) and minute (00–59) wheels snap to 44-pixel rows
-with two neighbours visible on either side. Repeated cycles recenter without
-animation only near an outer cycle, enabling circular scrolling without jumping
-after every selection. Taps and typed values align to the nearest copy with a
-scroll animation; the initial native offset stays fixed; nested Android scrolls
-stay inside each wheel. Long-pressing the selected time opens one numeric HH:MM
-pair of communicating inputs in the central wheel row, one in each original
-number column, while neighbours remain visible. No numeric input is placed in
-the header. Tapping an input selects its digits for replacement; automatic focus
-transfer keeps the cursor after any transferred minute prefix. A short tap only selects
-the wheel value.
+line. It presents its existing paired numeric HH:MM inputs directly, with no scroll
+wheels, alternate selection path or entry animation. Hours and minutes remain separate
+inputs inside one compact, left-aligned continuous rounded `surfaceSoft` panel, without internal gaps,
+outlines or dividers. Focus does not alter the panel background; only the selected
+field's digits change from `text` to `selection`. Tapping an input selects
+its digits for replacement; automatic focus transfer keeps the cursor after any
+transferred minute prefix. A valid time closes the picker immediately. No numeric
+input is placed in the header. Its compact “Agora” shortcut uses the floating mascot
+language, copies the device's current hours and minutes into the shared draft, and
+closes the picker through the normal valid-time path without saving the task. Quick
+Create marks its time pill with a selection-colored hairline while this picker is open.
 Formatting and validation live in `utils/time.js` and are shared with Details.
 Incomplete/invalid typing stays local to the picker. Completing a valid HH:MM
 automatically updates the task draft and both wheels, ends numeric editing and

@@ -107,6 +107,9 @@ test('title and multiline notes blur to labels; opening another field closes pre
   h.button('Editar hora de fim').props.onPress();
   assert.equal(h.timePicker().props.value, '11:00');
   h.timePicker().props.onChange('11:15');
+  assert.equal(h.timePicker(), undefined);
+  h.button('Editar hora de fim').props.onPress();
+  assert.equal(h.timePicker().props.value, '11:15');
   h.button('Editar hora de fim').props.onPress();
   assert.equal(h.timePicker(), undefined);
   await h.button('Guardar tarefa').props.onPress();
@@ -115,6 +118,13 @@ test('title and multiline notes blur to labels; opening another field closes pre
   assert.equal(h.saved[0].notes, 'Linha 1\nLinha 2');
   assert.equal(h.saved[0].startTime, '10:30');
   assert.equal(h.saved[0].durationMinutes, 45);
+});
+test('a time selection updates the details draft and closes without saving the task', () => {
+  const h = harness();
+  h.button('Editar hora de início').props.onPress();
+  h.timePicker().props.onChange('14:07');
+  assert.equal(h.timePicker(), undefined);
+  assert.equal(h.saved.length, 0);
 });
 test('calendar toggles, updates only the draft and saves the civil date with the existing schedule', async () => {
   const h = harness();

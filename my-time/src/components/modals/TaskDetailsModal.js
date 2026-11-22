@@ -1284,7 +1284,11 @@ export default function TaskDetailsModal({
                   key={activeField}
                   value={activeField === 'startTime' ? startTime : endTime}
                   disabled={isBusy}
-                  onChange={activeField === 'startTime' ? updateStartTime : updateEndTime}
+                  onChange={(time) => {
+                    if (activeField === 'startTime') updateStartTime(time);
+                    else updateEndTime(time);
+                    closeInlineEditor();
+                  }}
                 />
               )}
 
