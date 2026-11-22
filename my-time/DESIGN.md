@@ -36,6 +36,10 @@ mode the stop icon uses `onAction` and the pause/play icon uses `text` for the
 stronger contrast on each fill; dark-mode icons retain `text`. Geometry and
 behavior are identical in both themes.
 
+The native splash follows the device theme before JavaScript starts: light mode
+uses the warm-stone canvas with the bee, while dark mode uses the dark canvas
+with the firefly. Both variants retain the same centered scale and geometry.
+
 The active tracking panel shows a timestamp-derived `MM:SS` chronometer, keeping
 total minutes beyond one hour. It recalculates from stored session boundaries and
 the current instant on every tick; pausing therefore freezes at the persisted end
