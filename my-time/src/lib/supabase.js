@@ -2,6 +2,8 @@ import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
+import { createRefreshFetch, createSyncRequest } from './syncTransport';
+import { traceTaskSyncDiagnostic } from '../data/taskSyncDiagnostics';
 
 const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -19,6 +21,13 @@ export const supabase = createClient(
   supabaseUrl,
   supabasePublishableKey,
   {
+    global: {
+      fetch: createRefreshFetch(
+        (...args) => fetch(...args),
+        new URL('auth/v1/token', `${supabaseUrl.replace(/\/$/, '')}/`).href,
+        run => traceTaskSyncDiagnostic('auth-refresh', () => ({}), run),
+      ),
+    },
     auth: {
       ...(Platform.OS !== 'web'
         ? { storage: AsyncStorage }
@@ -35,8 +44,8 @@ let sessionUserId;
 let sessionIdentityRevision = 0;
 supabase.auth.onAuthStateChange((event, session) => {
   const userId = session?.user?.id ?? null;
-  if (event === 'INITIAL_SESSION' && sessionUserId === undefined) {
-    sessionUserId = userId;
+  if (event === 'INITIAL_SESSION') {
+    if (sessionUserId === undefined) sessionUserId = userId;
     return;
   }
   if (userId !== sessionUserId) {
@@ -50,7 +59,14 @@ export const getSessionIdentity = () => ({
   revision: sessionIdentityRevision,
 });
 
+// Sync queries provide Authorization themselves, after resolving the token once.
+export const syncDataClient = createClient(supabaseUrl, supabasePublishableKey, {
+  accessToken: async () => null,
+});
+export const runSyncRequest = createSyncRequest(supabase.auth, getSessionIdentity);
+
 if (Platform.OS !== 'web') {
+  if (AppState.currentState === 'active') void supabase.auth.startAutoRefresh();
   AppState.addEventListener('change', (state) => {
     if (state === 'active') {
       supabase.auth.startAutoRefresh();

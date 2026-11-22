@@ -9,6 +9,7 @@ const context = vm.createContext({
   Date, Promise, Math, Error, TypeError, RangeError,
   loadSessions: async () => [],
   saveSessions: async (sessions) => sessions,
+  getTaskSessionRepositoryUser: () => undefined,
 });
 vm.runInContext(modelSource.replaceAll('export const ', 'const ') +
   '\nglobalThis.createTaskSession = createTaskSession; globalThis.stopTaskSession = stopTaskSession; globalThis.getTaskDurationMs = getTaskDurationMs;', context);

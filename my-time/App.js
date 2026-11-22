@@ -12,8 +12,14 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { setTaskSyncOnline, setTaskSyncSessionReady } from './src/data/taskRepository';
-import { syncTaskSessions } from './src/services/taskSessionSyncService';
+import {
+  resumeTaskSync,
+  setTaskRepositoryUser,
+  setTaskSyncOnline,
+  setTaskSyncSessionReady,
+} from './src/data/taskRepository';
+import { setTaskSessionRepositoryUser } from './src/repositories/localTaskSessionRepository';
+import { setTaskSessionSyncOnline, syncTaskSessions } from './src/services/taskSessionSyncService';
 import NetInfo from '@react-native-community/netinfo';
 import { updateTaskSyncConnectivity } from './src/data/taskSyncStatus';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -36,36 +42,79 @@ function AppContent() {
   const [session, setSession] = useState(undefined);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
+    let active = true;
+    let receivedChange = false;
+    const applySession = (nextSession) => {
+      const userId = nextSession?.user?.id ?? null;
+      setTaskRepositoryUser(userId);
+      setTaskSessionRepositoryUser(userId);
+      setSession(nextSession);
+    };
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!active || (event === 'INITIAL_SESSION' && receivedChange)) return;
+      if (event !== 'INITIAL_SESSION') receivedChange = true;
+      applySession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const unsubscribe = NetInfo.addEventListener((state) => {
+    let active = true;
+    let networkRevision = 0;
+    let activityRevision = 0;
+    let wasOnline = false;
+    const applyNetwork = (state, source) => {
       updateTaskSyncConnectivity(state);
       const online = state.isConnected === true && state.isInternetReachable === true;
-      setTaskSyncOnline(online);
-      if (online) {
+      setTaskSyncOnline(online, source, state);
+      setTaskSessionSyncOnline(online);
+      const reconnected = online && !wasOnline;
+      wasOnline = online;
+      return reconnected;
+    };
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (!active) return;
+      networkRevision += 1;
+      if (applyNetwork(state, 'NetInfo')) {
         syncTaskSessions().catch((error) => {
           console.warn('[Sessions] Falha ao sincronizar na reconexão:', error);
         });
       }
     });
 
+    const subscription = AppState.addEventListener('change', (state) => {
+      const activity = ++activityRevision;
+      if (state !== 'active') return;
+      const revision = networkRevision;
+      NetInfo.refresh().then((network) => {
+        if (!active || activity !== activityRevision) return;
+        if (revision === networkRevision) applyNetwork(network, 'Primeiro plano');
+        // A listener may already have supplied newer connectivity during refresh.
+        resumeTaskSync();
+        syncTaskSessions().catch(() => {});
+      }).catch((error) => {
+        if (active && activity === activityRevision) {
+          resumeTaskSync();
+          syncTaskSessions().catch(() => {});
+        }
+        console.warn('[Sync] Não foi possível verificar a ligação:', error);
+      });
+    });
+
     return () => {
+      active = false;
       unsubscribe();
-      setTaskSyncOnline(false);
+      subscription.remove();
+      setTaskSyncOnline(false, 'Fim da subscrição');
+      setTaskSessionSyncOnline(false);
     };
   }, [session?.user?.id]);
   useEffect(() => {
@@ -74,27 +123,10 @@ function AppContent() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      NetInfo.fetch().then((network) => {
-        updateTaskSyncConnectivity(network);
-        setTaskSyncOnline(
-          network.isConnected === true && network.isInternetReachable === true,
-        );
-      }).catch((error) => {
-        console.warn('[Sync] Não foi possível verificar a ligação:', error);
-      });
-    });
-
-    return () => subscription.remove();
-  }, [session?.user?.id]);
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
     syncTaskSessions().catch((error) => {
       console.warn('[Sessions] Falha na sincronização inicial:', error);
     });
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session?.access_token]);
 
   if (!fontsLoaded || session === undefined) {
     return (
@@ -119,6 +151,7 @@ function AppContent() {
       <SafeAreaProvider>
         {session ? (
           <NavigationContainer
+            key={session.user.id}
             theme={{
               ...navigationTheme,
               colors: {

@@ -9,33 +9,31 @@ const stored = new Map();
 const AsyncStorage = {
   getItem: async (key) => stored.get(key) ?? null,
   setItem: async (key, value) => stored.set(key, value),
+  removeItem: async (key) => stored.delete(key),
 };
-const context = vm.createContext({ Date, Error, TypeError, RangeError, JSON, AsyncStorage });
+const context = vm.createContext({ Date, Error, TypeError, RangeError, JSON, AsyncStorage, encodeURIComponent, console });
 vm.runInContext(modelSource.replaceAll('export const ', 'const ') +
   '\nglobalThis.normalizeTaskSession = normalizeTaskSession;', context);
 vm.runInContext(repoSource.replace(/^import .*;\s*$/gm, '').replaceAll('export const ', 'const ') +
-  '\nglobalThis.api = { loadSessions, saveSessions, claimSessionOwner, loadSessionSyncState, confirmSyncedSession, mergeRemoteSessions, TASK_SESSION_STORAGE_INFO };', context);
+  '\nglobalThis.api = { loadSessions, saveSessions, setTaskSessionRepositoryUser, claimSessionOwner, loadSessionSyncState, confirmSyncedSession, mergeRemoteSessions, TASK_SESSION_STORAGE_INFO };', context);
 const api = context.api;
-const { key } = api.TASK_SESSION_STORAGE_INFO;
 const open = { id: 's1', taskId: 't1', startedAt: '2026-11-15T14:00:00Z', endedAt: null };
 const closed = { ...open, startedAt: '2026-11-15T14:00:00.000Z', endedAt: '2026-11-15T14:20:00Z' };
 
-test('migra sessões antigas mantendo-as pendentes de envio', async () => {
+const selectUser1 = () => api.setTaskSessionRepositoryUser('user1');
+
+test('apaga sessões antigas sem dono e não as atribui à conta', async () => {
   stored.clear();
-  stored.set(key, JSON.stringify([open]));
-  const before = await api.loadSessionSyncState();
-  assert.equal(before.sessions.length, 1);
-  assert.equal(before.pendingIds[0], 's1');
-  await api.claimSessionOwner('user1');
-  const after = JSON.parse(stored.get(key));
-  assert.equal(after.schemaVersion, 2);
-  assert.equal(after.sessions.length, 1);
-  assert.equal(after.ownerId, 'user1');
-  assert.deepEqual(after.pendingIds, ['s1']);
+  stored.set(api.TASK_SESSION_STORAGE_INFO.legacyKey, JSON.stringify([open]));
+  selectUser1();
+  await Promise.resolve();
+  assert.equal(stored.has(api.TASK_SESSION_STORAGE_INFO.legacyKey), false);
+  assert.equal((await api.loadSessions()).length, 0);
 });
 
 test('não apaga um novo fecho durante confirmação de envio antigo', async () => {
   stored.clear();
+  selectUser1();
   await api.saveSessions([open]);
   const old = (await api.loadSessions())[0];
   await api.saveSessions([closed]);
@@ -49,6 +47,7 @@ test('não apaga um novo fecho durante confirmação de envio antigo', async () 
 
 test('recupera sessões remotas sem perder alterações locais por enviar', async () => {
   stored.clear();
+  selectUser1();
   await api.saveSessions([open]);
   await api.mergeRemoteSessions([{ ...open, id: 's2', taskId: 't2', endedAt: '2026-11-15T14:15:00Z' }]);
   const state = await api.loadSessionSyncState();
@@ -59,6 +58,7 @@ test('recupera sessões remotas sem perder alterações locais por enviar', asyn
 
 test('não reabre sessões terminadas com dados remotos antigos', async () => {
   stored.clear();
+  selectUser1();
   await api.saveSessions([closed]);
   await api.mergeRemoteSessions([open]);
   const state = await api.loadSessionSyncState();
@@ -67,6 +67,7 @@ test('não reabre sessões terminadas com dados remotos antigos', async () => {
 
 test('reconcilia sessões remotas terminadas mesmo com início local pendente', async () => {
   stored.clear();
+  selectUser1();
   await api.saveSessions([open]);
   await api.mergeRemoteSessions([closed]);
   const state = await api.loadSessionSyncState();
@@ -76,6 +77,7 @@ test('reconcilia sessões remotas terminadas mesmo com início local pendente', 
 
 test('bloqueia associação de sessões a outra conta', async () => {
   stored.clear();
+  selectUser1();
   await api.saveSessions([open]);
   await api.claimSessionOwner('user1');
   await assert.rejects(api.claimSessionOwner('user2'), /outra conta/);

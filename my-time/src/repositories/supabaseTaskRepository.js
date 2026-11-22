@@ -1,8 +1,11 @@
-import { supabase } from '../lib/supabase';
+import { runSyncRequest, supabase, syncDataClient } from '../lib/supabase';
 import {
   normalizeTask,
   normalizeTasks,
 } from '../domain/taskModel';
+
+const remoteTaskError = (error, status) =>
+  Object.assign(new Error(error.message), error, { status: status ?? error.status });
 
 const fromDatabase = (row) => ({
   id: row.id,
@@ -55,18 +58,18 @@ const toDatabase = (task, userId) => ({
    READ
 ------------------------------------------------------- */
 
-export const loadTasks = async (userId, signal) => {
-  const { data, error } = await supabase
+export const loadTasks = async (userId, signal, reportHttp) => {
+  const { data, error, status } = await runSyncRequest(userId, signal, () => syncDataClient
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
     .order('position', {
       ascending: true,
-    })
-    .abortSignal(signal);
+    }));
 
+  reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return normalizeTasks(
@@ -82,11 +85,12 @@ export const createTask = async (
   userId,
   task,
   signal,
+  reportHttp,
 ) => {
   const canonicalTask =
     normalizeTask(task);
-  const { error } =
-    await supabase
+  const { error, status } =
+    await runSyncRequest(userId, signal, () => syncDataClient
       .from('tasks')
       .upsert(
         toDatabase(
@@ -97,11 +101,11 @@ export const createTask = async (
           onConflict: 'id',
           ignoreDuplicates: true,
         },
-      )
-      .abortSignal(signal);
+      ));
 
+  reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return canonicalTask;
@@ -115,6 +119,7 @@ export const updateTask = async (
   userId,
   task,
   signal,
+  reportHttp,
 ) => {
   const canonicalTask =
     normalizeTask(task);
@@ -131,18 +136,18 @@ export const updateTask = async (
     ...changes
   } = row;
 
-  const { data, error } =
-    await supabase
+  const { data, error, status } =
+    await runSyncRequest(userId, signal, () => syncDataClient
       .from('tasks')
       .update(changes)
       .eq('id', id)
       .eq('user_id', userId)
-      .abortSignal(signal)
       .select('*')
-      .single();
+      .single());
 
+  reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 
   return normalizeTask(
@@ -158,16 +163,17 @@ export const deleteTask = async (
   userId,
   taskId,
   signal,
+  reportHttp,
 ) => {
-  const { error } = await supabase
+  const { error, status } = await runSyncRequest(userId, signal, () => syncDataClient
     .from('tasks')
     .delete()
     .eq('id', taskId)
-    .eq('user_id', userId)
-    .abortSignal(signal);
+    .eq('user_id', userId));
 
+  reportHttp?.(status);
   if (error) {
-    throw error;
+    throw remoteTaskError(error, status);
   }
 };
 
