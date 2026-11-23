@@ -54,7 +54,7 @@ import {
 } from '../../utils/timelineDate';
 import { roundTimestampToMinuteMs } from '../../domain/taskSessionModel';
 import { getChronometerDurationMs } from '../../utils/trackingChronometer';
-import { getContextualTaskCountdown } from '../../utils/taskCountdown';
+import { getContextualTaskCountdowns } from '../../utils/taskCountdown';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
@@ -471,10 +471,10 @@ export default function TimelineScreen() {
     });
   }, [tasks, selectedTimelineDateKey]);
 
-  const contextualCountdown = useMemo(
+  const contextualCountdowns = useMemo(
     () => isViewingToday
-      ? getContextualTaskCountdown(visibleTasks, now)
-      : null,
+      ? getContextualTaskCountdowns(visibleTasks, now)
+      : [],
     [isViewingToday, timelineNow, visibleTasks],
   );
 
@@ -1185,7 +1185,7 @@ export default function TimelineScreen() {
                 ppm={ppm}
                 themeIndex={index}
                 layoutStyle={taskHorizontalLayouts.get(task.id)}
-                countdown={contextualCountdown?.taskId === task.id ? contextualCountdown : null}
+                countdown={contextualCountdowns.find((item) => item.taskId === task.id) ?? null}
                 onChangeStart={handleDragEnd}
                 onDragStateChange={setIsDragging}
                 onDragPreview={setDragPreview}

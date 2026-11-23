@@ -26,52 +26,49 @@ const getTaskWindow = (task, now) => {
 
 export const formatTaskCountdown = (minutes, phase) => {
   const safeMinutes = Math.max(1, Math.ceil(minutes));
-
-  if (phase === 'current') {
-    return safeMinutes === 1 ? 'falta 1 min' : `faltam ${safeMinutes} min`;
-  }
-
-  if (safeMinutes < 60) {
-    return `em ${safeMinutes} min`;
-  }
-
   const hours = Math.floor(safeMinutes / 60);
   const remainingMinutes = safeMinutes % 60;
+  const duration = hours
+    ? `${hours}h${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
+    : `${remainingMinutes} min`;
 
-  return remainingMinutes
-    ? `daqui a ${hours}h ${remainingMinutes}m`
-    : `daqui a ${hours}h`;
+  return phase === 'current' ? duration : `daqui a ${duration}`;
 };
 
-export const getContextualTaskCountdown = (tasks, nowValue = new Date()) => {
+export const getContextualTaskCountdowns = (tasks, nowValue = new Date()) => {
   const now = nowValue instanceof Date ? nowValue : new Date(nowValue);
 
   if (Number.isNaN(now.getTime())) {
-    return null;
+    return [];
   }
 
-  const relevant = tasks
+  const windows = tasks
     .filter((task) => (task.status ?? 'pending') === 'pending')
     .map((task) => getTaskWindow(task, now))
     .filter((window) => window && window.end.getTime() > now.getTime())
     .sort((left, right) =>
       left.start.getTime() - right.start.getTime() ||
       String(left.task.id).localeCompare(String(right.task.id)),
-    )[0];
+    );
 
-  if (!relevant) {
-    return null;
-  }
+  const current = windows
+    .filter((window) => window.start.getTime() <= now.getTime())
+    .at(-1);
+  const upcoming = windows.find((window) => window.start.getTime() > now.getTime());
 
-  const isCurrent = relevant.start.getTime() <= now.getTime();
-  const target = isCurrent ? relevant.end : relevant.start;
-  const minutes = (target.getTime() - now.getTime()) / MINUTE_MS;
-  const phase = isCurrent ? 'current' : 'upcoming';
+  return [
+    current && { window: current, phase: 'current', target: current.end },
+    upcoming && { window: upcoming, phase: 'upcoming', target: upcoming.start },
+  ]
+    .filter(Boolean)
+    .map(({ window, phase, target }) => {
+      const minutes = (target.getTime() - now.getTime()) / MINUTE_MS;
 
-  return {
-    taskId: relevant.task.id,
-    phase,
-    minutes: Math.max(1, Math.ceil(minutes)),
-    label: formatTaskCountdown(minutes, phase),
-  };
+      return {
+        taskId: window.task.id,
+        phase,
+        minutes: Math.max(1, Math.ceil(minutes)),
+        label: formatTaskCountdown(minutes, phase),
+      };
+    });
 };

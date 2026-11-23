@@ -28,23 +28,31 @@ function render(colors, task, height, countdown = null) {
 }
 
 for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
-  test(`${name}: only a supplied current countdown receives the honey pill`, () => {
+  test(`${name}: a current countdown is plain text with a matching hourglass`, () => {
     const task = { id: 'a', title: 'Example', categoryId: 'work', status: 'pending', durationMinutes: 30, startTime: '09:00' };
-    const countdown = { taskId: 'a', phase: 'current', label: 'faltam 12 min', minutes: 12 };
+    const countdown = { taskId: 'a', phase: 'current', label: '12 min', minutes: 12 };
     const tree = render(colors, task, 60, countdown);
     const rendered = nodes(tree);
 
-    assert.ok(rendered.some(node => flattenStyle(node.props.style).backgroundColor === colors.now));
-    assert.ok(rendered.some(node => flattenStyle(node.props.style).color === colors.onNow));
+    assert.equal(rendered.some(node => flattenStyle(node.props.style).backgroundColor === colors.now), false);
+    assert.ok(rendered.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline' && node.props.size === 14 && node.props.color === colors.timelineCountdown));
+    assert.ok(rendered.some(node => flattenStyle(node.props.style).color === colors.timelineCountdown));
     assert.match(
       rendered.find(node => node.props.accessibilityRole === 'button').props.accessibilityLabel,
-      /faltam 12 min/,
+      /12 min/,
     );
 
-    const withoutCountdown = render(colors, task, 60);
-    assert.equal(
-      nodes(withoutCountdown).some(node => flattenStyle(node.props.style).backgroundColor === colors.now),
-      false,
+    const upcoming = nodes(render(colors, task, 60, { ...countdown, phase: 'upcoming', label: 'daqui a 12 min' }));
+    assert.equal(upcoming.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline'), false);
+
+    const compact = nodes(render(colors, task, 20, countdown));
+    assert.ok(compact.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline'));
+
+    const tiny = nodes(render(colors, task, 10, countdown));
+    assert.equal(tiny.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline'), false);
+    assert.match(
+      tiny.find(node => node.props.accessibilityRole === 'button').props.accessibilityLabel,
+      /12 min/,
     );
   });
 }

@@ -58,6 +58,7 @@ export const lightColors = {
   taskCardNeutral: '#F5F4F2',
   taskCardMuted: '#C7BFB9',
   taskCardBorder: '#E7E3DF',
+  timelineCountdown: '#B8C9A6',
 
   themeToggle: {
     track: '#F4F4F5',
@@ -129,6 +130,7 @@ export const darkColors = {
   taskCardNeutral: '#302D29',
   taskCardMuted: '#827A73',
   taskCardBorder: '#403B36',
+  timelineCountdown: '#B8C9A6',
 
   themeToggle: {
     track: '#18181B',

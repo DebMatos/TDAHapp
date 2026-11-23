@@ -104,7 +104,7 @@ export default function TaskCardClean({
 
   const hasRoomForMeta = visualHeight >= 32;
   const showCheckbox = !isVeryNarrow;
-  const showCountdownPill = Boolean(countdown) && visualHeight >= 24 && !isVeryNarrow;
+  const showCountdown = Boolean(countdown) && visualHeight >= 14;
 
   /* -------------------------------------------------------
      TEMA DINÂMICO
@@ -120,18 +120,18 @@ export default function TaskCardClean({
   const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
   const countdownAccessibility = countdown ? ` ${countdown.label}.` : '';
 
-  const renderCountdownPill = () => (
-    <View
-      style={[
-        styles.countdownPill,
-        countdown.phase === 'current' && styles.countdownPillCurrent,
-      ]}
-    >
+  const renderCountdown = () => (
+    <View style={styles.countdownIndicator}>
+      {countdown.phase === 'current' && (
+        <Ionicons
+          name="hourglass-outline"
+          size={14}
+          color={colors.timelineCountdown}
+          style={styles.countdownIcon}
+        />
+      )}
       <Text
-        style={[
-          styles.countdownText,
-          countdown.phase === 'current' && styles.countdownTextCurrent,
-        ]}
+        style={styles.countdownText}
         numberOfLines={1}
       >
         {countdown.label}
@@ -397,7 +397,7 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {countdown ? `${task.title} · ${countdown.label}` : task.title}
+            {task.title}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -451,13 +451,11 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {showCountdownPill
+            {showCountdown
               ? task.title
-              : countdown
-                ? `${task.title} · ${countdown.label}`
-                : isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
+              : isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
           </Text>
-          {showCountdownPill && renderCountdownPill()}
+          {showCountdown && renderCountdown()}
         </TouchableOpacity>
 
         {showCheckbox && (
@@ -527,7 +525,7 @@ export default function TaskCardClean({
   >
     {task.title}
   </Text>
-  {showCountdownPill && renderCountdownPill()}
+  {showCountdown && renderCountdown()}
 </View>
 
         {hasRoomForMeta && (
@@ -539,9 +537,7 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {countdown && !showCountdownPill
-              ? `${countdown.label} · ${durationStr}`
-              : isVeryNarrow
+            {isVeryNarrow
                 ? durationStr
               : isNarrow
                 ? `${startTimeStr} · ${durationStr}`
@@ -643,29 +639,24 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 9,
   },
 
-  countdownPill: {
+  countdownIndicator: {
     flexShrink: 0,
     marginLeft: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 9,
-    backgroundColor: colors.surfaceMuted,
-  },
-
-  countdownPillCurrent: {
-    backgroundColor: colors.now,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   countdownText: {
-    color: colors.textSecondary,
+    color: colors.timelineCountdown,
     fontSize: 9,
     lineHeight: 11,
     fontWeight: '700',
     includeFontPadding: false,
+    fontVariant: ['tabular-nums'],
   },
 
-  countdownTextCurrent: {
-    color: colors.onNow,
+  countdownIcon: {
+    marginRight: 3,
   },
 
   universalCheckbox: {
