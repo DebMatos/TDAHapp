@@ -34,6 +34,7 @@ const LONG_PRESS_DELAY_MS = 350;
 export default function TaskCardClean({
   task,
   ppm,
+  countdown = null,
 
   onChangeStart,
   onDragStateChange,
@@ -103,6 +104,7 @@ export default function TaskCardClean({
 
   const hasRoomForMeta = visualHeight >= 32;
   const showCheckbox = !isVeryNarrow;
+  const showCountdownPill = Boolean(countdown) && visualHeight >= 24 && !isVeryNarrow;
 
   /* -------------------------------------------------------
      TEMA DINÂMICO
@@ -116,6 +118,26 @@ export default function TaskCardClean({
 
   const titleColor = isAbandoned ? colors.textFaint : colors.text;
   const metaColor = isAbandoned ? colors.taskCardMuted : colors.textMuted;
+  const countdownAccessibility = countdown ? ` ${countdown.label}.` : '';
+
+  const renderCountdownPill = () => (
+    <View
+      style={[
+        styles.countdownPill,
+        countdown.phase === 'current' && styles.countdownPillCurrent,
+      ]}
+    >
+      <Text
+        style={[
+          styles.countdownText,
+          countdown.phase === 'current' && styles.countdownTextCurrent,
+        ]}
+        numberOfLines={1}
+      >
+        {countdown.label}
+      </Text>
+    </View>
+  );
 
 
   /* -------------------------------------------------------
@@ -318,7 +340,7 @@ export default function TaskCardClean({
 
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
           style={StyleSheet.absoluteFill}
           onPress={() => {
             if (!isDragActive.current) {
@@ -357,7 +379,7 @@ export default function TaskCardClean({
 
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
           style={styles.tinyClickArea}
           onPress={() => {
             if (!isDragActive.current) {
@@ -375,7 +397,7 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {task.title}
+            {countdown ? `${task.title} · ${countdown.label}` : task.title}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -411,7 +433,7 @@ export default function TaskCardClean({
 
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
+          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
           style={styles.compactClickArea}
           onPress={() => {
             if (!isDragActive.current) {
@@ -429,8 +451,13 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
+            {showCountdownPill
+              ? task.title
+              : countdown
+                ? `${task.title} · ${countdown.label}`
+                : isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
           </Text>
+          {showCountdownPill && renderCountdownPill()}
         </TouchableOpacity>
 
         {showCheckbox && (
@@ -478,7 +505,7 @@ export default function TaskCardClean({
 
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.`}
+        accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
         style={styles.taskBody}
         onPress={() => {
           if (!isDragActive.current) {
@@ -500,8 +527,7 @@ export default function TaskCardClean({
   >
     {task.title}
   </Text>
-
-
+  {showCountdownPill && renderCountdownPill()}
 </View>
 
         {hasRoomForMeta && (
@@ -513,8 +539,10 @@ export default function TaskCardClean({
             ]}
             numberOfLines={1}
           >
-            {isVeryNarrow
-              ? durationStr
+            {countdown && !showCountdownPill
+              ? `${countdown.label} · ${durationStr}`
+              : isVeryNarrow
+                ? durationStr
               : isNarrow
                 ? `${startTimeStr} · ${durationStr}`
                 : `${startTimeStr}–${endTimeStr} · ${durationStr}`}
@@ -615,6 +643,31 @@ const createStyles = (colors) => StyleSheet.create({
     fontSize: 9,
   },
 
+  countdownPill: {
+    flexShrink: 0,
+    marginLeft: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 9,
+    backgroundColor: colors.surfaceMuted,
+  },
+
+  countdownPillCurrent: {
+    backgroundColor: colors.now,
+  },
+
+  countdownText: {
+    color: colors.textSecondary,
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+
+  countdownTextCurrent: {
+    color: colors.onNow,
+  },
+
   universalCheckbox: {
     width: 18,
     height: 18,
@@ -661,6 +714,8 @@ const createStyles = (colors) => StyleSheet.create({
     paddingLeft: 9,
     paddingRight: 6,
     justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     transform: [
       {
         translateY: -1,
@@ -669,6 +724,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   compactTitle: {
+    flex: 1,
     fontSize: 10,
     fontWeight: '600',
     includeFontPadding: false,

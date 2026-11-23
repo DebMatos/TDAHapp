@@ -54,6 +54,7 @@ import {
 } from '../../utils/timelineDate';
 import { roundTimestampToMinuteMs } from '../../domain/taskSessionModel';
 import { getChronometerDurationMs } from '../../utils/trackingChronometer';
+import { getContextualTaskCountdown } from '../../utils/taskCountdown';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
@@ -264,7 +265,23 @@ export default function TimelineScreen() {
   );
   const [goToNowRequest, setGoToNowRequest] = useState(0);
 
-  const now = new Date();
+  const [timelineNow, setTimelineNow] = useState(Date.now());
+
+  useEffect(() => {
+    let interval = null;
+    const delay = 60_050 - (Date.now() % 60_000);
+    const timeout = setTimeout(() => {
+      setTimelineNow(Date.now());
+      interval = setInterval(() => setTimelineNow(Date.now()), 60_000);
+    }, delay);
+
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
+  }, []);
+
+  const now = new Date(timelineNow);
 
   const currentTimelineDate = getTimelineDate(now);
 
@@ -453,6 +470,13 @@ export default function TimelineScreen() {
       return getDateKey(taskTimelineDate) === selectedTimelineDateKey;
     });
   }, [tasks, selectedTimelineDateKey]);
+
+  const contextualCountdown = useMemo(
+    () => isViewingToday
+      ? getContextualTaskCountdown(visibleTasks, now)
+      : null,
+    [isViewingToday, timelineNow, visibleTasks],
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -1161,6 +1185,7 @@ export default function TimelineScreen() {
                 ppm={ppm}
                 themeIndex={index}
                 layoutStyle={taskHorizontalLayouts.get(task.id)}
+                countdown={contextualCountdown?.taskId === task.id ? contextualCountdown : null}
                 onChangeStart={handleDragEnd}
                 onDragStateChange={setIsDragging}
                 onDragPreview={setDragPreview}
