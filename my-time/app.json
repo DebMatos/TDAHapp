@@ -21,19 +21,14 @@
       [
         "expo-splash-screen",
         {
-          "plugins": [
-            "expo-font",
-            "expo-status-bar",
-            [
-              "expo-splash-screen",
-              {
-                "image": "./assets/abelhaInicio.png",
-                "resizeMode": "contain",
-                "backgroundColor": "#EAE7E1",
-                "imageWidth": 180
-              }
-            ]
-          ]
+          "image": "./assets/abelhaInicio.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#EAE7E1",
+          "imageWidth": 180,
+          "dark": {
+            "image": "./assets/prilampoInicio.png",
+            "backgroundColor": "#141412"
+          }
         }
       ]
     ],

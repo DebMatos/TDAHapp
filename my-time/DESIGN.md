@@ -36,6 +36,10 @@ mode the stop icon uses `onAction` and the pause/play icon uses `text` for the
 stronger contrast on each fill; dark-mode icons retain `text`. Geometry and
 behavior are identical in both themes.
 
+The native splash follows the device theme before JavaScript starts: light mode
+uses the warm-stone canvas with the bee, while dark mode uses the dark canvas
+with the firefly. Both variants retain the same centered scale and geometry.
+
 The active tracking panel shows a timestamp-derived `MM:SS` chronometer, keeping
 total minutes beyond one hour. It recalculates from stored session boundaries and
 the current instant on every tick; pausing therefore freezes at the persisted end
@@ -143,6 +147,12 @@ label uses the existing `now` honey with the shared `onNow` dark text role. Comp
 cards fall back to inline text rather than overlapping controls, and all other
 cards remain unchanged. The label updates on minute boundaries and is included in
 the relevant card's accessible name.
+Dragging a task keeps minute-level precision. A horizontal target line and a compact
+`HH:MM` label preview the exact saved start time above the dragged card. Full and
+half hours attract within a fixed visual distance at every zoom level; a wider
+release distance prevents oscillation, and the selection tokens mark an active
+magnet without replacing the task's category color. Task Details remains the
+non-drag path for precise time changes.
 
 Task sheets share presentation through `theme/styles/taskSheets.styles.js`:
 surface, backdrop, top corners (22 px), handle (42 × 4), content inset (18 px), and

@@ -35,6 +35,17 @@ const baseStyles = StyleSheet.create({
     position: 'absolute', left: -3, top: -2.5,
     width: 6.5, height: 6.5, borderRadius: 4,
   },
+  dragTargetLine: {
+    position: 'absolute', left: AXIS_WIDTH, right: 20, height: 1, zIndex: 95,
+  },
+  dragTargetLabel: {
+    position: 'absolute', left: -AXIS_WIDTH + 2, bottom: 6,
+    minWidth: 48, paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 10, alignItems: 'center',
+  },
+  dragTargetLabelText: {
+    fontSize: 12, lineHeight: 14, fontWeight: '700', fontVariant: ['tabular-nums'],
+  },
   nowBeeImage: {
     position: 'absolute', right: -6, top: -10,
     width: 20, height: 20, resizeMode: 'contain',
@@ -58,6 +69,12 @@ const createHomeStyles = (colors: typeof lightColors) => StyleSheet.create({
   halfHourLine: { ...baseStyles.halfHourLine, borderBottomColor: colors.timelineGrid },
   nowLine: { ...baseStyles.nowLine, backgroundColor: colors.now },
   nowDot: { ...baseStyles.nowDot, backgroundColor: colors.now },
+  dragTargetLine: { ...baseStyles.dragTargetLine, backgroundColor: colors.action },
+  dragTargetLineMagnetized: { backgroundColor: colors.selectionIndicator, height: 2 },
+  dragTargetLabel: { ...baseStyles.dragTargetLabel, backgroundColor: colors.action },
+  dragTargetLabelMagnetized: { backgroundColor: colors.selection },
+  dragTargetLabelText: { ...baseStyles.dragTargetLabelText, color: colors.onAction },
+  dragTargetLabelTextMagnetized: { color: colors.onAction },
 });
 
 export const lightHomeStyles = createHomeStyles(lightColors);
