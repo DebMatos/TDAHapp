@@ -299,6 +299,7 @@ export default function TimelineScreen() {
   const [viewportWidth, setViewportWidth] = useState(0);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [dragPreview, setDragPreview] = useState(null);
 
   const [ppm, setPpm] = useState(DEFAULT_PPM);
 
@@ -1162,6 +1163,7 @@ export default function TimelineScreen() {
                 layoutStyle={taskHorizontalLayouts.get(task.id)}
                 onChangeStart={handleDragEnd}
                 onDragStateChange={setIsDragging}
+                onDragPreview={setDragPreview}
                 onToggle={(taskId) => {
                   suppressTimelineCreateRef.current = true;
                   toggleTaskComplete(taskId);
@@ -1177,6 +1179,33 @@ export default function TimelineScreen() {
                 getMinuteFromY={getMinuteFromY}
               />
             ))}
+
+            {dragPreview && (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.dragTargetLine,
+                  dragPreview.isMagnetized && styles.dragTargetLineMagnetized,
+                  { top: getVisualY(dragPreview.minute) },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.dragTargetLabel,
+                    dragPreview.isMagnetized && styles.dragTargetLabelMagnetized,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dragTargetLabelText,
+                      dragPreview.isMagnetized && styles.dragTargetLabelTextMagnetized,
+                    ]}
+                  >
+                    {formatTimeFromMinutes(dragPreview.minute)}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* LINHA AGORA */}
 

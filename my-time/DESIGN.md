@@ -140,6 +140,13 @@ time and duration even when visual text is hidden. Android status-bar icons foll
 the resolved app theme through the existing `expo-status-bar` dependency; no native
 navigation-bar styling or system-theme configuration is changed in this step.
 
+Dragging a task keeps minute-level precision. A horizontal target line and a compact
+`HH:MM` label preview the exact saved start time above the dragged card. Full and
+half hours attract within a fixed visual distance at every zoom level; a wider
+release distance prevents oscillation, and the selection tokens mark an active
+magnet without replacing the task's category color. Task Details remains the
+non-drag path for precise time changes.
+
 Task sheets share presentation through `theme/styles/taskSheets.styles.js`:
 surface, backdrop, top corners (22 px), handle (42 × 4), content inset (18 px), and
 44-pixel buttons.

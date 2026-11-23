@@ -41,20 +41,85 @@ export const formatDuration = (minutes) => {
 export const snapMinutes = (minutes, step = SNAP_MINUTES) =>
   Math.round(minutes / step) * step;
 
-// Converte um deslocamento vertical em hora de início na timeline 07:00 → 07:00.
-// Limita o cartão no espaço visual antes de converter para hora civil.
-export const getDraggedTimelineStart = (startMinute, deltaY, ppm, durationMinutes) => {
+const MAGNET_INTERVAL_MINUTES = 30;
+const MAGNET_CAPTURE_PX = 8;
+const MAGNET_RELEASE_PX = 14;
+
+const getTimelineOffset = (minute) =>
+  ((minute - TIMELINE_START_MINUTES) % DAY_MINUTES + DAY_MINUTES) % DAY_MINUTES;
+
+export const getDraggedTimelinePosition = (
+  startMinute,
+  deltaY,
+  ppm,
+  durationMinutes,
+  activeMagnetMinute = null,
+  suppressedMagnetMinute = null,
+) => {
   if (!Number.isFinite(ppm) || ppm <= 0) {
     throw new RangeError('A escala da timeline tem de ser positiva.');
   }
-  const startOffset = ((startMinute - TIMELINE_START_MINUTES) % DAY_MINUTES + DAY_MINUTES) % DAY_MINUTES;
-  const maxOffset = Math.floor(
-    Math.max(0, DAY_MINUTES - Math.max(0, durationMinutes)) / SNAP_MINUTES
-  ) * SNAP_MINUTES;
-  const nextOffset = Math.max(0, Math.min(maxOffset,
-    snapMinutes(startOffset + deltaY / ppm)
-  ));
-  return (TIMELINE_START_MINUTES + nextOffset) % DAY_MINUTES;
+
+  const maxOffset = Math.max(0, DAY_MINUTES - Math.max(0, durationMinutes));
+  const rawOffset = Math.max(
+    0,
+    Math.min(maxOffset, getTimelineOffset(startMinute) + deltaY / ppm),
+  );
+  const activeMagnetOffset = Number.isFinite(activeMagnetMinute)
+    ? getTimelineOffset(activeMagnetMinute)
+    : null;
+  const activeMagnetDistancePx = activeMagnetOffset == null
+    ? Infinity
+    : Math.abs(rawOffset - activeMagnetOffset) * ppm;
+
+  let magnetOffset = null;
+  let nextSuppressedMagnetMinute = suppressedMagnetMinute;
+
+  if (
+    activeMagnetOffset != null &&
+    activeMagnetOffset <= maxOffset &&
+    activeMagnetDistancePx <= MAGNET_RELEASE_PX
+  ) {
+    magnetOffset = activeMagnetOffset;
+  } else {
+    if (activeMagnetOffset != null && activeMagnetDistancePx > MAGNET_RELEASE_PX) {
+      nextSuppressedMagnetMinute = activeMagnetMinute;
+    }
+
+    const candidate = Math.round(rawOffset / MAGNET_INTERVAL_MINUTES) * MAGNET_INTERVAL_MINUTES;
+    const candidateMinute = (TIMELINE_START_MINUTES + candidate) % DAY_MINUTES;
+    const isSuppressed = candidateMinute === nextSuppressedMagnetMinute;
+
+    if (
+      !isSuppressed &&
+      candidate >= 0 &&
+      candidate <= maxOffset &&
+      Math.abs(rawOffset - candidate) * ppm <= MAGNET_CAPTURE_PX
+    ) {
+      magnetOffset = candidate;
+    }
+  }
+
+  const finalOffset = magnetOffset ?? Math.round(rawOffset);
+  const minute = (TIMELINE_START_MINUTES + finalOffset) % DAY_MINUTES;
+
+  return {
+    minute,
+    isMagnetized: magnetOffset != null,
+    magnetMinute: magnetOffset == null ? null : minute,
+    suppressedMagnetMinute: nextSuppressedMagnetMinute,
+  };
+};
+
+// Converte um deslocamento vertical em hora de início na timeline 07:00 → 07:00.
+// Limita o cartão no espaço visual antes de converter para hora civil.
+export const getDraggedTimelineStart = (startMinute, deltaY, ppm, durationMinutes) => {
+  return getDraggedTimelinePosition(
+    startMinute,
+    deltaY,
+    ppm,
+    durationMinutes,
+  ).minute;
 };
 
 
