@@ -23,6 +23,16 @@ test('light: tracking control icons meet non-text contrast', () => {
   assert.ok(contrast(lightColors.text, lightColors.completed) >= 3);
 });
 for (const [theme, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  test(`${theme}: authentication focus border is visible on the input surface`, () => {
+    assert.ok(contrast(colors.selection, colors.input) >= 3,
+      `${colors.selection} on ${colors.input}`);
+  });
+  test(`${theme}: notification switch thumb is distinct in both states`, () => {
+    assert.ok(contrast(colors.selection, colors.selectionSoft) >= 3,
+      `${colors.selection} on ${colors.selectionSoft}`);
+    assert.ok(contrast(colors.textMuted, colors.surfaceMuted) >= 3,
+      `${colors.textMuted} on ${colors.surfaceMuted}`);
+  });
   test(`${theme}: action labels, selected day and Quick Create meet small-text contrast`, () => {
     for (const [text, background] of [[colors.onAction, colors.action], [colors.onAction, colors.selection], [colors.surface, colors.selection]]) {
       assert.ok(contrast(text, background) >= 4.5, `${text} on ${background}`);

@@ -73,17 +73,6 @@ export default function TaskCardClean({
   const visualHeight = Math.max(rawHeight, 4);
 
   /* -------------------------------------------------------
-     TIPO DE CARTÃO
-  ------------------------------------------------------- */
-
-  const isMicroTask = visualHeight < 8;
-
-  const isTinyTask = visualHeight >= 8 && visualHeight < 14;
-
-  const isCompactTask = visualHeight >= 14 && visualHeight < 32;
-
-  const isNormalTask = visualHeight >= 32;
-  /* -------------------------------------------------------
      POSIÇÃO
   ------------------------------------------------------- */
 
@@ -99,11 +88,8 @@ export default function TaskCardClean({
   ------------------------------------------------------- */
 
   const cardWidth = layoutStyle?.width ?? null;
-  const isNarrow = cardWidth != null && cardWidth < 180;
-  const isVeryNarrow = cardWidth != null && cardWidth < 105;
-
   const hasRoomForMeta = visualHeight >= 32;
-  const showCheckbox = !isVeryNarrow;
+  const showCheckbox = visualHeight >= 14 && (cardWidth == null || cardWidth >= 42);
   const showCountdown = Boolean(countdown) && visualHeight >= 14;
 
   /* -------------------------------------------------------
@@ -126,7 +112,7 @@ export default function TaskCardClean({
         <Ionicons
           name="hourglass-outline"
           size={14}
-          color={colors.timelineCountdown}
+          color={colors.selectionText}
           style={styles.countdownIcon}
         />
       )}
@@ -311,175 +297,7 @@ export default function TaskCardClean({
     return null;
   };
 
-  /* -------------------------------------------------------
-     MICRO
-  ------------------------------------------------------- */
-
-  if (isMicroTask) {
-    return (
-      <Animated.View
-        {...responder.panHandlers}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        style={[
-          styles.taskCompact,
-          {
-            top,
-            height: visualHeight,
-            backgroundColor: cardBackground,
-            transform: [{ translateY: dragY }, { scale: scaleAnim }],
-          },
-          horizontalStyle,
-        ]}
-      >
-        <View
-          style={[styles.taskCompactBar, { backgroundColor: accentColor }]}
-        />
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            if (!isDragActive.current) {
-              onPress(task);
-            }
-          }}
-        />
-      </Animated.View>
-    );
-  }
-
-  /* -------------------------------------------------------
-     TINY
-  ------------------------------------------------------- */
-
-  if (isTinyTask) {
-    return (
-      <Animated.View
-        {...responder.panHandlers}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        style={[
-          styles.taskTiny,
-          {
-            top,
-            height: visualHeight,
-            backgroundColor: cardBackground,
-            transform: [{ translateY: dragY }, { scale: scaleAnim }],
-          },
-          horizontalStyle,
-        ]}
-      >
-        <View style={[styles.taskTinyBar, { backgroundColor: accentColor }]} />
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
-          style={styles.tinyClickArea}
-          onPress={() => {
-            if (!isDragActive.current) {
-              onPress(task);
-            }
-          }}
-        >
-          <Text
-            style={[
-              styles.tinyTitle,
-              { color: titleColor },
-              isVeryNarrow && styles.tinyTitleVeryNarrow,
-              isCompleted && styles.taskTitleCompleted,
-              isAbandoned && styles.taskTitleAbandoned,
-            ]}
-            numberOfLines={1}
-          >
-            {task.title}
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }
-
-  /* -------------------------------------------------------
-     COMPACTO
-  ------------------------------------------------------- */
-
-  if (isCompactTask) {
-    return (
-      <Animated.View
-        {...responder.panHandlers}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        style={[
-          styles.taskCompact,
-          {
-            top,
-            height: visualHeight,
-            backgroundColor: cardBackground,
-            transform: [{ translateY: dragY }, { scale: scaleAnim }],
-          },
-          horizontalStyle,
-        ]}
-      >
-        <View
-          style={[styles.taskCompactBar, { backgroundColor: accentColor }]}
-        />
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
-          style={styles.compactClickArea}
-          onPress={() => {
-            if (!isDragActive.current) {
-              onPress(task);
-            }
-          }}
-        >
-          <Text
-            style={[
-              styles.compactTitle,
-              { color: titleColor },
-              isVeryNarrow && styles.compactTitleVeryNarrow,
-              isCompleted && styles.taskTitleCompleted,
-              isAbandoned && styles.taskTitleAbandoned,
-            ]}
-            numberOfLines={1}
-          >
-            {showCountdown
-              ? task.title
-              : isVeryNarrow ? task.title : `${task.title} · ${durationStr}`}
-          </Text>
-          {showCountdown && renderCountdown()}
-        </TouchableOpacity>
-
-        {showCheckbox && (
-          <TouchableOpacity
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: isCompleted }}
-            accessibilityLabel={`Conclusão de ${task.title}. Estado: ${statusLabel}.`}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={() => onToggle(task.id)}
-            style={[
-              styles.compactCheckbox,
-              isAbandoned && styles.abandonedCheckbox,
-            ]}
-          >
-            {renderStatusIcon(8)}
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-    );
-  }
-
-  /* -------------------------------------------------------
-     NORMAL
-  ------------------------------------------------------- */
+  const contentTop = (visualHeight - (hasRoomForMeta ? 28 : 15)) / 2;
 
   return (
     <Animated.View
@@ -489,7 +307,7 @@ export default function TaskCardClean({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       style={[
-        styles.taskNormal,
+        styles.taskCard,
         {
           top,
           height: visualHeight,
@@ -500,133 +318,106 @@ export default function TaskCardClean({
       ]}
     >
       <View style={[styles.taskAccentBar, { backgroundColor: accentColor }]} />
-
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel={`Abrir tarefa ${task.title}. ${category.label}. ${statusLabel}. ${startTimeStr}, ${durationStr}.${countdownAccessibility}`}
-        style={styles.taskBody}
+        style={[
+          styles.taskBody,
+          { paddingTop: visualHeight < 14 ? Math.max(0, (visualHeight - 9) / 2) : Math.max(0, contentTop) },
+          showCheckbox && styles.taskBodyWithCheckbox,
+        ]}
         onPress={() => {
-          if (!isDragActive.current) {
-            onPress(task);
-          }
+          if (!isDragActive.current) onPress(task);
         }}
       >
-<View style={styles.cardTopRow}>
-  <Text
-    style={[
-      styles.taskTitle,
-      { color: titleColor },
-      isNarrow && styles.taskTitleNarrow,
-      isVeryNarrow && styles.taskTitleVeryNarrow,
-      isCompleted && styles.taskTitleCompleted,
-      isAbandoned && styles.taskTitleAbandoned,
-    ]}
-    numberOfLines={1}
-  >
-    {task.title}
-  </Text>
-  {showCountdown && renderCountdown()}
-</View>
-
+        {visualHeight >= 8 && (
+          <View style={styles.cardTopRow}>
+            <Text
+              style={[
+                styles.taskTitle,
+                visualHeight < 15 && styles.taskTitleTiny,
+                { color: titleColor },
+                isCompleted && styles.taskTitleCompleted,
+                isAbandoned && styles.taskTitleAbandoned,
+              ]}
+              numberOfLines={1}
+            >
+              {task.title}
+            </Text>
+            {showCountdown && renderCountdown()}
+          </View>
+        )}
         {hasRoomForMeta && (
-          <Text
-            style={[
-              styles.taskMeta,
-              { color: metaColor },
-              isNarrow && styles.taskMetaNarrow,
-            ]}
-            numberOfLines={1}
-          >
-            {isVeryNarrow
-                ? durationStr
-              : isNarrow
-                ? `${startTimeStr} · ${durationStr}`
-                : `${startTimeStr}–${endTimeStr} · ${durationStr}`}
+          <Text style={[styles.taskMeta, { color: metaColor }]} numberOfLines={1}>
+            {`${startTimeStr}–${endTimeStr} · ${durationStr}`}
           </Text>
         )}
       </TouchableOpacity>
-
       {showCheckbox && (
         <TouchableOpacity
           accessibilityRole="checkbox"
           accessibilityState={{ checked: isCompleted }}
           accessibilityLabel={`Conclusão de ${task.title}. Estado: ${statusLabel}.`}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={hasRoomForMeta ? 10 : 8}
           onPress={() => onToggle(task.id)}
           style={[
-            styles.universalCheckbox,
+            styles.checkbox,
+            { top: Math.max(0, contentTop + 0.5) },
             isAbandoned && styles.abandonedCheckbox,
           ]}
         >
-          {renderStatusIcon(10)}
+          {renderStatusIcon(8)}
         </TouchableOpacity>
       )}
     </Animated.View>
   );
 }
 
-/* -------------------------------------------------------
-   STYLES
-------------------------------------------------------- */
-
 const createStyles = (colors) => StyleSheet.create({
-  /* NORMAL */
-  taskNormal: {
+  taskCard: {
     position: 'absolute',
     borderRadius: 8,
-    borderWidth: 0,
-    paddingLateral: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.taskCardBorder,
     flexDirection: 'row',
-    alignItems: 'center',
     overflow: 'hidden',
   },
-
   taskAccentBar: {
     width: 3,
     alignSelf: 'stretch',
   },
-
   taskBody: {
     flex: 1,
-    alignSelf: 'stretch',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    justifyContent: 'center',
-    transform: [
-      {
-        translateY: -2,
-      },
-    ],
+    minWidth: 0,
+    paddingLeft: 9,
+    paddingRight: 8,
   },
-
+  taskBodyWithCheckbox: {
+    paddingRight: 28,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   taskTitle: {
-    flexShrink: 1,
-    fontSize: 13,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
     fontWeight: '600',
     includeFontPadding: false,
     lineHeight: 15,
   },
-
-  taskTitleNarrow: {
-    fontSize: 12,
+  taskTitleTiny: {
+    fontSize: 8,
+    lineHeight: 9,
   },
-
-  taskTitleVeryNarrow: {
-    fontSize: 10,
-  },
-
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
     color: colors.completed,
   },
-
   taskTitleAbandoned: {
-    textDecorationLine: 'none',
     color: colors.textFaint,
   },
-
   taskMeta: {
     marginTop: 1,
     fontSize: 10,
@@ -634,153 +425,39 @@ const createStyles = (colors) => StyleSheet.create({
     includeFontPadding: false,
     lineHeight: 12,
   },
-
-  taskMetaNarrow: {
-    fontSize: 9,
-  },
-
   countdownIndicator: {
-    flexShrink: 0,
-    marginLeft: 8,
+    maxWidth: '65%',
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 4,
   },
-
   countdownText: {
-    color: colors.timelineCountdown,
+    flexShrink: 1,
+    color: colors.selectionText,
     fontSize: 9,
     lineHeight: 11,
     fontWeight: '700',
     includeFontPadding: false,
     fontVariant: ['tabular-nums'],
   },
-
   countdownIcon: {
     marginRight: 3,
   },
-
-  universalCheckbox: {
-    width: 18,
-    height: 18,
-    marginRight: 10,
-    marginLeft: 4,
-    borderRadius: 4,
-    borderWidth: 1.2,
+  checkbox: {
+    position: 'absolute',
+    right: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1,
     borderColor: colors.taskCardMuted,
     backgroundColor: colors.input,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [
-      {
-        translateY: -2,
-      },
-    ],
   },
-
   abandonedCheckbox: {
     borderColor: colors.textFaint,
     backgroundColor: colors.surfaceSoft,
   },
-
-  /* COMPACT */
-  taskCompact: {
-    position: 'absolute',
-    borderRadius: 3,
-    borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.taskCardBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-
-  taskCompactBar: {
-    width: 3,
-    alignSelf: 'stretch',
-  },
-
-  compactClickArea: {
-    flex: 1,
-    height: '100%',
-    paddingLeft: 9,
-    paddingRight: 6,
-    justifyContent: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    transform: [
-      {
-        translateY: -1,
-      },
-    ],
-  },
-
-  compactTitle: {
-    flex: 1,
-    fontSize: 10,
-    fontWeight: '600',
-    includeFontPadding: false,
-  },
-
-  compactTitleVeryNarrow: {
-    fontSize: 9,
-  },
-
-  compactCheckbox: {
-    width: 14,
-    height: 14,
-
-    marginRight: 8,
-    marginLeft: 3,
-
-    borderRadius: 3,
-    borderWidth: 1,
-
-    borderColor: colors.taskCardMuted,
-    backgroundColor: colors.input,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* TINY */
-  taskTiny: {
-    position: 'absolute',
-    borderRadius: 2,
-    borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.taskCardBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-
-  taskTinyBar: {
-    width: 3,
-    height: '100%',
-  },
-
-  tinyClickArea: {
-    flex: 1,
-    height: '100%',
-    paddingHorizontal: 6,
-    justifyContent: 'center',
-  },
-
-  tinyTitle: {
-    fontSize: 8,
-    lineHeight: 9,
-    fontWeight: '600',
-    includeFontPadding: false,
-  },
-
-  tinyTitleVeryNarrow: {
-    fontSize: 7,
-  },
-
-cardTopRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-
-
 });

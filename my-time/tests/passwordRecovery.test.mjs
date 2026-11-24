@@ -51,6 +51,15 @@ test('auth UI and app shell retain the complete recovery flow', () => {
   assert.match(auth, /O teu dia, ao teu ritmo\./);
   assert.match(auth, /Pirilampo da My Time/);
   assert.match(auth, /Abelha da My Time/);
+  assert.match(auth, /<Image[\s\S]*?style=\{styles\.mascot\}/);
+  assert.doesNotMatch(auth, /<Imagem|style=\{styles\.mascot\}Image/);
+  assert.equal((auth.match(/selectionColor=\{colors\.selection\}/g) || []).length, 2);
+  assert.equal((auth.match(/cursorColor=\{colors\.selection\}/g) || []).length, 2);
+  assert.equal((auth.match(/underlineColorAndroid="transparent"/g) || []).length, 2);
+  assert.match(auth, /fieldFocused: \{ borderColor: colors\.selection \}/);
+  assert.equal((auth.match(/onFocus=\{\(\) => setFocused\(true\)\}/g) || []).length, 2);
+  assert.equal((auth.match(/onBlur=\{\(\) => setFocused\(false\)\}/g) || []).length, 2);
+  assert.equal((auth.match(/outlineStyle: 'none'/g) || []).length, 2);
   assert.match(auth, /<Text style=\{styles\.fieldLabel\}>Email<\/Text>/);
   assert.match(app, /Linking\.getInitialURL\(\)/);
   assert.match(app, /Linking\.addEventListener\('url'/);

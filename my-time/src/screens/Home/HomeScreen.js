@@ -1178,6 +1178,13 @@ export default function TimelineScreen() {
 
             {/* TAREFAS */}
 
+            {isViewingToday && (
+              <View
+                pointerEvents="none"
+                style={[styles.nowLine, styles.nowLineBehindCards, { top: nowTop }]}
+              />
+            )}
+
             {visibleTasks.map((task, index) => (
               <TaskCardClean
                 key={task.id}
@@ -1208,24 +1215,11 @@ export default function TimelineScreen() {
             {dragPreview && (
               <View
                 pointerEvents="none"
-                style={[
-                  styles.dragTargetLine,
-                  dragPreview.isMagnetized && styles.dragTargetLineMagnetized,
-                  { top: getVisualY(dragPreview.minute) },
-                ]}
+                style={[styles.dragTargetLine, { top: getVisualY(dragPreview.minute) }]}
               >
-                <View
-                  style={[
-                    styles.dragTargetLabel,
-                    dragPreview.isMagnetized && styles.dragTargetLabelMagnetized,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dragTargetLabelText,
-                      dragPreview.isMagnetized && styles.dragTargetLabelTextMagnetized,
-                    ]}
-                  >
+                <View style={styles.dragTargetStroke} />
+                <View style={styles.dragTargetLabel}>
+                  <Text style={styles.dragTargetLabelText} numberOfLines={1} maxFontSizeMultiplier={1}>
                     {formatTimeFromMinutes(dragPreview.minute)}
                   </Text>
                 </View>
@@ -1244,6 +1238,8 @@ export default function TimelineScreen() {
                   },
                 ]}
               >
+                {/* A base opaca fica visível nos espaços entre cartões. */}
+                <View style={styles.nowLineTint} />
                 <View style={styles.nowDot} />
 
                 <Image

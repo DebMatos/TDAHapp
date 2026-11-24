@@ -81,6 +81,16 @@ export const addDaysToDateInput = (value, days) => {
   return formatDateForInput(date);
 };
 
+export const postponeSchedule = (date, startTime, minutes) => {
+  const [hours, remainder] = startTime.split(':').map(Number);
+  const total = hours * 60 + remainder + minutes;
+  const withinDay = total % 1440;
+  return {
+    date: addDaysToDateInput(date, Math.floor(total / 1440)),
+    startMinutes: withinDay,
+  };
+};
+
 export const getDateDisplayLabel = (value) => {
   if (value === getTodayDateInput()) {
     return 'Hoje';

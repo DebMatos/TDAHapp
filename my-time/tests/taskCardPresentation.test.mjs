@@ -35,8 +35,8 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
     const rendered = nodes(tree);
 
     assert.equal(rendered.some(node => flattenStyle(node.props.style).backgroundColor === colors.now), false);
-    assert.ok(rendered.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline' && node.props.size === 14 && node.props.color === colors.timelineCountdown));
-    assert.ok(rendered.some(node => flattenStyle(node.props.style).color === colors.timelineCountdown));
+    assert.ok(rendered.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline' && node.props.size === 14 && node.props.color === colors.selectionText));
+    assert.ok(rendered.some(node => flattenStyle(node.props.style).color === colors.selectionText));
     assert.match(
       rendered.find(node => node.props.accessibilityRole === 'button').props.accessibilityLabel,
       /12 min/,
@@ -47,6 +47,16 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
 
     const compact = nodes(render(colors, task, 20, countdown));
     assert.ok(compact.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline'));
+    const checkboxStyle = items => flattenStyle(items.find(node => node.props.accessibilityRole === 'checkbox').props.style);
+    for (const key of ['width', 'height', 'right']) {
+      assert.equal(checkboxStyle(compact)[key], checkboxStyle(rendered)[key]);
+    }
+    const longTitle = 'Título muito comprido para um cartão compacto com um indicador temporal';
+    const overnight = { ...task, title: longTitle, startTime: '23:45' };
+    const compactOvernight = nodes(render(colors, overnight, 20, countdown));
+    assert.equal(compactOvernight.find(node => node.children.includes(longTitle)).props.numberOfLines, 1);
+    assert.equal(compactOvernight.some(node => node.children.includes('23:45–00:15 · 30 min')), false);
+    assert.ok(nodes(render(colors, overnight, 60, countdown)).some(node => node.children.includes('23:45–00:15 · 30 min')));
 
     const tiny = nodes(render(colors, task, 10, countdown));
     assert.equal(tiny.some(node => node.type === 'icon' && node.props.name === 'hourglass-outline'), false);
@@ -57,6 +67,20 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
   });
 }
 const nodes = tree => [tree, ...tree.children.flat(Infinity).filter(value => value && typeof value === 'object').flatMap(nodes)];
+
+test('the opaque now line is drawn beneath cards and the tint and mascot above them', () => {
+  const home = read('screens/Home/HomeScreen.js');
+  const styles = read('screens/Home/HomeScreen.styles.ts');
+  const base = home.indexOf('styles.nowLineBehindCards');
+  const cards = home.indexOf('<TaskCardClean');
+  const overlay = home.indexOf('styles.nowLineTint');
+  assert.ok(base >= 0 && base < cards && cards < overlay);
+  assert.match(home, /pointerEvents="none"\s+style=\{\[styles.nowLine, styles.nowLineBehindCards, \{ top: nowTop \}\]\}/);
+  assert.match(home.slice(cards, overlay), /pointerEvents="none"\s+style=\{\[\s+styles.nowLine,\s+\{\s+top: nowTop/);
+  assert.match(home.slice(overlay), /<Image[\s\S]*?styles.nowBeeImage/);
+  assert.match(styles, /nowLineTint: \{ height: '100%', opacity: 0\.12 \}/);
+});
+
 const flattenStyle = style => Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean).map(flattenStyle)) : style ?? {};
 for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
   test(`${name}: category accents survive every task state and zoom variant`, () => {

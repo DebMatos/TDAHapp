@@ -171,6 +171,7 @@ const commit = async (buildNextState) => {
   const savedState = await enqueueWrite(async () => {
     const state = await getState(owner);
     const nextState = buildNextState(state);
+    if (nextState === state) return state;
 
     const pendingOps = [...state.pendingOps];
     const now = Date.now();
@@ -337,6 +338,7 @@ const commitTaskUpdate = async (taskId, buildUpdatedTask) => {
     }
 
     const updatedTask = buildUpdatedTask(currentTask);
+    if (updatedTask === currentTask) return state;
 
     return {
       ...state,
@@ -358,6 +360,18 @@ export const updateTask = async (taskId, changes) => {
     task => updateTaskModel(task, changes),
   );
   return savedState.tasks.find(task => task.id === taskId);
+};
+
+export const updateTaskFromReminder = async (userId, taskId, buildChanges) => {
+  if (taskUserId !== userId) return;
+  try {
+    await commitTaskUpdate(taskId, task => {
+      const changes = buildChanges(task);
+      return changes ? updateTaskModel(task, changes) : task;
+    });
+  } catch (error) {
+    if (!['TASK_NOT_FOUND', 'LOCAL_USER_CHANGED'].includes(error.code)) throw error;
+  }
 };
 
 export const updateTaskAndLoadTasks = async (taskId, changes) => {

@@ -1,4 +1,5 @@
 import { registerRootComponent } from 'expo';
+import './src/services/taskReminders';
 
 import App from './App';
 
