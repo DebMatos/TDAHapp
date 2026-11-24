@@ -157,16 +157,33 @@ export const saveReminderPreferences = preferences => serialize(async () => {
   await reconcile();
 });
 
+async function ensureIdentity() {
+  if (owner !== undefined) return;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (owner !== undefined) return;
+  owner = data.session?.user?.id ?? null;
+  setTaskRepositoryUser(owner);
+  resolveIdentity();
+}
+
 async function handleResponse(response) {
   const request = response?.notification?.request;
   const data = request?.content?.data;
   const minutes = actions.find(value => String(value) === response?.actionIdentifier);
   if (data?.kind !== category || !minutes) return;
+  await ensureIdentity();
   await identityReady;
   await serialize(async () => {
     const preferences = await readReminderPreferences();
-    if (!owner || owner !== data.userId || !preferences.enabled || preferences.lead !== data.lead) return;
-    await updateTaskFromReminder(owner, data.taskId, task => {
+    if (!owner || owner !== data.userId || !preferences.enabled || preferences.lead !== data.lead) {
+      diagnostic('ação ignorada', {
+        taskId: data.taskId, notificationId: request.identifier, minutes,
+        reason: 'contexto-inválido',
+      });
+      return;
+    }
+    const applied = await updateTaskFromReminder(owner, data.taskId, task => {
       if (task.status !== 'pending' || reminderVersion(task) !== data.version) return null;
       const schedule = postponeSchedule(formatDateForInput(task.date), task.startTime, minutes);
       return {
@@ -174,8 +191,9 @@ async function handleResponse(response) {
         startTime: formatTimeFromMinutes(schedule.startMinutes),
       };
     });
-    diagnostic('ação aplicada', {
+    diagnostic(applied ? 'ação aplicada' : 'ação ignorada', {
       taskId: data.taskId, notificationId: request.identifier, minutes,
+      ...(!applied && { reason: 'tarefa-ausente-ou-desatualizada' }),
     });
     await Notifications.dismissNotificationAsync(request.identifier);
     await reconcile();
@@ -188,9 +206,8 @@ Notifications.setNotificationHandler({
   }),
 });
 Notifications.addNotificationResponseReceivedListener(response => {
-  // Android also dispatches background responses to TaskManager. Give that
-  // executor ownership so two runtimes do not write the local snapshot.
-  if (Platform.OS === 'android' && AppState.currentState !== 'active') return;
+  // Android may dispatch the same action to this listener and TaskManager.
+  // The notification version makes the local update idempotent.
   void handleResponse(response).catch(report);
 });
 Notifications.addNotificationReceivedListener(notification => {

@@ -7,6 +7,13 @@ const load = code => import('data:text/javascript;base64,' + Buffer.from(code).t
 const plan = await load(source('services/taskReminderPlan.js'));
 const dates = await load(source('utils/taskDateInput.js'));
 const code = source('services/taskReminders.native.js').replace(/^import [\s\S]*?;\n/gm, '').replace(/export /g, '');
+const until = async predicate => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (predicate()) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.fail('condition was not reached');
+};
 
 test('holds one reminder per task, reconciles settings and applies one offline action', async () => {
   let task = { id: 'a', date: '2090-03-10', startTime: '15:00', durationMinutes: 30, status: 'pending', title: 'Estudar Go' };
@@ -42,7 +49,10 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       },
     },
     TaskManager: { defineTask: (_, fn) => { background = fn; }, isTaskRegisteredAsync: async () => false },
-    supabase: { auth: { onAuthStateChange: fn => { auth = fn; } } },
+    supabase: { auth: {
+      onAuthStateChange: fn => { auth = fn; },
+      getSession: async () => ({ data: { session: { user: { id: 'user' } } }, error: null }),
+    } },
     setTaskRepositoryUser() {}, subscribeTasks() {},
     loadTasksSnapshot: async () => ({ tasks: task ? [task] : [] }),
     updateTaskFromReminder: async (user, id, build) => {
@@ -50,6 +60,7 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       assert.equal(id, task.id);
       const changes = build(task);
       if (changes) { writes++; task = { ...task, ...changes, updatedAt: String(writes) }; }
+      return Boolean(changes);
     },
     formatTimeFromMinutes: minutes => [Math.floor(minutes / 60), minutes % 60].map(value => String(value).padStart(2, '0')).join(':'),
   };
@@ -65,15 +76,29 @@ test('holds one reminder per task, reconciles settings and applies one offline a
   assert.equal(scheduled.size, 0);
   assert.deepEqual(await api.readReminderPreferences(), { enabled: false, lead: 5, unit: 'minutes' });
   await api.saveReminderPreferences({ enabled: true, lead: 5 });
-  for (const [actionIdentifier, startTime, fireAt] of [
-    ['5', '15:05', '15:00'], ['15', '15:20', '15:15'], ['30', '15:50', '15:45'],
+  context.AppState.currentState = 'background';
+  let expectedWrites = 0;
+  for (const [actionIdentifier, startTime, fireAt, executor] of [
+    ['5', '15:05', '15:00', 'listener'],
+    ['15', '15:20', '15:15', 'task'],
+    ['30', '15:50', '15:45', 'listener'],
   ]) {
     const response = { actionIdentifier, notification: { request: only() } };
-    listener(response);
-    await background({ data: response });
+    expectedWrites += 1;
+    if (executor === 'listener') listener(response);
+    else await background({ data: response });
+    await until(() => writes === expectedWrites);
     assert.equal(task.startTime, startTime);
     assert.equal(task.durationMinutes, 30);
     assert.equal(only().trigger.date, at(fireAt));
+
+    if (executor === 'listener') await background({ data: response });
+    else {
+      listener(response);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    await until(() => scheduled.size === 1);
+    assert.equal(writes, expectedWrites);
   }
   assert.equal(writes, 3);
   const stale = only();

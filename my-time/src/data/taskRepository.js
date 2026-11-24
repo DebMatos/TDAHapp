@@ -363,15 +363,20 @@ export const updateTask = async (taskId, changes) => {
 };
 
 export const updateTaskFromReminder = async (userId, taskId, buildChanges) => {
-  if (taskUserId !== userId) return;
+  if (taskUserId !== userId) return false;
+  let applied = false;
   try {
     await commitTaskUpdate(taskId, task => {
       const changes = buildChanges(task);
-      return changes ? updateTaskModel(task, changes) : task;
+      if (!changes) return task;
+      applied = true;
+      return updateTaskModel(task, changes);
     });
   } catch (error) {
     if (!['TASK_NOT_FOUND', 'LOCAL_USER_CHANGED'].includes(error.code)) throw error;
+    return false;
   }
+  return applied;
 };
 
 export const updateTaskAndLoadTasks = async (taskId, changes) => {
