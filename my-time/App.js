@@ -11,6 +11,7 @@ import { parsePasswordRecoveryUrl } from './src/auth/passwordRecovery';
 import { supabase } from './src/lib/supabase';
 import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
+import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import {
@@ -253,6 +254,7 @@ function AppContent() {
             >
               <Drawer.Screen name="Home" component={HomeScreen} />
               <Drawer.Screen name="SyncStatus" component={SyncStatusScreen} />
+              <Drawer.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
               <Drawer.Screen name="TaskSessionHistory" component={TaskSessionHistoryScreen} />
             </Drawer.Navigator>
           </NavigationContainer>

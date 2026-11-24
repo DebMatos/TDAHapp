@@ -37,6 +37,7 @@ import {
   dateInputToStorageDate,
   addDaysToDateInput,
   getDateDisplayLabel,
+  postponeSchedule,
 } from '../../utils/taskDateInput';
 
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
@@ -831,15 +832,9 @@ export default function TaskDetailsModal({
       return;
     }
 
-    const baseStart = parseTime(base.startTime);
+    const { date, startMinutes: nextStart } = postponeSchedule(base.date, base.startTime, option.minutes);
 
-    const rawStart = baseStart + option.minutes;
-
-    const dayOffset = Math.floor(rawStart / DAY_MINUTES);
-
-    const nextStart = normalizeMinutes(rawStart);
-
-    setDateValue(addDaysToDateInput(base.date, dayOffset));
+    setDateValue(date);
 
     setStartTime(formatTime(nextStart));
 

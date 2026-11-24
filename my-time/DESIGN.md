@@ -80,6 +80,15 @@ Colors come from `src/theme/colors.js`.
 
 ## Components
 
+Settings groups notification controls on the existing surface. The numeric lead
+and its inline unit selector share one soft surface, with small shortcuts beneath.
+Selection uses the active theme's selection tokens; in light mode the selected unit
+uses the filled selection treatment while dark mode retains the softer selection
+surface. The native notification switch maps both track states and its thumb to
+theme tokens, using `selection` on the active thumb and `selectionSoft` on its
+track. A valid edit saves on completion, and operating-system authorization has
+its own compact inline recovery action.
+
 Authentication uses one quiet, centered surface in both themes. The current theme's
 mascot sits beside the My Time wordmark and the line “O teu dia, ao teu ritmo.” above
 the form. Login, account creation, recovery request and new-password states reuse the
@@ -140,18 +149,26 @@ time and duration even when visual text is hidden. Android status-bar icons foll
 the resolved app theme through the existing `expo-status-bar` dependency; no native
 navigation-bar styling or system-theme configuration is changed in this step.
 
-Only today's single relevant pending task shows a contextual countdown. Before its
-start, the next pending card reads “em X min” or “daqui a Xh Ym”; while its planned
-block contains the present, the same card reads “falta/faltam X min”. The active
-label uses the existing `now` honey with the shared `onNow` dark text role. Compact
-cards fall back to inline text rather than overlapping controls, and all other
-cards remain unchanged. The label updates on minute boundaries and is included in
-the relevant card's accessible name.
+Only today's current pending task and closest future pending task show contextual
+countdowns, and both may appear simultaneously. The current task uses its planned
+end, reads “X min” or “Xh Y min”, and includes a static 14 px `hourglass-outline`
+icon. The next task always uses its planned start and reads “daqui a X min” or
+“daqui a Xh Y min”, without an icon. Both indicators use the shared
+`selectionText` theme color, matching typography, and no background,
+border or pill geometry. They remain right-aligned immediately before the checkbox;
+the task title truncates instead of overlapping either element. Cards too short to
+render legible text retain the countdown in their accessible name. All other cards
+use the same card structure. A compact card omits secondary metadata. The current
+time line has an opaque base behind the cards and a 12% tint above them, with
+the mascot and dot on the upper layer at full opacity.
+Values update on minute boundaries and never depend on recorded
+execution time or change task/tracking state.
 Dragging a task keeps minute-level precision. A horizontal target line and a compact
-`HH:MM` label preview the exact saved start time above the dragged card. Full and
+`HH:MM` label preview the exact saved start time, with the label centered on the
+1 px guide just left of the time rail. The guide uses selection at 40% and the
+label uses selectionSoft with selectionText. Full and
 half hours attract within a fixed visual distance at every zoom level; a wider
-release distance prevents oscillation, and the selection tokens mark an active
-magnet without replacing the task's category color. Task Details remains the
+release distance prevents oscillation. Task Details remains the
 non-drag path for precise time changes.
 
 Task sheets share presentation through `theme/styles/taskSheets.styles.js`:

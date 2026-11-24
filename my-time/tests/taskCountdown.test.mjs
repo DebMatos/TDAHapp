@@ -6,7 +6,7 @@ const source = fs.readFileSync(
   new URL('../src/utils/taskCountdown.js', import.meta.url),
   'utf8',
 );
-const { formatTaskCountdown, getContextualTaskCountdown } = await import(
+const { formatTaskCountdown, getContextualTaskCountdowns } = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 );
 
@@ -19,64 +19,77 @@ const task = (overrides) => ({
   ...overrides,
 });
 
-test('selects only the next pending task and ignores finished states', () => {
-  const result = getContextualTaskCountdown([
+test('selects the closest future pending task and ignores finished states', () => {
+  const result = getContextualTaskCountdowns([
     task({ id: 'completed', startTime: '11:00', status: 'completed' }),
     task({ id: 'later', startTime: '13:00' }),
     task({ id: 'next', startTime: '12:15' }),
   ], new Date('2026-11-22T12:00:00'));
 
-  assert.deepEqual(result, {
+  assert.deepEqual(result, [{
     taskId: 'next',
     phase: 'upcoming',
     minutes: 15,
-    label: 'em 15 min',
-  });
+    label: 'daqui a 15 min',
+  }]);
 });
 
-test('keeps the same task while now is inside its planned block', () => {
-  const result = getContextualTaskCountdown([
+test('returns current and closest future tasks at the same time', () => {
+  const result = getContextualTaskCountdowns([
     task({ id: 'current', startTime: '11:50', durationMinutes: 30 }),
     task({ id: 'next', startTime: '12:30' }),
   ], new Date('2026-11-22T12:00:30'));
 
-  assert.deepEqual(result, {
-    taskId: 'current',
-    phase: 'current',
-    minutes: 20,
-    label: 'faltam 20 min',
-  });
+  assert.deepEqual(result, [
+    { taskId: 'current', phase: 'current', minutes: 20, label: '20 min' },
+    { taskId: 'next', phase: 'upcoming', minutes: 30, label: 'daqui a 30 min' },
+  ]);
 });
 
 test('moves to the following task when the current planned block ends', () => {
-  const result = getContextualTaskCountdown([
+  const result = getContextualTaskCountdowns([
     task({ id: 'ended', startTime: '11:30', durationMinutes: 30 }),
     task({ id: 'next', startTime: '12:10' }),
   ], new Date('2026-11-22T12:00:00'));
 
-  assert.equal(result.taskId, 'next');
-  assert.equal(result.label, 'em 10 min');
+  assert.equal(result[0].taskId, 'next');
+  assert.equal(result[0].label, 'daqui a 10 min');
 });
 
-test('formats longer waits and singular remaining time naturally', () => {
-  assert.equal(formatTaskCountdown(75, 'upcoming'), 'daqui a 1h 15m');
+test('formats both phases with the same minute notation', () => {
+  assert.equal(formatTaskCountdown(75, 'upcoming'), 'daqui a 1h 15 min');
   assert.equal(formatTaskCountdown(120, 'upcoming'), 'daqui a 2h');
-  assert.equal(formatTaskCountdown(1, 'current'), 'falta 1 min');
+  assert.equal(formatTaskCountdown(75, 'current'), '1h 15 min');
+  assert.equal(formatTaskCountdown(1, 'current'), '1 min');
+});
+
+test('a newly started task becomes current while the next future task advances', () => {
+  const result = getContextualTaskCountdowns([
+    task({ id: 'earlier', startTime: '11:45', durationMinutes: 60 }),
+    task({ id: 'new-current', startTime: '12:00', durationMinutes: 30 }),
+    task({ id: 'next', startTime: '12:20' }),
+  ], new Date('2026-11-22T12:00:00'));
+
+  assert.deepEqual(result.map(({ taskId, phase }) => ({ taskId, phase })), [
+    { taskId: 'new-current', phase: 'current' },
+    { taskId: 'next', phase: 'upcoming' },
+  ]);
 });
 
 test('returns no countdown when no pending task remains', () => {
-  assert.equal(getContextualTaskCountdown([
+  assert.deepEqual(getContextualTaskCountdowns([
     task({ status: 'completed' }),
     task({ id: 'past', startTime: '10:00', durationMinutes: 30 }),
-  ], new Date('2026-11-22T12:00:00')), null);
+  ], new Date('2026-11-22T12:00:00')), []);
 });
 
 test('home assigns the countdown to one matching card and hides it off today', () => {
   const home = fs.readFileSync(new URL('../src/screens/Home/HomeScreen.js', import.meta.url), 'utf8');
   const card = fs.readFileSync(new URL('../src/components/TaskCardClean.js', import.meta.url), 'utf8');
 
-  assert.match(home, /isViewingToday\s*\? getContextualTaskCountdown\(visibleTasks, now\)/);
-  assert.match(home, /contextualCountdown\?\.taskId === task\.id \? contextualCountdown : null/);
+  assert.match(home, /isViewingToday\s*\? getContextualTaskCountdowns\(visibleTasks, now\)/);
+  assert.match(home, /contextualCountdowns\.find\(\(item\) => item\.taskId === task\.id\)/);
   assert.match(card, /countdown\.phase === 'current'/);
+  assert.match(card, /name="hourglass-outline"/);
   assert.match(card, /countdownAccessibility/);
 });

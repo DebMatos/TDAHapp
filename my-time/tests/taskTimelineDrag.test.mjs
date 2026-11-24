@@ -102,5 +102,14 @@ test('task card reports the same preview position that it persists', () => {
   assert.match(card, /onDragPreview\?\.\(position\)/);
   assert.match(card, /onChangeStart\(task\.id, position\.minute\)/);
   assert.match(home, /formatTimeFromMinutes\(dragPreview\.minute\)/);
-  assert.match(home, /styles\.dragTargetLineMagnetized/);
+  assert.match(home, /pointerEvents="none"\s+style=\{\[styles\.dragTargetLine, \{ top: getVisualY\(dragPreview\.minute\) \}\]\}/);
+});
+
+test('drag guide centers the label on the same thin stroke in both themes', () => {
+  const styles = fs.readFileSync(new URL('../src/screens/Home/HomeScreen.styles.ts', import.meta.url), 'utf8');
+  assert.match(styles, /left: AXIS_WIDTH, right: 0, height: 1/);
+  assert.match(styles, /marginRight: 4, top: -12,\s+height: 25/);
+  assert.match(styles, /dragTargetStroke: \{ height: '100%', opacity: 0\.4 \}/);
+  assert.match(styles, /dragTargetStroke: \{ \.\.\.baseStyles\.dragTargetStroke, backgroundColor: colors\.selection \}/);
+  assert.match(styles, /dragTargetLabelText: \{ \.\.\.baseStyles\.dragTargetLabelText, color: colors\.selectionText \}/);
 });

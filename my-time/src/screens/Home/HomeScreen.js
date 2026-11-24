@@ -54,7 +54,7 @@ import {
 } from '../../utils/timelineDate';
 import { roundTimestampToMinuteMs } from '../../domain/taskSessionModel';
 import { getChronometerDurationMs } from '../../utils/trackingChronometer';
-import { getContextualTaskCountdown } from '../../utils/taskCountdown';
+import { getContextualTaskCountdowns } from '../../utils/taskCountdown';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
@@ -471,10 +471,10 @@ export default function TimelineScreen() {
     });
   }, [tasks, selectedTimelineDateKey]);
 
-  const contextualCountdown = useMemo(
+  const contextualCountdowns = useMemo(
     () => isViewingToday
-      ? getContextualTaskCountdown(visibleTasks, now)
-      : null,
+      ? getContextualTaskCountdowns(visibleTasks, now)
+      : [],
     [isViewingToday, timelineNow, visibleTasks],
   );
 
@@ -1178,6 +1178,13 @@ export default function TimelineScreen() {
 
             {/* TAREFAS */}
 
+            {isViewingToday && (
+              <View
+                pointerEvents="none"
+                style={[styles.nowLine, styles.nowLineBehindCards, { top: nowTop }]}
+              />
+            )}
+
             {visibleTasks.map((task, index) => (
               <TaskCardClean
                 key={task.id}
@@ -1185,7 +1192,7 @@ export default function TimelineScreen() {
                 ppm={ppm}
                 themeIndex={index}
                 layoutStyle={taskHorizontalLayouts.get(task.id)}
-                countdown={contextualCountdown?.taskId === task.id ? contextualCountdown : null}
+                countdown={contextualCountdowns.find((item) => item.taskId === task.id) ?? null}
                 onChangeStart={handleDragEnd}
                 onDragStateChange={setIsDragging}
                 onDragPreview={setDragPreview}
@@ -1208,24 +1215,11 @@ export default function TimelineScreen() {
             {dragPreview && (
               <View
                 pointerEvents="none"
-                style={[
-                  styles.dragTargetLine,
-                  dragPreview.isMagnetized && styles.dragTargetLineMagnetized,
-                  { top: getVisualY(dragPreview.minute) },
-                ]}
+                style={[styles.dragTargetLine, { top: getVisualY(dragPreview.minute) }]}
               >
-                <View
-                  style={[
-                    styles.dragTargetLabel,
-                    dragPreview.isMagnetized && styles.dragTargetLabelMagnetized,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dragTargetLabelText,
-                      dragPreview.isMagnetized && styles.dragTargetLabelTextMagnetized,
-                    ]}
-                  >
+                <View style={styles.dragTargetStroke} />
+                <View style={styles.dragTargetLabel}>
+                  <Text style={styles.dragTargetLabelText} numberOfLines={1} maxFontSizeMultiplier={1}>
                     {formatTimeFromMinutes(dragPreview.minute)}
                   </Text>
                 </View>
@@ -1244,6 +1238,8 @@ export default function TimelineScreen() {
                   },
                 ]}
               >
+                {/* A base opaca fica visível nos espaços entre cartões. */}
+                <View style={styles.nowLineTint} />
                 <View style={styles.nowDot} />
 
                 <Image

@@ -70,6 +70,15 @@ export function DrawerNavContent(props) {
           <Ionicons name="cloud-done-outline" size={20} color={colors.textSecondary} />
           <Text style={[styles.navItemText, { color: colors.text }]}>Sincronização</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => props.navigation.navigate('NotificationSettings')}
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.navItemText, { color: colors.text }]}>Definições</Text>
+        </TouchableOpacity>
       </DrawerContentScrollView>
       {/* <Rodapé do Menu (Terminar Sessão) */}
       <View style={[styles.footer, { borderTopColor: colors.borderSoft }]}>

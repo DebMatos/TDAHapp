@@ -6,13 +6,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PASSWORD_RECOVERY_REDIRECT } from '../auth/passwordRecovery';
 import { supabase } from '../lib/supabase';
@@ -32,20 +32,26 @@ const friendlyError = (fallback) => {
 
 function PasswordField({ value, onChangeText, placeholder, autoComplete, visible,
   onToggleVisibility, editable, styles, colors }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{placeholder}</Text>
-      <View style={styles.passwordField}>
+      <View style={[styles.passwordField, focused && styles.fieldFocused]}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder="••••••••"
           placeholderTextColor={colors.placeholder}
+          selectionColor={colors.selection}
+          cursorColor={colors.selection}
+          underlineColorAndroid="transparent"
           secureTextEntry={!visible}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete={autoComplete}
           editable={editable}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           style={styles.passwordInput}
           accessibilityLabel={placeholder}
         />
@@ -92,7 +98,7 @@ export default function AuthScreen({
 
   const signIn = async () => {
     if (!email.trim() || !password) {
-      setNotice({ tone: 'error', text: 'Preenche o email e a palavra-passe.' });
+      setNotice({ tone: 'error', text: 'Preenche o email e palavra-passe.' });
       return;
     }
     setNotice(null);
@@ -109,7 +115,7 @@ export default function AuthScreen({
 
   const signUp = async () => {
     if (!email.trim() || !password) {
-      setNotice({ tone: 'error', text: 'Preenche o email e a palavra-passe.' });
+      setNotice({ tone: 'error', text: 'Preenche o email e palavra-passe.' });
       return;
     }
     setNotice(null);
@@ -294,7 +300,7 @@ export default function AuthScreen({
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.brand} accessibilityRole="header">
             <Image
-              source={isDark ? require('../../assets/pirilampo.png') : require('../../assets/abelha.png')}
+              source={isDark ? require('../../assets/prilampoInicio.png') : require('../../assets/abelhaInicio.png')}
               style={styles.mascot}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
@@ -316,14 +322,18 @@ export default function AuthScreen({
 }
 
 function EmailField({ email, setEmail, editable, styles, colors }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>Email</Text>
       <TextInput
         value={email} onChangeText={setEmail} placeholder="nome@exemplo.pt"
-        placeholderTextColor={colors.placeholder} keyboardType="email-address"
+        placeholderTextColor={colors.placeholder} selectionColor={colors.selection}
+        cursorColor={colors.selection} underlineColorAndroid="transparent"
+        keyboardType="email-address"
         autoCapitalize="none" autoCorrect={false} autoComplete="email"
-        editable={editable} style={styles.input} accessibilityLabel="Email"
+        editable={editable} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={[styles.input, focused && styles.fieldFocused]} accessibilityLabel="Email"
       />
     </View>
   );
@@ -367,9 +377,10 @@ const createStyles = (colors) => StyleSheet.create({
   requirement: { marginBottom: 2, fontSize: 13, lineHeight: 18, color: colors.textSecondary },
   fieldGroup: { gap: 7 },
   fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: colors.textSecondary },
-  input: { height: 50, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.input, color: colors.text },
+  input: { height: 50, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.input, color: colors.text, ...Platform.select({ web: { outlineStyle: 'none' }, default: {} }) },
   passwordField: { height: 50, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.input },
-  passwordInput: { flex: 1, height: '100%', paddingLeft: 14, paddingRight: 6, color: colors.text },
+  passwordInput: { flex: 1, height: '100%', paddingLeft: 14, paddingRight: 6, color: colors.text, ...Platform.select({ web: { outlineStyle: 'none' }, default: {} }) },
+  fieldFocused: { borderColor: colors.selection },
   visibilityButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   forgotButton: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingLeft: 12 },
   forgotButtonText: { fontSize: 14, fontWeight: '600', color: colors.action },
