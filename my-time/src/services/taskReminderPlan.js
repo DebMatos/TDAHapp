@@ -30,13 +30,14 @@ export function reminderPlan(task, lead, now, userId, kind) {
   if (!Number.isFinite(fireAt) || fireAt <= now) return null;
   const version = reminderVersion(task);
   const key = JSON.stringify([kind, userId, version, fireAt, lead, task.title]);
+  const plannedAt = `${task.date}T${task.startTime}:00`;
   return {
-    key, fireAt,
+    key, fireAt, taskId: task.id, plannedAt,
     content: {
       title: task.title,
       body: lead ? `A tua tarefa começa dentro de ${describeLead(lead)}.` : 'A tua tarefa começa agora.',
       categoryIdentifier: kind,
-      data: { kind, key, userId, taskId: task.id, version, lead },
+      data: { kind, key, userId, taskId: task.id, version, lead, plannedAt, fireAt },
     },
   };
 }

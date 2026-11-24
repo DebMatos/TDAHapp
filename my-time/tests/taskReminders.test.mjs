@@ -24,7 +24,10 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       AndroidImportance: { DEFAULT: 3 }, SchedulableTriggerInputTypes: { DATE: 'date' },
       setNotificationHandler() {}, addNotificationReceivedListener() {},
       addNotificationResponseReceivedListener: fn => { listener = fn; },
-      registerTaskAsync: async () => {}, getPermissionsAsync: async () => ({ granted: true }),
+      registerTaskAsync: async () => {},
+      getPermissionsAsync: async () => ({ granted: true }),
+      getExactAlarmPermissionsAsync: async () => ({ granted: true }),
+      requestExactAlarmPermissionsAsync: async () => ({ granted: true }),
       getAllScheduledNotificationsAsync: async () => [...scheduled.values()],
       cancelScheduledNotificationAsync: async id => scheduled.delete(id),
       getPresentedNotificationsAsync: async () => [], dismissNotificationAsync: async () => {},
@@ -106,4 +109,50 @@ test('past alerts are skipped and postponement crosses midnight as a civil sched
   const task = { date: '2090-12-31', startTime: '23:55', durationMinutes: 30, status: 'pending' };
   assert.equal(plan.reminderPlan(task, 15, new Date('2090-12-31T23:50:00').getTime(), 'user', 'kind'), null);
   assert.deepEqual(dates.postponeSchedule('31/12/2090', '23:55', 15), { date: '01/01/2091', startMinutes: 10 });
+});
+
+test('planned notification diagnostics keep task and planned timestamps', () => {
+  const task = {
+    id: 'diagnostic', title: 'Teste', date: '2090-03-10', startTime: '15:00',
+    durationMinutes: 30, status: 'pending', updatedAt: '1',
+  };
+  const result = plan.reminderPlan(task, 15, 0, 'user', 'kind');
+  assert.equal(result.taskId, 'diagnostic');
+  assert.equal(result.plannedAt, '2090-03-10T15:00:00');
+  assert.equal(result.content.data.plannedAt, result.plannedAt);
+  assert.equal(result.content.data.fireAt, result.fireAt);
+});
+
+test('Android does not apply the iOS pending-notification safety limit', () => {
+  assert.match(code, /Platform\.OS === 'ios' \? plans\.slice\(0, 60\) : plans/);
+});
+
+test('service checks and requests exact alarms after notification permission', async () => {
+  let exactGranted = false;
+  let exactRequests = 0;
+  const context = {
+    ...plan, ...dates,
+    AsyncStorage: { getItem: async () => null, setItem: async () => {} },
+    AppState: { currentState: 'active', addEventListener() {} }, Platform: { OS: 'android' },
+    Notifications: {
+      AndroidImportance: { DEFAULT: 3 }, SchedulableTriggerInputTypes: { DATE: 'date' },
+      setNotificationHandler() {}, addNotificationReceivedListener() {},
+      addNotificationResponseReceivedListener() {}, setNotificationChannelAsync: async () => {},
+      getPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
+      requestPermissionsAsync: async () => ({ granted: true }),
+      getExactAlarmPermissionsAsync: async () => ({ granted: exactGranted }),
+      requestExactAlarmPermissionsAsync: async () => { exactRequests++; exactGranted = true; },
+      getAllScheduledNotificationsAsync: async () => [], getPresentedNotificationsAsync: async () => [],
+      setNotificationCategoryAsync: async () => {}, scheduleNotificationAsync: async () => 'id',
+    },
+    TaskManager: { defineTask() {}, isTaskRegisteredAsync: async () => true },
+    supabase: { auth: { onAuthStateChange() {} } }, setTaskRepositoryUser() {}, subscribeTasks() {},
+    loadTasksSnapshot: async () => ({ tasks: [] }), updateTaskFromReminder: async () => {},
+  };
+  const api = new Function(...Object.keys(context), code +
+    '\nreturn { getReminderPermission, requestReminderPermission };')(...Object.values(context));
+  assert.equal(await api.getReminderPermission(), 'exact');
+  await api.requestReminderPermission();
+  assert.equal(exactRequests, 1);
+  assert.equal(await api.getReminderPermission(), 'granted');
 });

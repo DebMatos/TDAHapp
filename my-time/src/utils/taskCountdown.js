@@ -1,5 +1,11 @@
 const MINUTE_MS = 60_000;
 
+export const truncateToMinute = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(Math.floor(date.getTime() / MINUTE_MS) * MINUTE_MS);
+};
+
 const getLocalDateKey = (date) => [
   date.getFullYear(),
   String(date.getMonth() + 1).padStart(2, '0'),
@@ -36,9 +42,9 @@ export const formatTaskCountdown = (minutes, phase) => {
 };
 
 export const getContextualTaskCountdowns = (tasks, nowValue = new Date()) => {
-  const now = nowValue instanceof Date ? nowValue : new Date(nowValue);
+  const now = truncateToMinute(nowValue);
 
-  if (Number.isNaN(now.getTime())) {
+  if (!now) {
     return [];
   }
 
@@ -62,7 +68,8 @@ export const getContextualTaskCountdowns = (tasks, nowValue = new Date()) => {
   ]
     .filter(Boolean)
     .map(({ window, phase, target }) => {
-      const minutes = (target.getTime() - now.getTime()) / MINUTE_MS;
+      const targetMinute = truncateToMinute(target);
+      const minutes = (targetMinute.getTime() - now.getTime()) / MINUTE_MS;
 
       return {
         taskId: window.task.id,

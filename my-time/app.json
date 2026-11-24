@@ -13,7 +13,9 @@
         "backgroundColor": "#121212"
       },
       "softwareKeyboardLayoutMode": "pan",
-      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"],
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
       "package": "com.pedromatos88.mytime"
     },
     "plugins": [
@@ -38,6 +40,9 @@
       "eas": {
         "projectId": "34d9f5f3-ee37-4775-81d6-fbc6ac2288e2"
       }
+    },
+    "ios": {
+      "bundleIdentifier": "com.pedromatos88.mytime"
     }
   }
 }

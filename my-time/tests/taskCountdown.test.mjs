@@ -46,6 +46,33 @@ test('returns current and closest future tasks at the same time', () => {
   ]);
 });
 
+test('ignores seconds and milliseconds before calculating both planned countdowns', () => {
+  const tasks = [
+    task({ id: 'current', startTime: '11:50', durationMinutes: 30 }),
+    task({ id: 'next', startTime: '12:30' }),
+  ];
+
+  assert.deepEqual(
+    getContextualTaskCountdowns(tasks, new Date('2026-11-22T12:00:59.999')),
+    [
+      { taskId: 'current', phase: 'current', minutes: 20, label: '20 min' },
+      { taskId: 'next', phase: 'upcoming', minutes: 30, label: 'daqui a 30 min' },
+    ],
+  );
+});
+
+test('handles minute, hour and day boundaries from the current clock time', () => {
+  const upcoming = task({ id: 'next-day', date: '2026-11-23', startTime: '00:01' });
+  assert.equal(
+    getContextualTaskCountdowns([upcoming], new Date('2026-11-22T23:59:59.900'))[0].minutes,
+    2,
+  );
+  assert.equal(
+    getContextualTaskCountdowns([upcoming], new Date('2026-11-23T00:00:00.000'))[0].minutes,
+    1,
+  );
+});
+
 test('moves to the following task when the current planned block ends', () => {
   const result = getContextualTaskCountdowns([
     task({ id: 'ended', startTime: '11:30', durationMinutes: 30 }),
