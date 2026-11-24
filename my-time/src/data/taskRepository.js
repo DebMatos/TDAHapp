@@ -639,6 +639,10 @@ export const syncOperationWithTimeout = (userId, operation, timeoutMs, reportHtt
 
 export const resumeTaskSync = () => {
   if (!syncOnline || !syncSessionReady) return;
+  // Foreground, reconnection and session recovery are fresh system signals.
+  // Do not leave them blocked behind a JS timer that Android may have suspended.
+  sendRetry.clear();
+  pullRetry.clear();
   syncPendingTasks({ automatic: true, retryAuth: true }).catch(error => {
     console.warn('[Sync] Falha ao retomar envio:', error);
   });
