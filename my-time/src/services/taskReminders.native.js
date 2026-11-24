@@ -40,6 +40,8 @@ const configureChannel = async () => {
     await Notifications.setNotificationChannelAsync(channel, {
       name: 'Avisos de tarefas',
       importance: Notifications.AndroidImportance.DEFAULT,
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 200, 250],
     });
   }
 };

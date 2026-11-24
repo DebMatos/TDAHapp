@@ -38,7 +38,11 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       getAllScheduledNotificationsAsync: async () => [...scheduled.values()],
       cancelScheduledNotificationAsync: async id => scheduled.delete(id),
       getPresentedNotificationsAsync: async () => [], dismissNotificationAsync: async () => {},
-      setNotificationChannelAsync: async () => {},
+      setNotificationChannelAsync: async (id, input) => {
+        assert.equal(id, 'task-reminders');
+        assert.equal(input.enableVibrate, true);
+        assert.deepEqual(input.vibrationPattern, [0, 250, 200, 250]);
+      },
       setNotificationCategoryAsync: async (_, actions) => {
         assert.deepEqual(actions.map(action => [action.buttonTitle, action.options.opensAppToForeground]),
           [['+5 min', false], ['+15 min', false], ['+30 min', false]]);
