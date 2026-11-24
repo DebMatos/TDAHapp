@@ -363,15 +363,20 @@ export const updateTask = async (taskId, changes) => {
 };
 
 export const updateTaskFromReminder = async (userId, taskId, buildChanges) => {
-  if (taskUserId !== userId) return;
+  if (taskUserId !== userId) return false;
+  let applied = false;
   try {
     await commitTaskUpdate(taskId, task => {
       const changes = buildChanges(task);
-      return changes ? updateTaskModel(task, changes) : task;
+      if (!changes) return task;
+      applied = true;
+      return updateTaskModel(task, changes);
     });
   } catch (error) {
     if (!['TASK_NOT_FOUND', 'LOCAL_USER_CHANGED'].includes(error.code)) throw error;
+    return false;
   }
+  return applied;
 };
 
 export const updateTaskAndLoadTasks = async (taskId, changes) => {
@@ -639,6 +644,10 @@ export const syncOperationWithTimeout = (userId, operation, timeoutMs, reportHtt
 
 export const resumeTaskSync = () => {
   if (!syncOnline || !syncSessionReady) return;
+  // Foreground, reconnection and session recovery are fresh system signals.
+  // Do not leave them blocked behind a JS timer that Android may have suspended.
+  sendRetry.clear();
+  pullRetry.clear();
   syncPendingTasks({ automatic: true, retryAuth: true }).catch(error => {
     console.warn('[Sync] Falha ao retomar envio:', error);
   });

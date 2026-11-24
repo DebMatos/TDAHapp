@@ -13,6 +13,7 @@ import {
   Text,
   View,
   Alert,
+  AppState,
   TouchableOpacity,
 } from 'react-native';
 import {
@@ -52,9 +53,9 @@ import {
   getTimelineDate,
   getCivilDateForTimelineSlot,
 } from '../../utils/timelineDate';
-import { roundTimestampToMinuteMs } from '../../domain/taskSessionModel';
 import { getChronometerDurationMs } from '../../utils/trackingChronometer';
 import { getContextualTaskCountdowns } from '../../utils/taskCountdown';
+import { startMinuteClock } from '../../utils/minuteClock';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
 
@@ -267,19 +268,10 @@ export default function TimelineScreen() {
 
   const [timelineNow, setTimelineNow] = useState(Date.now());
 
-  useEffect(() => {
-    let interval = null;
-    const delay = 60_050 - (Date.now() % 60_000);
-    const timeout = setTimeout(() => {
-      setTimelineNow(Date.now());
-      interval = setInterval(() => setTimelineNow(Date.now()), 60_000);
-    }, delay);
-
-    return () => {
-      clearTimeout(timeout);
-      if (interval) clearInterval(interval);
-    };
-  }, []);
+  useEffect(() => startMinuteClock({
+    onTick: setTimelineNow,
+    subscribeAppState: (listener) => AppState.addEventListener('change', listener),
+  }), []);
 
   const now = new Date(timelineNow);
 
@@ -323,11 +315,9 @@ export default function TimelineScreen() {
   const [tasks, setTasks] = useState([]);
   const [trackedTaskId, setTrackedTaskId] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
-  const [trackedDurationMs, setTrackedDurationMs] = useState(0);
   const [trackingSessions, setTrackingSessions] = useState([]);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackingNow, setTrackingNow] = useState(Date.now());
-  const [trackingBaselineAt, setTrackingBaselineAt] = useState(Date.now());
 
   // Tempo real das sessões, independentemente do horário planeado.
   useEffect(() => {
@@ -353,17 +343,10 @@ export default function TimelineScreen() {
     const active = await taskExecution.getActiveSession();
     const taskId = active?.taskId ?? preferredTaskId;
     const timestamp = new Date().toISOString();
-    const [duration, sessions] = taskId
-      ? await Promise.all([
-          taskExecution.getTrackedDurationMs(taskId, timestamp),
-          taskExecution.getTaskSessions(taskId),
-        ])
-      : [0, []];
+    const sessions = taskId ? await taskExecution.getTaskSessions(taskId) : [];
     setActiveSession(active);
     setTrackedTaskId(taskId ?? null);
-    setTrackedDurationMs(duration);
     setTrackingSessions(sessions);
-    setTrackingBaselineAt(Date.parse(timestamp));
     setTrackingNow(Date.parse(timestamp));
   }, []);
 
@@ -387,7 +370,13 @@ export default function TimelineScreen() {
   useEffect(() => {
     if (!activeSession) return;
     const interval = setInterval(() => setTrackingNow(Date.now()), 1000);
-    return () => clearInterval(interval);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setTrackingNow(Date.now());
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, [activeSession]);
 
   const handleTrackingAction = async (taskId, action) => {
@@ -441,13 +430,6 @@ export default function TimelineScreen() {
   };
 
   const trackedTask = tasks.find((task) => task.id === trackedTaskId) ?? null;
-  const liveDurationMs = activeSession
-    ? trackedDurationMs + Math.max(
-        0,
-        roundTimestampToMinuteMs(new Date(trackingNow).toISOString()) -
-          roundTimestampToMinuteMs(new Date(trackingBaselineAt).toISOString()),
-      )
-    : trackedDurationMs;
   const chronometerDurationMs = getChronometerDurationMs(
     trackingSessions,
     trackedTaskId,
@@ -1013,7 +995,7 @@ export default function TimelineScreen() {
         isTracking={activeSession?.taskId === detailsTask?.id}
         trackingBusy={trackingBusy}
         trackedDurationMs={activeSession?.taskId === detailsTask?.id
-          ? liveDurationMs
+          ? chronometerDurationMs
           : detailsTrackedDurationMs}
         onDelete={
           detailsMode === 'edit'

@@ -5,7 +5,7 @@ import {
 } from '../domain/taskSessionModel';
 
 export const formatTrackingMinutes = (minutes) => {
-  const safeMinutes = Math.max(0, Number(minutes) || 0);
+  const safeMinutes = Math.round(Math.max(0, Number(minutes) || 0));
   const hours = Math.floor(safeMinutes / 60);
   const remaining = safeMinutes % 60;
   if (!hours) return `${remaining} min`;
@@ -54,13 +54,13 @@ export const buildTaskSessionHistory = (sessions, taskId, now = new Date().toISO
       ...session,
       startLabel: formatTime(session.startedAt),
       endLabel: session.endedAt === null ? 'Em curso' : formatTime(session.endedAt),
-      durationMinutes: getSessionDurationMs(session, now) / 60000,
+      durationMinutes: Math.round(getSessionDurationMs(session, now) / 60000),
     });
   }
 
   return {
     sessions: unique,
     groups,
-    totalMinutes: getTaskDurationMs(unique, taskId, now) / 60000,
+    totalMinutes: Math.round(getTaskDurationMs(unique, taskId, now) / 60000),
   };
 };

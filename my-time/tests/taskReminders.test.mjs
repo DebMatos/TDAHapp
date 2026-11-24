@@ -7,6 +7,13 @@ const load = code => import('data:text/javascript;base64,' + Buffer.from(code).t
 const plan = await load(source('services/taskReminderPlan.js'));
 const dates = await load(source('utils/taskDateInput.js'));
 const code = source('services/taskReminders.native.js').replace(/^import [\s\S]*?;\n/gm, '').replace(/export /g, '');
+const until = async predicate => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (predicate()) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.fail('condition was not reached');
+};
 
 test('holds one reminder per task, reconciles settings and applies one offline action', async () => {
   let task = { id: 'a', date: '2090-03-10', startTime: '15:00', durationMinutes: 30, status: 'pending', title: 'Estudar Go' };
@@ -24,11 +31,18 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       AndroidImportance: { DEFAULT: 3 }, SchedulableTriggerInputTypes: { DATE: 'date' },
       setNotificationHandler() {}, addNotificationReceivedListener() {},
       addNotificationResponseReceivedListener: fn => { listener = fn; },
-      registerTaskAsync: async () => {}, getPermissionsAsync: async () => ({ granted: true }),
+      registerTaskAsync: async () => {},
+      getPermissionsAsync: async () => ({ granted: true }),
+      getExactAlarmPermissionsAsync: async () => ({ granted: true }),
+      requestExactAlarmPermissionsAsync: async () => ({ granted: true }),
       getAllScheduledNotificationsAsync: async () => [...scheduled.values()],
       cancelScheduledNotificationAsync: async id => scheduled.delete(id),
       getPresentedNotificationsAsync: async () => [], dismissNotificationAsync: async () => {},
-      setNotificationChannelAsync: async () => {},
+      setNotificationChannelAsync: async (id, input) => {
+        assert.equal(id, 'task-reminders');
+        assert.equal(input.enableVibrate, true);
+        assert.deepEqual(input.vibrationPattern, [0, 250, 200, 250]);
+      },
       setNotificationCategoryAsync: async (_, actions) => {
         assert.deepEqual(actions.map(action => [action.buttonTitle, action.options.opensAppToForeground]),
           [['+5 min', false], ['+15 min', false], ['+30 min', false]]);
@@ -39,7 +53,10 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       },
     },
     TaskManager: { defineTask: (_, fn) => { background = fn; }, isTaskRegisteredAsync: async () => false },
-    supabase: { auth: { onAuthStateChange: fn => { auth = fn; } } },
+    supabase: { auth: {
+      onAuthStateChange: fn => { auth = fn; },
+      getSession: async () => ({ data: { session: { user: { id: 'user' } } }, error: null }),
+    } },
     setTaskRepositoryUser() {}, subscribeTasks() {},
     loadTasksSnapshot: async () => ({ tasks: task ? [task] : [] }),
     updateTaskFromReminder: async (user, id, build) => {
@@ -47,6 +64,7 @@ test('holds one reminder per task, reconciles settings and applies one offline a
       assert.equal(id, task.id);
       const changes = build(task);
       if (changes) { writes++; task = { ...task, ...changes, updatedAt: String(writes) }; }
+      return Boolean(changes);
     },
     formatTimeFromMinutes: minutes => [Math.floor(minutes / 60), minutes % 60].map(value => String(value).padStart(2, '0')).join(':'),
   };
@@ -62,15 +80,29 @@ test('holds one reminder per task, reconciles settings and applies one offline a
   assert.equal(scheduled.size, 0);
   assert.deepEqual(await api.readReminderPreferences(), { enabled: false, lead: 5, unit: 'minutes' });
   await api.saveReminderPreferences({ enabled: true, lead: 5 });
-  for (const [actionIdentifier, startTime, fireAt] of [
-    ['5', '15:05', '15:00'], ['15', '15:20', '15:15'], ['30', '15:50', '15:45'],
+  context.AppState.currentState = 'background';
+  let expectedWrites = 0;
+  for (const [actionIdentifier, startTime, fireAt, executor] of [
+    ['5', '15:05', '15:00', 'listener'],
+    ['15', '15:20', '15:15', 'task'],
+    ['30', '15:50', '15:45', 'listener'],
   ]) {
     const response = { actionIdentifier, notification: { request: only() } };
-    listener(response);
-    await background({ data: response });
+    expectedWrites += 1;
+    if (executor === 'listener') listener(response);
+    else await background({ data: response });
+    await until(() => writes === expectedWrites);
     assert.equal(task.startTime, startTime);
     assert.equal(task.durationMinutes, 30);
     assert.equal(only().trigger.date, at(fireAt));
+
+    if (executor === 'listener') await background({ data: response });
+    else {
+      listener(response);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    await until(() => scheduled.size === 1);
+    assert.equal(writes, expectedWrites);
   }
   assert.equal(writes, 3);
   const stale = only();
@@ -106,4 +138,50 @@ test('past alerts are skipped and postponement crosses midnight as a civil sched
   const task = { date: '2090-12-31', startTime: '23:55', durationMinutes: 30, status: 'pending' };
   assert.equal(plan.reminderPlan(task, 15, new Date('2090-12-31T23:50:00').getTime(), 'user', 'kind'), null);
   assert.deepEqual(dates.postponeSchedule('31/12/2090', '23:55', 15), { date: '01/01/2091', startMinutes: 10 });
+});
+
+test('planned notification diagnostics keep task and planned timestamps', () => {
+  const task = {
+    id: 'diagnostic', title: 'Teste', date: '2090-03-10', startTime: '15:00',
+    durationMinutes: 30, status: 'pending', updatedAt: '1',
+  };
+  const result = plan.reminderPlan(task, 15, 0, 'user', 'kind');
+  assert.equal(result.taskId, 'diagnostic');
+  assert.equal(result.plannedAt, '2090-03-10T15:00:00');
+  assert.equal(result.content.data.plannedAt, result.plannedAt);
+  assert.equal(result.content.data.fireAt, result.fireAt);
+});
+
+test('Android does not apply the iOS pending-notification safety limit', () => {
+  assert.match(code, /Platform\.OS === 'ios' \? plans\.slice\(0, 60\) : plans/);
+});
+
+test('service checks and requests exact alarms after notification permission', async () => {
+  let exactGranted = false;
+  let exactRequests = 0;
+  const context = {
+    ...plan, ...dates,
+    AsyncStorage: { getItem: async () => null, setItem: async () => {} },
+    AppState: { currentState: 'active', addEventListener() {} }, Platform: { OS: 'android' },
+    Notifications: {
+      AndroidImportance: { DEFAULT: 3 }, SchedulableTriggerInputTypes: { DATE: 'date' },
+      setNotificationHandler() {}, addNotificationReceivedListener() {},
+      addNotificationResponseReceivedListener() {}, setNotificationChannelAsync: async () => {},
+      getPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
+      requestPermissionsAsync: async () => ({ granted: true }),
+      getExactAlarmPermissionsAsync: async () => ({ granted: exactGranted }),
+      requestExactAlarmPermissionsAsync: async () => { exactRequests++; exactGranted = true; },
+      getAllScheduledNotificationsAsync: async () => [], getPresentedNotificationsAsync: async () => [],
+      setNotificationCategoryAsync: async () => {}, scheduleNotificationAsync: async () => 'id',
+    },
+    TaskManager: { defineTask() {}, isTaskRegisteredAsync: async () => true },
+    supabase: { auth: { onAuthStateChange() {} } }, setTaskRepositoryUser() {}, subscribeTasks() {},
+    loadTasksSnapshot: async () => ({ tasks: [] }), updateTaskFromReminder: async () => {},
+  };
+  const api = new Function(...Object.keys(context), code +
+    '\nreturn { getReminderPermission, requestReminderPermission };')(...Object.values(context));
+  assert.equal(await api.getReminderPermission(), 'exact');
+  await api.requestReminderPermission();
+  assert.equal(exactRequests, 1);
+  assert.equal(await api.getReminderPermission(), 'granted');
 });

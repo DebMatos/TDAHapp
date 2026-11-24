@@ -149,12 +149,18 @@ export default function NotificationSettingsScreen({ navigation }) {
         {remindersSupported && preferences?.enabled && permission && permission !== 'granted' && (
           <View style={styles.permissionNotice}>
             <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
-              {permission === 'blocked' ? 'O sistema bloqueou as notificações da My Time.' : 'Autoriza as notificações para receber avisos.'}
+              {permission === 'blocked'
+                ? 'O sistema bloqueou as notificações da My Time.'
+                : permission === 'exact'
+                  ? 'Autoriza alarmes exatos para melhorar a pontualidade dos avisos no Android.'
+                  : 'Autoriza as notificações para receber avisos.'}
             </Text>
             <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={authorize}
               accessibilityState={{ disabled: busy, busy }} style={styles.permissionAction} activeOpacity={0.7}>
               <Text style={[styles.permissionActionText, { color: colors.selectionText }]}>
-                {permission === 'blocked' ? 'Abrir definições do sistema' : 'Autorizar notificações'}
+                {permission === 'blocked'
+                  ? 'Abrir definições do sistema'
+                  : permission === 'exact' ? 'Autorizar alarmes exatos' : 'Autorizar notificações'}
               </Text>
             </TouchableOpacity>
           </View>

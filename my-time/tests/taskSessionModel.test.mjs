@@ -41,32 +41,32 @@ test('sessões ativas não produzem duração negativa', () => {
   assert.equal(getSessionDurationMs(session, '2026-11-15T14:10:00Z'), 0);
 });
 
-test('arredonda início e fim antes de calcular a duração', () => {
+test('preserva segundos e milissegundos ao calcular a duração', () => {
   const session = {
     id: 'rounded',
     taskId: 't1',
     startedAt: '2026-11-19T21:54:20Z',
     endedAt: '2026-11-19T22:03:40Z',
   };
-  assert.equal(getSessionDurationMs(session), 10 * 60 * 1000);
+  assert.equal(getSessionDurationMs(session), 9 * 60 * 1000 + 20 * 1000);
 });
 
-test('sessões inferiores a um minuto podem resultar em zero minutos', () => {
+test('sessões inferiores a um minuto mantêm a duração real', () => {
   const session = {
     id: 'short',
     taskId: 't1',
     startedAt: '2026-11-19T10:00:10Z',
     endedAt: '2026-11-19T10:00:20Z',
   };
-  assert.equal(getSessionDurationMs(session), 0);
+  assert.equal(getSessionDurationMs(session), 10 * 1000);
 });
 
-test('soma durações individuais arredondadas sem voltar a arredondar o total', () => {
+test('soma várias sessões sem acumular erros de arredondamento', () => {
   const sessions = [
     { id: 'a', taskId: 't1', startedAt: '2026-11-19T10:00:20Z', endedAt: '2026-11-19T10:00:40Z' },
     { id: 'b', taskId: 't1', startedAt: '2026-11-19T11:00:20Z', endedAt: '2026-11-19T11:00:40Z' },
   ];
-  assert.equal(getTaskDurationMs(sessions, 't1'), 2 * 60 * 1000);
+  assert.equal(getTaskDurationMs(sessions, 't1'), 40 * 1000);
 });
 
 test('calcula corretamente uma sessão que atravessa a meia-noite', () => {
@@ -76,5 +76,5 @@ test('calcula corretamente uma sessão que atravessa a meia-noite', () => {
     startedAt: '2026-11-19T23:59:20Z',
     endedAt: '2026-11-20T00:00:40Z',
   };
-  assert.equal(getSessionDurationMs(session), 2 * 60 * 1000);
+  assert.equal(getSessionDurationMs(session), 80 * 1000);
 });

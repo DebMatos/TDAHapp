@@ -416,6 +416,41 @@ test('foreground rechecks the FIFO head after an auth failure with existing conn
   assert.deepEqual(h.sent, ['first', 'first', 'second']);
 });
 
+test('foreground bypasses a scheduled transient send retry', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
+  const h = setup();
+  h.setError({ status: 503 });
+  await assert.rejects(h.repository.syncPendingTasks(), { status: 503 });
+  assert.deepEqual(h.sent, ['first']);
+
+  h.setError(null);
+  h.repository.resumeTaskSync();
+  await until(() => h.observed().sendConfirmed);
+
+  assert.deepEqual(h.sent, ['first', 'first', 'second']);
+  assert.equal(h.state().pendingOps.length, 0);
+});
+
+test('foreground bypasses a scheduled transient pull retry', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: new Date() });
+  let attempt = 0;
+  const h = setup({
+    withPendingOperations: false,
+    loadRemote: async () => {
+      attempt += 1;
+      if (attempt === 1) throw { status: 503 };
+      return [];
+    },
+  });
+  await assert.rejects(h.repository.pullRemoteTasks(), { status: 503 });
+  assert.equal(h.remoteLoads(), 1);
+
+  h.repository.resumeTaskSync();
+  await until(() => h.observed().pullConfirmed && !h.observed().pulling);
+
+  assert.equal(h.remoteLoads(), 2);
+});
+
 test('a token renewal during an in-flight 401 is picked up without another session event', async () => {
   const h = setup();
   const attempted = [];

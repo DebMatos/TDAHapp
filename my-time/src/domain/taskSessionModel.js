@@ -61,10 +61,10 @@ export const stopTaskSession = (session, endedAt = new Date().toISOString()) => 
 
 export const getSessionDurationMs = (session, now = new Date().toISOString()) => {
   const current = normalizeTaskSession(session);
-  const start = roundTimestampToMinuteMs(current.startedAt, 'startedAt');
+  const start = parseTimestamp(current.startedAt, 'startedAt');
   const end = current.endedAt === null
-    ? roundTimestampToMinuteMs(now, 'now')
-    : roundTimestampToMinuteMs(current.endedAt, 'endedAt');
+    ? parseTimestamp(now, 'now')
+    : parseTimestamp(current.endedAt, 'endedAt');
 
   return Math.max(0, end - start);
 };

@@ -113,3 +113,12 @@ test('permission recovery is hidden when system authorization is already granted
   assert.equal(ui.button('Autorizar notificações'), undefined);
   assert.equal(ui.button('Abrir definições do sistema'), undefined);
 });
+
+test('exact alarm authorization has a specific Android recovery action', async () => {
+  const ui = mount(themes.lightColors, 'exact');
+  await Promise.resolve();
+  assert.ok(ui.render().some(node => node.children.includes(
+    'Autoriza alarmes exatos para melhorar a pontualidade dos avisos no Android.',
+  )));
+  assert.ok(ui.button('Autorizar alarmes exatos'));
+});

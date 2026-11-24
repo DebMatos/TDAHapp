@@ -37,7 +37,7 @@ test('duration and completed comparison use natural Portuguese copy', () => {
   assert.equal(history.getTrackingComparisonLabel(80, 80), 'Dentro do previsto');
 });
 
-test('visible times and duration use the same rounded endpoints', () => {
+test('visible duration rounds the precise tracked interval only after calculation', () => {
   const result = history.buildTaskSessionHistory([{
     id: 'rounded',
     taskId: 't1',
@@ -47,7 +47,16 @@ test('visible times and duration use the same rounded endpoints', () => {
   const session = result.groups[0].sessions[0];
   assert.equal(session.startLabel, '21:54');
   assert.equal(session.endLabel, '22:04');
-  assert.equal(session.durationMinutes, 10);
-  assert.equal(result.totalMinutes, 10);
+  assert.equal(session.durationMinutes, 9);
+  assert.equal(result.totalMinutes, 9);
   assert.equal(result.groups[0].label, '19 de novembro');
+});
+
+test('total rounds only after accumulating multiple precise sessions', () => {
+  const result = history.buildTaskSessionHistory([
+    { id: 'a', taskId: 't1', startedAt: '2026-11-19T10:00:20Z', endedAt: '2026-11-19T10:00:40Z' },
+    { id: 'b', taskId: 't1', startedAt: '2026-11-19T11:00:20Z', endedAt: '2026-11-19T11:00:40Z' },
+  ], 't1');
+
+  assert.equal(result.totalMinutes, 1);
 });
