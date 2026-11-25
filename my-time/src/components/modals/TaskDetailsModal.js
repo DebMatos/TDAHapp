@@ -206,6 +206,7 @@ export default function TaskDetailsModal({
   banner,
   onDismissBanner,
   onDelete,
+  onCopy,
   onStartTracking,
   onOpenSessionHistory,
   isTracking = false,
@@ -919,6 +920,11 @@ export default function TaskDetailsModal({
     }
   };
 
+  const handleCopy = () => {
+    if (isBusy || !onCopy) return;
+    onCopy();
+  };
+
   const closeInlineEditor = () => {
     setActiveField(null);
     Keyboard.dismiss();
@@ -1576,6 +1582,21 @@ export default function TaskDetailsModal({
               )}
               {/* DELETE */}
 
+              {isEdit && onCopy && (
+                <TouchableOpacity
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isBusy }}
+                  accessibilityLabel="Copiar tarefa"
+                  style={styles.copyTaskButton}
+                  activeOpacity={0.7}
+                  onPress={handleCopy}
+                >
+                  <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
+                  <Text style={styles.copyTaskText}>Copiar tarefa</Text>
+                </TouchableOpacity>
+              )}
+
               {isEdit && onDelete && (
                 <TouchableOpacity
                   disabled={isBusy}
@@ -2133,6 +2154,22 @@ const createStyles = (colors) => {
       gap: 7,
 
       borderRadius: 8,
+    },
+    copyTaskButton: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 8,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    copyTaskText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
     },
 
     deleteTaskText: {

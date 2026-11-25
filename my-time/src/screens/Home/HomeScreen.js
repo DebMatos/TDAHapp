@@ -58,6 +58,11 @@ import { getContextualTaskCountdowns } from '../../utils/taskCountdown';
 import { startMinuteClock } from '../../utils/minuteClock';
 import { getHomeScreenStyles } from './HomeScreen.styles';
 import { getFloatingButtonStyles } from '../../theme/styles/buttons.styles';
+import {
+  buildPastedTask,
+  getCopiedTask,
+  storeCopiedTask,
+} from '../../domain/taskClipboard';
 
 /* -------------------------------------------------------
    TIMELINE
@@ -248,6 +253,7 @@ export default function TimelineScreen() {
   const buttonStyles = getFloatingButtonStyles(isDark);
   const verticalSegments = useMemo(() => getVerticalSegments(colors), [colors]);
   const [taskError, setTaskError] = useState(null);
+  const [copiedTask, setCopiedTask] = useState(getCopiedTask);
   const banner = taskError;
   const dismissBanner = () => setTaskError(null);
   const showTaskError = (title, error) => {
@@ -716,6 +722,40 @@ export default function TimelineScreen() {
     }
   };
 
+  const pasteTaskAt = async (slotMinutes) => {
+    if (!copiedTask) return;
+
+    setTaskError(null);
+    try {
+      await taskService.createTask(buildPastedTask(copiedTask, {
+        date: getDateKey(
+          getCivilDateForTimelineSlot(selectedTimelineDate, slotMinutes),
+        ),
+        startTime: formatTimeFromMinutes(slotMinutes),
+      }));
+    } catch (error) {
+      showTaskError('Não foi possível colar a tarefa', error);
+    }
+  };
+
+  const openCreateAt = (slotMinutes) => {
+    setTargetSlotMinutes(slotMinutes);
+    setModalVisible(true);
+  };
+
+  const chooseTimelineAction = (slotMinutes) => {
+    if (!copiedTask) {
+      openCreateAt(slotMinutes);
+      return;
+    }
+
+    Alert.alert('Adicionar tarefa', 'O que pretende fazer neste horário?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Nova tarefa', onPress: () => openCreateAt(slotMinutes) },
+      { text: 'Colar tarefa', onPress: () => void pasteTaskAt(slotMinutes) },
+    ]);
+  };
+
   /* -------------------------------------------------------
      TOQUE NA TIMELINE -> CRIAR
   ------------------------------------------------------- */
@@ -817,9 +857,7 @@ export default function TimelineScreen() {
         return;
       }
 
-      setTargetSlotMinutes(snappedMinute);
-
-      setModalVisible(true);
+      chooseTimelineAction(snappedMinute);
     });
   };
 
@@ -1008,6 +1046,18 @@ export default function TimelineScreen() {
                 } catch (error) {
                   showTaskError('Não foi possível apagar a tarefa', error);
                 }
+              }
+            : undefined
+        }
+        onCopy={
+          detailsMode === 'edit'
+            ? () => {
+                setCopiedTask(storeCopiedTask(detailsTask));
+                setTaskError({
+                  tone: 'info',
+                  title: 'Tarefa copiada',
+                  message: 'Pode colá-la com uma pressão prolongada na timeline.',
+                });
               }
             : undefined
         }

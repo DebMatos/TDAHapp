@@ -126,6 +126,13 @@ test('a time selection updates the details draft and closes without saving the t
   assert.equal(h.timePicker(), undefined);
   assert.equal(h.saved.length, 0);
 });
+test('edit details expose copy without changing or saving the task', () => {
+  let copies = 0;
+  const h = harness(lightColors, { onCopy: () => { copies += 1; } });
+  h.button('Copiar tarefa').props.onPress();
+  assert.equal(copies, 1);
+  assert.equal(h.saved.length, 0);
+});
 test('calendar toggles, updates only the draft and saves the civil date with the existing schedule', async () => {
   const h = harness();
   for (let i = 0; i < 3; i++) {
