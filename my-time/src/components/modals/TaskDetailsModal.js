@@ -23,7 +23,7 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCategory, getCategoryOptions } from '../../config/categories';
+import { useCategories } from '../../data/CategoryContext';
 import { useTheme } from '../../theme/ThemeContext';
 import {
   createTaskSheetStyles,
@@ -214,9 +214,9 @@ export default function TaskDetailsModal({
   trackedDurationMs = null,
 }) {
   const { colors, isDark } = useTheme();
+  const { favoriteCategories: categoryOptions, resolveCategory } = useCategories();
   const buttonStyles = getFloatingButtonStyles(isDark);
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
   const insets = useSafeAreaInsets();
   const EXPANDED_SHEET_HEIGHT = Math.max(MIN_SHEET_HEIGHT, SCREEN_HEIGHT - insets.top);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
@@ -224,7 +224,15 @@ export default function TaskDetailsModal({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copyConfirmed, setCopyConfirmed] = useState(false);
+  const copyFeedbackTimer = useRef(null);
   const isBusy = isSaving || isDeleting;
+
+  useEffect(() => () => clearTimeout(copyFeedbackTimer.current), []);
+  useEffect(() => {
+    setCopyConfirmed(false);
+    clearTimeout(copyFeedbackTimer.current);
+  }, [visible, initialValues?.id]);
 
   const [title, setTitle] = useState('');
 
@@ -293,7 +301,7 @@ export default function TaskDetailsModal({
   };
 
   const dragStartHeightRef = useRef(NORMAL_SHEET_HEIGHT);
-  const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
+  const selectedCategory = useMemo(() => resolveCategory(categoryId), [categoryId, resolveCategory]);
 
   const currentSnapshot = useMemo(
     () =>
@@ -923,6 +931,10 @@ export default function TaskDetailsModal({
   const handleCopy = () => {
     if (isBusy || !onCopy) return;
     onCopy();
+    setCopyConfirmed(true);
+    clearTimeout(copyFeedbackTimer.current);
+    copyFeedbackTimer.current = setTimeout(() => setCopyConfirmed(false), 1200);
+    copyFeedbackTimer.current?.unref?.();
   };
 
   const closeInlineEditor = () => {
@@ -1172,6 +1184,23 @@ export default function TaskDetailsModal({
                   <Text style={styles.editTitle} numberOfLines={3}>
                     {title || 'O que vais fazer?'}
                   </Text>
+                </TouchableOpacity>
+              )}
+              {isEdit && onCopy && (
+                <TouchableOpacity
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isBusy }}
+                  accessibilityLabel={copyConfirmed ? 'Tarefa copiada' : 'Copiar tarefa'}
+                  style={styles.copyHeaderButton}
+                  activeOpacity={0.65}
+                  onPress={handleCopy}
+                >
+                  <Ionicons
+                    name={copyConfirmed ? 'checkmark' : 'copy-outline'}
+                    size={19}
+                    color={copyConfirmed ? colors.selectionText : colors.textMuted}
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -1582,21 +1611,6 @@ export default function TaskDetailsModal({
               )}
               {/* DELETE */}
 
-              {isEdit && onCopy && (
-                <TouchableOpacity
-                  disabled={isBusy}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isBusy }}
-                  accessibilityLabel="Copiar tarefa"
-                  style={styles.copyTaskButton}
-                  activeOpacity={0.7}
-                  onPress={handleCopy}
-                >
-                  <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
-                  <Text style={styles.copyTaskText}>Copiar tarefa</Text>
-                </TouchableOpacity>
-              )}
-
               {isEdit && onDelete && (
                 <TouchableOpacity
                   disabled={isBusy}
@@ -1729,6 +1743,14 @@ const createStyles = (colors) => {
 
     titleCategoryIcon: {
       flexShrink: 0,
+    },
+
+    copyHeaderButton: {
+      width: 44,
+      height: 44,
+      flexShrink: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     titleInput: {
@@ -2155,23 +2177,6 @@ const createStyles = (colors) => {
 
       borderRadius: 8,
     },
-    copyTaskButton: {
-      minHeight: 48,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: 8,
-      borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-    },
-    copyTaskText: {
-      color: colors.textSecondary,
-      fontSize: 14,
-      fontWeight: '600',
-    },
-
     deleteTaskText: {
       fontSize: 13,
 

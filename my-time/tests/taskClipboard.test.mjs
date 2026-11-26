@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
+const homeSource = fs.readFileSync(new URL('../src/screens/Home/HomeScreen.js', import.meta.url), 'utf8');
+const homeStylesSource = fs.readFileSync(new URL('../src/screens/Home/HomeScreen.styles.ts', import.meta.url), 'utf8');
+const detailsSource = fs.readFileSync(new URL('../src/components/modals/TaskDetailsModal.js', import.meta.url), 'utf8');
+
 const source = fs.readFileSync(
   new URL('../src/domain/taskClipboard.js', import.meta.url),
   'utf8',
@@ -84,4 +88,30 @@ test('application clipboard keeps only the latest copied task', () => {
 
   assert.equal(clipboard.getCopiedTask().title, 'Segunda tarefa');
   assert.equal('id' in clipboard.getCopiedTask(), false);
+});
+
+test('timeline uses a contextual paste toolbar instead of a native alert', () => {
+  assert.equal(homeSource.includes("Alert.alert('Adicionar tarefa'"), false);
+  assert.match(homeSource, /accessibilityLabel="Ações da timeline"/);
+  assert.match(homeSource, /accessibilityLabel="Cancelar"/);
+  assert.match(homeSource, /accessibilityLabel="Colar tarefa"/);
+  assert.match(homeSource, /accessibilityLabel="Criar nova tarefa"/);
+  assert.match(homeSource, /setTimelineAction\(null\)/);
+});
+
+test('paste toolbar follows the task-card column and keeps paste visually light', () => {
+  assert.match(homeSource, /viewportWidth - TASK_CARD_LEFT - TASK_CARD_RIGHT/);
+  assert.match(homeSource, /const left = TASK_CARD_LEFT/);
+  assert.match(homeSource, /getVisualY\(timelineAction\.slotMinutes\) - scrollYRef\.current/);
+  assert.match(homeSource, /name="clipboard-outline"/);
+  assert.equal(homeSource.includes('styles.timelineActionPrimary}'), false);
+  assert.match(homeStylesSource, /timelineActionPrimaryText: \{ color: colors\.selectionText \}/);
+  assert.match(homeStylesSource, /colors === lightColors[\s\S]*shadowOpacity: 0\.1/);
+});
+
+test('copy action is icon-only in the task header and has no success banner', () => {
+  assert.match(detailsSource, /style=\{styles\.copyHeaderButton\}/);
+  assert.match(detailsSource, /copyConfirmed \? 'checkmark' : 'copy-outline'/);
+  assert.equal(detailsSource.includes('copyTaskText'), false);
+  assert.equal(homeSource.includes("title: 'Tarefa copiada'"), false);
 });

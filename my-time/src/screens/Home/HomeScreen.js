@@ -15,6 +15,7 @@ import {
   Alert,
   AppState,
   TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import {
   DAY_MINUTES,
@@ -30,6 +31,7 @@ import {
 } from '../../utils/time';
 
 import {useNavigation} from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getDateKey, isSameDay, addDays } from '../../utils/date';
 import * as taskService from '../../services/taskService';
@@ -294,7 +296,6 @@ export default function TimelineScreen() {
   const scrollYRef = useRef(0);
 
   const viewportWindowYRef = useRef(0);
-
   const tapStartRef = useRef(null);
 
   const touchMovedRef = useRef(false);
@@ -469,6 +470,8 @@ export default function TimelineScreen() {
   const [modalVisible, setModalVisible] = useState(false);
 
   const [targetSlotMinutes, setTargetSlotMinutes] = useState(null);
+  const [timelineAction, setTimelineAction] = useState(null);
+  useEffect(() => setTimelineAction(null), [selectedTimelineDateKey]);
   const goToPreviousDay = () => {
     setSelectedTimelineDate((current) => addDays(current, -1));
   };
@@ -748,12 +751,7 @@ export default function TimelineScreen() {
       openCreateAt(slotMinutes);
       return;
     }
-
-    Alert.alert('Adicionar tarefa', 'O que pretende fazer neste horário?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Nova tarefa', onPress: () => openCreateAt(slotMinutes) },
-      { text: 'Colar tarefa', onPress: () => void pasteTaskAt(slotMinutes) },
-    ]);
+    setTimelineAction({ slotMinutes });
   };
 
   /* -------------------------------------------------------
@@ -1053,11 +1051,6 @@ export default function TimelineScreen() {
           detailsMode === 'edit'
             ? () => {
                 setCopiedTask(storeCopiedTask(detailsTask));
-                setTaskError({
-                  tone: 'info',
-                  title: 'Tarefa copiada',
-                  message: 'Pode colá-la com uma pressão prolongada na timeline.',
-                });
               }
             : undefined
         }
@@ -1288,6 +1281,42 @@ export default function TimelineScreen() {
             )}
           </View>
         </ScrollView>
+        {timelineAction && (() => {
+          const width = Math.max(0, viewportWidth - TASK_CARD_LEFT - TASK_CARD_RIGHT);
+          const left = TASK_CARD_LEFT;
+          const top = clamp(
+            getVisualY(timelineAction.slotMinutes) - scrollYRef.current,
+            8,
+            Math.max(8, viewportHeight - 56),
+          );
+          const selectAction = (action) => {
+            const slotMinutes = timelineAction.slotMinutes;
+            setTimelineAction(null);
+            action(slotMinutes);
+          };
+          return <>
+            <Pressable accessible={false} style={styles.timelineActionDismiss} onPress={() => setTimelineAction(null)} />
+            <View accessibilityRole="toolbar" accessibilityLabel="Ações da timeline"
+              style={[styles.timelineActionBar, { width, left, top }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancelar" onPress={() => setTimelineAction(null)}
+                style={styles.timelineActionButton}>
+                <Text style={styles.timelineActionText}>Cancelar</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Colar tarefa"
+                onPress={() => selectAction(slot => void pasteTaskAt(slot))}
+                style={styles.timelineActionButton}>
+                <View style={styles.timelinePasteContent}>
+                  <Ionicons name="clipboard-outline" size={17} color={colors.selectionText} />
+                  <Text style={[styles.timelineActionText, styles.timelineActionPrimaryText]}>Colar</Text>
+                </View>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Criar nova tarefa"
+                onPress={() => selectAction(openCreateAt)} style={styles.timelineActionButton}>
+                <Text style={styles.timelineActionText}>Nova tarefa</Text>
+              </Pressable>
+            </View>
+          </>;
+        })()}
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Ir para agora"

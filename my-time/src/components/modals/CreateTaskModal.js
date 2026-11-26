@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 
-import { getCategory, getCategoryOptions } from '../../config/categories';
+import { useCategories } from '../../data/CategoryContext';
 import { useTheme } from '../../theme/ThemeContext';
 import {
   createTaskSheetStyles,
@@ -88,10 +88,10 @@ export default function CreateTaskModal({
   initialMinutes = null,
 }) {
   const { colors, isDark } = useTheme();
+  const { favoriteCategories: categoryOptions, resolveCategory } = useCategories();
   const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const buttonStyles = getFloatingButtonStyles(isDark);
-  const categoryOptions = useMemo(() => getCategoryOptions(colors), [colors]);
   const priorityOptions = useMemo(() => getPriorityOptions(colors), [colors]);
   const [title, setTitle] = useState('');
 
@@ -140,7 +140,7 @@ export default function CreateTaskModal({
     return stopSheetAnimation;
   }, [visible, expandedContent, stopSheetAnimation]);
 
-  const selectedCategory = useMemo(() => getCategory(categoryId, colors), [categoryId, colors]);
+  const selectedCategory = useMemo(() => resolveCategory(categoryId), [categoryId, resolveCategory]);
 
   const selectedPriority = priorityOptions.find((item) => item.id === priority);
   /* -------------------------------------------------------

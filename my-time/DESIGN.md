@@ -80,6 +80,14 @@ Colors come from `src/theme/colors.js`.
 
 ## Components
 
+Category management uses one scrollable screen with quiet surface cards, the existing
+gold `now` token for the single create disclosure, and inline expansion for both create
+and edit. Category identity comes from user-selected color and a thin Ionicons glyph;
+actions remain neutral except the reversible archive action. Favorites expose a visible
+count, native drag ordering, and labelled move-up/move-down alternatives. Archived
+categories stay behind a closed disclosure by default. The same geometry and hierarchy
+are retained across themes; only canonical theme surfaces, borders and text roles change.
+
 Settings groups notification controls on the existing surface. The numeric lead
 and its inline unit selector share one soft surface, with small shortcuts beneath.
 Selection uses the active theme's selection tokens; in light mode the selected unit
@@ -218,6 +226,16 @@ blur or switching fields; selectors close on selection. Notes keep multiline inp
 The sheet save action still owns persistence. Postponement actions share a compact horizontal bar,
 including the existing Tomorrow shortcut. Read rows have no added surfaces or
 borders, and category, priority and status colors retain their semantic roles.
+
+Task copying is a quiet header utility in edit details: a borderless 44 px touch
+target contains only the thin copy glyph and briefly swaps it for a checkmark.
+Copying never opens a banner or toast. A long press on an empty timeline slot with
+a copied task opens a compact, non-modal contextual bar aligned with the task-card
+column at that slot. Cancel, Paste and New task share the existing timeline surface;
+Paste alone uses a clipboard glyph and selection-colored text without a separate
+background. The light theme adds the same restrained shadow language used by floating
+surfaces; dark remains flat. The bar clamps to the timeline viewport and closes on
+selection or outside touch without dimming or hiding the timeline.
 
 Details date editing uses `InlineDatePicker` inside the form scroll, immediately
 after the date/time/duration line and before category, without a second modal or native dialog. It has a Monday-first calendar,

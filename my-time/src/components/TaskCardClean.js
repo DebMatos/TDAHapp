@@ -15,9 +15,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getCategory } from '../config/categories';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { getCategory } from '../config/categories';
 
 const CARD_LEFT = 58;
 const CARD_RIGHT = 16;

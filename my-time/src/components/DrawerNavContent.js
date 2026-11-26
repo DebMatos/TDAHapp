@@ -62,6 +62,16 @@ export function DrawerNavContent(props) {
         </View>
         <TouchableOpacity
           style={styles.navItem}
+          onPress={() => props.navigation.navigate('Categories')}
+          accessibilityRole="button"
+          accessibilityLabel="Gerir categorias"
+          activeOpacity={0.7}
+        >
+          <Ionicons name="pricetags-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.navItemText, { color: colors.text }]}>Categorias</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navItem}
           onPress={() => props.navigation.navigate('SyncStatus')}
           accessibilityRole="button"
           accessibilityLabel="Abrir estado da sincronização"

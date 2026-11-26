@@ -13,7 +13,10 @@ import HomeScreen from './src/screens/Home/HomeScreen';
 import SyncStatusScreen from './src/screens/SyncStatusScreen';
 import NotificationSettingsScreen from './src/screens/NotificationSettingsScreen';
 import TaskSessionHistoryScreen from './src/screens/TaskSessionHistoryScreen';
+import CategoryManagementScreen from './src/screens/CategoryManagementScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { CategoryProvider } from './src/data/CategoryContext';
+import { setCategoryRepositoryUser, setCategorySyncState, syncCategories } from './src/data/categoryRepository';
 import {
   resumeTaskSync,
   setTaskRepositoryUser,
@@ -56,6 +59,7 @@ function AppContent() {
       const userId = nextSession?.user?.id ?? null;
       setTaskRepositoryUser(userId);
       setTaskSessionRepositoryUser(userId);
+      setCategoryRepositoryUser(userId);
       setSession(nextSession);
     };
     const {
@@ -151,6 +155,7 @@ function AppContent() {
       const online = state.isConnected === true && state.isInternetReachable === true;
       setTaskSyncOnline(online, source, state);
       setTaskSessionSyncOnline(online);
+      setCategorySyncState({ isOnline: online });
       const reconnected = online && !wasOnline;
       wasOnline = online;
       return reconnected;
@@ -175,10 +180,12 @@ function AppContent() {
         // A listener may already have supplied newer connectivity during refresh.
         resumeTaskSync();
         syncTaskSessions().catch(() => {});
+        void syncCategories();
       }).catch((error) => {
         if (active && activity === activityRevision) {
           resumeTaskSync();
           syncTaskSessions().catch(() => {});
+          void syncCategories();
         }
         console.warn('[Sync] Não foi possível verificar a ligação:', error);
       });
@@ -190,10 +197,12 @@ function AppContent() {
       subscription.remove();
       setTaskSyncOnline(false, 'Fim da subscrição');
       setTaskSessionSyncOnline(false);
+      setCategorySyncState({ isOnline: false });
     };
   }, [session?.user?.id]);
   useEffect(() => {
     setTaskSyncSessionReady(Boolean(session?.user?.id && session?.access_token));
+    setCategorySyncState({ isSessionReady: Boolean(session?.user?.id && session?.access_token) });
   }, [session?.user?.id, session?.access_token]);
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -240,7 +249,7 @@ function AppContent() {
               },
             }}
           >
-            <Drawer.Navigator
+            <CategoryProvider><Drawer.Navigator
               drawerContent={(props) => <DrawerNavContent {...props} />}
               screenOptions={{
                 headerShown: false,
@@ -256,7 +265,8 @@ function AppContent() {
               <Drawer.Screen name="SyncStatus" component={SyncStatusScreen} />
               <Drawer.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
               <Drawer.Screen name="TaskSessionHistory" component={TaskSessionHistoryScreen} />
-            </Drawer.Navigator>
+              <Drawer.Screen name="Categories" component={CategoryManagementScreen} />
+            </Drawer.Navigator></CategoryProvider>
           </NavigationContainer>
         ) : (
           <AuthScreen

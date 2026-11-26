@@ -32,6 +32,7 @@ function harness(colors = lightColors, overrides = {}) {
     requestAnimationFrame: fn => fn(),
     useLayoutEffect: fn => layouts.push(fn),
     useTheme: () => ({ colors, isDark: colors === darkColors }), useSafeAreaInsets: () => ({ top: 24, bottom: 24 }), ...dates,
+    useCategories: () => ({ favoriteCategories: categories.getCategoryOptions(colors), resolveCategory: id => categories.getCategory(id, colors) }),
     getFloatingButtonStyles: () => ({ floatingButton: {} }), KeyboardAvoidingView: 'keyboardAvoiding',
     formatTimeInput: times.formatTimeInput, isValidTime: times.isValidTime, ...categories,
     formatTrackingMinutes: minutes => `${Math.max(0, Math.round(minutes))} min`,
@@ -132,6 +133,8 @@ test('edit details expose copy without changing or saving the task', () => {
   h.button('Copiar tarefa').props.onPress();
   assert.equal(copies, 1);
   assert.equal(h.saved.length, 0);
+  const confirmed = h.button('Tarefa copiada');
+  assert.ok(confirmed.children.some(child => child?.props?.name === 'checkmark'));
 });
 test('calendar toggles, updates only the draft and saves the civil date with the existing schedule', async () => {
   const h = harness();
